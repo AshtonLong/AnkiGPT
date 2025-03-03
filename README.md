@@ -53,6 +53,26 @@ A beautiful, modern web application that uses AI to automatically generate Anki 
 
 5. Open your browser and navigate to `http://localhost:5000`
 
+## ❓ Frequently Asked Questions
+
+### What is AnkiGPT?
+AnkiGPT is a web application that leverages AI to automatically generate Anki flashcards from your notes and study materials, saving you time and effort in creating effective study materials.
+
+### How does AnkiGPT work?
+AnkiGPT uses Google Gemini AI to analyze your text input and intelligently create cloze deletion cards that highlight key concepts. The AI identifies important information and creates optimal cards for memorization.
+
+### Is AnkiGPT free to use?
+AnkiGPT requires a Google Gemini API key, which as of right now offers generous rate limits on the Flash series of models. So yes, as of right now this app can be used for free.
+
+### What types of content work best with AnkiGPT?
+AnkiGPT works best with clearly structured content like lecture notes, textbook chapters, and study guides. It's particularly effective for subjects that require memorization of key facts, definitions, and concepts.
+
+### Can I edit the cards before exporting to Anki?
+Yes! AnkiGPT provides a preview and editing interface so you can review and modify all generated cards before exporting them to an Anki-compatible file.
+
+### How do I import the generated cards into Anki?
+After generating and reviewing your cards, you can export them as an .apkg file with one click. Then, simply open Anki and double click the .apkg file to import it.
+
 ## 👨‍💻 Author
 
 **Ashton Long**
