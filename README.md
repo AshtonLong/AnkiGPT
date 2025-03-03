@@ -46,12 +46,7 @@ A beautiful, modern web application that uses AI to automatically generate Anki 
    pip install -r requirements.txt
    ```
 
-3. Create a `.env` file with your Gemini API key:
-   ```
-   GEMINI_API_KEY=your_api_key_here
-   ```
-
-4. Run the application:
+3. Run the application:
    ```bash
    python app.py
    ```
