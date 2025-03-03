@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}AnkiGPT - Generating Your Cards{% endblock %}
+
+{% block head %}
+<!-- Inline styles moved to style.css -->
+{% endblock %}
+
+{% block content %}
+<div class="loading-container">
+    <!-- Hidden form that will be submitted automatically -->
+    <form id="processingForm" action="{{ url_for('generate') }}" method="post">
+        <input type="hidden" name="notes" value="{{ session.get('notes_text', '') }}">
+        <input type="hidden" name="deck_name" value="{{ session.get('deck_name', '') }}">
+        <input type="hidden" name="card_count" value="{{ session.get('card_count', '15-25') }}">
+        <input type="hidden" name="focus_area" value="{{ session.get('focus_area', 'balanced') }}">
+    </form>
+    
+    <div class="brain-loader" data-aos="fade-in">
+        <div class="loader-ring"></div>
+        <div class="loader-ring"></div>
+        <div class="loader-ring"></div>
+        <div class="brain-icon">
+            <i class="fas fa-brain"></i>
+        </div>
+    </div>
+    
+    <h1 class="mb-3" data-aos="fade-up" data-aos-delay="200">Generating Your Anki Cards</h1>
+    <p class="lead mb-4" data-aos="fade-up" data-aos-delay="300">Our AI is analyzing your notes and creating high-quality flashcards</p>
+    
+    <div class="progress-container" data-aos="fade-up" data-aos-delay="400">
+        <div class="progress">
+            <div class="progress-bar" role="progressbar"></div>
+        </div>
+        <div class="status-message mt-2">
+            Processing<span>.</span><span>.</span><span>.</span>
+        </div>
+    </div>
+    
+    <div class="ai-steps" data-aos="fade-up" data-aos-delay="500">
+        <div class="ai-step completed" id="step1">
+            <div class="step-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="step-content">
+                <h6 class="mb-0">Analyzing your notes</h6>
+                <small class="text-muted">Identifying key concepts and information</small>
+            </div>
+        </div>
+        
+        <div class="ai-step active" id="step2">
+            <div class="step-icon">
+                <i class="fas fa-brain"></i>
+            </div>
+            <div class="step-content">
+                <h6 class="mb-0">Processing with AI</h6>
+                <small class="text-muted">Using advanced algorithms to understand the content</small>
+            </div>
+        </div>
+        
+        <div class="ai-step" id="step3">
+            <div class="step-icon">
+                <i class="fas fa-clone"></i>
+            </div>
+            <div class="step-content">
+                <h6 class="mb-0">Creating cloze cards</h6>
+                <small class="text-muted">Generating effective flashcards from your material</small>
+            </div>
+        </div>
+        
+        <div class="ai-step" id="step4">
+            <div class="step-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="step-content">
+                <h6 class="mb-0">Finalizing</h6>
+                <small class="text-muted">Preparing your cards for review</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="fun-fact" data-aos="fade-up" data-aos-delay="600">
+        <h6 class="fun-fact-title">Did you know?</h6>
+        <div class="fun-fact-content">
+            <p class="fun-fact-text active" data-index="0">Spaced repetition, the learning technique used by Anki, can improve long-term retention by up to 50% compared to traditional study methods.</p>
+            <p class="fun-fact-text" data-index="1">The average medical student creates over 10,000 flashcards during their education.</p>
+            <p class="fun-fact-text" data-index="2">Studies show that active recall testing is one of the most effective learning strategies.</p>
+            <p class="fun-fact-text" data-index="3">The 'forgetting curve' shows we forget about 70% of what we learn within 24 hours without review.</p>
+            <p class="fun-fact-text" data-index="4">Anki was created in 2006 by Damien Elmes and has been used by millions of students worldwide.</p>
+        </div>
+        <div class="fun-fact-indicator">
+            <span class="fun-fact-dot active" data-index="0"></span>
+            <span class="fun-fact-dot" data-index="1"></span>
+            <span class="fun-fact-dot" data-index="2"></span>
+            <span class="fun-fact-dot" data-index="3"></span>
+            <span class="fun-fact-dot" data-index="4"></span>
+        </div>
+    </div>
+    
+    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary cancel-btn" data-aos="fade-up" data-aos-delay="700">
+        <i class="fas fa-times me-2"></i> Cancel
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Progress bar animation
+        const progressBar = document.querySelector('.progress-bar');
+        let width = 0;
+        const interval = setInterval(function() {
+            if (width >= 90) {
+                clearInterval(interval);
+            } else {
+                width += Math.random() * 2;
+                progressBar.style.width = width + '%';
+            }
+        }, 300);
+        
+        // Dots animation for status message
+        const statusDots = document.querySelectorAll('.status-message span');
+        let dotIndex = 0;
+        setInterval(function() {
+            statusDots.forEach(dot => dot.style.opacity = '0.3');
+            statusDots[dotIndex].style.opacity = '1';
+            dotIndex = (dotIndex + 1) % statusDots.length;
+        }, 500);
+        
+        // Fun fact rotation
+        const facts = document.querySelectorAll('.fun-fact-text');
+        const factDots = document.querySelectorAll('.fun-fact-dot');
+        let currentFact = 0;
+        
+        // Manual navigation with dots
+        factDots.forEach(dot => {
+            dot.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                showFact(index);
+            });
+        });
+        
+        // Auto-rotate facts every 8 seconds
+        setInterval(function() {
+            const nextFact = (currentFact + 1) % facts.length;
+            showFact(nextFact);
+        }, 8000);
+        
+        function showFact(index) {
+            // Remove active class from current fact and add fade-out
+            facts[currentFact].classList.remove('active');
+            facts[currentFact].classList.add('fade-out');
+            factDots[currentFact].classList.remove('active');
+            
+            // Add active class to new fact
+            setTimeout(function() {
+                facts[currentFact].classList.remove('fade-out');
+                currentFact = index;
+                facts[currentFact].classList.add('active');
+                factDots[currentFact].classList.add('active');
+            }, 300);
+        }
+        
+        // AI steps animation
+        const steps = document.querySelectorAll('.ai-step');
+        let currentStep = 1; // Start with step 2 (index 1) as active
+        
+        // Simulate AI processing steps
+        setTimeout(function() {
+            const stepInterval = setInterval(function() {
+                if (currentStep >= steps.length - 1) {
+                    clearInterval(stepInterval);
+                    
+                    // When all steps are complete, submit the form
+                    setTimeout(function() {
+                        document.getElementById('processingForm').submit();
+                    }, 1500);
+                } else {
+                    // Mark current step as completed and activate next step
+                    steps[currentStep].classList.remove('active');
+                    steps[currentStep].classList.add('completed');
+                    currentStep++;
+                    steps[currentStep].classList.add('active');
+                }
+            }, 3000); // Each step takes 3 seconds
+        }, 2000); // Start after 2 seconds
+    });
+</script>
+{% endblock %} 

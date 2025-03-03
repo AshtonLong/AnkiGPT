@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}AnkiGPT - Export Successful{% endblock %}
+
+{% block head %}
+<!-- Inline styles moved to style.css -->
+{% endblock %}
+
+{% block content %}
+<div id="confetti-container"></div>
+
+<div class="success-container">
+    <div class="success-icon">
+        <i class="fas fa-check"></i>
+    </div>
+    
+    <h1 class="mb-3">Export Successful!</h1>
+    <p class="lead mb-4">Your Anki deck "<span class="fw-bold">{{ deck_name }}</span>" with <span class="fw-bold">{{ card_count }}</span> cards has been successfully created and downloaded.</p>
+    
+    <div class="card-counter mb-4">
+        <i class="fas fa-clone"></i> {{ card_count }} cards exported
+    </div>
+    
+    <div class="next-steps">
+        <h3 class="mb-4">Next Steps</h3>
+        
+        <div class="card mb-3">
+            <div class="card-body d-flex align-items-start">
+                <div class="step-number me-3">1</div>
+                <div>
+                    <h5>Open Anki Desktop</h5>
+                    <p class="mb-0">Launch the Anki desktop application on your computer. If you don't have it yet, <a href="https://apps.ankiweb.net/" target="_blank">download it here</a>.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-body d-flex align-items-start">
+                <div class="step-number me-3">2</div>
+                <div>
+                    <h5>Import Your Deck</h5>
+                    <p class="mb-0">In Anki, click on "File" > "Import" and select the .apkg file you just downloaded. Your cards will be imported into Anki.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-body d-flex align-items-start">
+                <div class="step-number me-3">3</div>
+                <div>
+                    <h5>Start Studying</h5>
+                    <p class="mb-0">Click on your new deck and press "Study Now" to begin reviewing your flashcards. Anki will automatically schedule reviews based on your performance.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+            <i class="fas fa-plus me-2"></i> Create Another Deck
+        </a>
+        <a href="https://apps.ankiweb.net/" target="_blank" class="btn btn-outline-primary btn-lg">
+            <i class="fas fa-download me-2"></i> Download Anki
+        </a>
+    </div>
+    
+    <div class="card mt-5">
+        <div class="card-header bg-info">
+            <h4 class="mb-0"><i class="fas fa-comment-dots me-2"></i> Your Feedback</h4>
+        </div>
+        <div class="card-body">
+            <h5 class="text-center mb-3">How was your experience?</h5>
+            
+            <div class="star-rating">
+                <input type="radio" id="star5" name="rating" value="5">
+                <label for="star5" class="fas fa-star"></label>
+                <input type="radio" id="star4" name="rating" value="4">
+                <label for="star4" class="fas fa-star"></label>
+                <input type="radio" id="star3" name="rating" value="3">
+                <label for="star3" class="fas fa-star"></label>
+                <input type="radio" id="star2" name="rating" value="2">
+                <label for="star2" class="fas fa-star"></label>
+                <input type="radio" id="star1" name="rating" value="1">
+                <label for="star1" class="fas fa-star"></label>
+            </div>
+            
+            <div class="mb-3">
+                <label for="feedback" class="form-label">Any suggestions for improvement?</label>
+                <textarea class="form-control" id="feedback" rows="3" placeholder="Your feedback helps us improve..."></textarea>
+            </div>
+            
+            <div class="d-grid">
+                <button type="button" class="btn btn-success" id="submitFeedback">
+                    <i class="fas fa-paper-plane me-2"></i> Submit Feedback
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Create confetti effect
+        const confettiContainer = document.getElementById('confetti-container');
+        const colors = ['#4361ee', '#7209b7', '#f72585', '#06d6a0', '#4cc9f0', '#f9c74f'];
+        
+        for (let i = 0; i < 100; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + 'vw';
+            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.width = Math.random() * 10 + 5 + 'px';
+            confetti.style.height = Math.random() * 10 + 5 + 'px';
+            confetti.style.animationDuration = Math.random() * 3 + 2 + 's';
+            confetti.style.animationDelay = Math.random() * 5 + 's';
+            confettiContainer.appendChild(confetti);
+        }
+        
+        // Handle feedback submission
+        document.getElementById('submitFeedback').addEventListener('click', function() {
+            const rating = document.querySelector('input[name="rating"]:checked');
+            const feedback = document.getElementById('feedback').value;
+            
+            if (rating) {
+                // In a real app, you would send this data to your server
+                console.log('Rating:', rating.value);
+                console.log('Feedback:', feedback);
+                
+                // Show thank you message
+                const feedbackCard = document.querySelector('.card-body');
+                feedbackCard.innerHTML = `
+                    <div class="text-center">
+                        <i class="fas fa-heart text-danger fa-3x mb-3"></i>
+                        <h4>Thank You for Your Feedback!</h4>
+                        <p>We appreciate your input and will use it to improve AnkiGPT.</p>
+                    </div>
+                `;
+            } else {
+                alert('Please select a rating before submitting.');
+            }
+        });
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}AnkiGPT - Preview Generated Cards{% endblock %}
+
+{% block head %}
+<!-- Inline styles moved to style.css -->
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="mb-0" data-aos="fade-right">
+                <i class="fas fa-check-circle text-success me-2"></i> Cards Generated
+            </h1>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary" data-aos="fade-left">
+                <i class="fas fa-arrow-left me-2"></i> Create New Cards
+            </a>
+        </div>
+        
+        <div class="card mb-4" data-aos="fade-up">
+            <div class="card-header bg-success">
+                <h2 class="mb-0"><i class="fas fa-layer-group me-2"></i> Generated Anki Cards</h2>
+            </div>
+            <div class="card-body">
+                <div class="deck-info" data-aos="fade-up" data-aos-delay="100">
+                    <div class="deck-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-1">{{ deck_name }}</h4>
+                        <p class="mb-0 text-muted">Ready to export to Anki</p>
+                    </div>
+                </div>
+                
+                <div class="card-counter" data-aos="fade-up" data-aos-delay="150">
+                    <i class="fas fa-clone"></i> Generated {{ cards|length }} cards
+                </div>
+                
+                <form action="{{ url_for('export') }}" method="post" id="export-form">
+                    <input type="hidden" name="deck_name" value="{{ deck_name }}">
+                    <input type="hidden" name="notes_text" id="notes-text-hidden" value="{{ notes_text }}">
+                    
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><i class="fas fa-edit me-2"></i> Review & Edit Cards</h5>
+                            <div class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i> You can modify the text directly
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            {% for card in cards %}
+                            <div class="col-md-6" data-aos="fade-up" data-aos-delay="{{ 200 + loop.index * 50 }}">
+                                <div class="card-preview position-relative">
+                                    <div class="card-count-badge">{{ loop.index }}</div>
+                                    <div class="form-floating">
+                                        <textarea class="form-control" name="card_text" id="card{{ loop.index }}">{{ card.text }}</textarea>
+                                        <label for="card{{ loop.index }}">Card {{ loop.index }}</label>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button type="button" class="btn btn-sm btn-outline-primary regenerate-card" data-card-id="{{ loop.index }}">
+                                            <i class="fas fa-sync-alt me-1"></i> Regenerate
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-card" data-card-id="{{ loop.index }}">
+                                            <i class="fas fa-trash-alt me-1"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="export-container text-center" data-aos="fade-up" data-aos-delay="400">
+                        <div class="success-icon">
+                            <i class="fas fa-file-export"></i>
+                        </div>
+                        <h4 class="mb-3">Ready to Export Your Cards?</h4>
+                        <p class="mb-4">Click the button below to download your Anki deck file (.apkg) that you can import directly into Anki.</p>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-download me-2"></i> Export to Anki
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card" data-aos="fade-up" data-aos-delay="500">
+            <div class="card-header bg-info">
+                <h3 class="mb-0"><i class="fas fa-file-alt me-2"></i> Original Notes</h3>
+            </div>
+            <div class="card-body">
+                <div class="notes-container p-3">
+                    <pre class="p-3 rounded">{{ notes_text }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Regeneration Modal -->
+<div class="modal fade" id="regeneratingModal" tabindex="-1" aria-labelledby="regeneratingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="regeneratingModalLabel">Regenerating Card</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="brain-loader mb-3">
+                    <div class="loader-ring"></div>
+                    <div class="loader-ring"></div>
+                    <div class="loader-ring"></div>
+                    <div class="brain-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                </div>
+                <p>Creating a new version of this card...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Card removal functionality
+        const removeButtons = document.querySelectorAll('.remove-card');
+        removeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const cardId = this.getAttribute('data-card-id');
+                const cardElement = this.closest('.col-md-6');
+                
+                // Confirm before removing
+                if (confirm('Are you sure you want to remove this card?')) {
+                    // Add fade-out animation
+                    cardElement.style.transition = 'all 0.3s ease';
+                    cardElement.style.opacity = '0';
+                    cardElement.style.transform = 'scale(0.9)';
+                    
+                    // Remove after animation completes
+                    setTimeout(() => {
+                        cardElement.remove();
+                        updateCardCount();
+                    }, 300);
+                }
+            });
+        });
+        
+        // Card regeneration functionality
+        const regenerateButtons = document.querySelectorAll('.regenerate-card');
+        const regeneratingModal = new bootstrap.Modal(document.getElementById('regeneratingModal'));
+        
+        regenerateButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const cardId = this.getAttribute('data-card-id');
+                const cardTextarea = document.getElementById(`card${cardId}`);
+                const cardText = cardTextarea.value;
+                const notesText = document.getElementById('notes-text-hidden').value;
+                
+                // Show the regenerating modal
+                regeneratingModal.show();
+                
+                // Send request to regenerate the card
+                fetch('{{ url_for("regenerate_card") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        'card_text': cardText,
+                        'card_index': cardId,
+                        'notes_text': notesText
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide the modal
+                    regeneratingModal.hide();
+                    
+                    if (data.success) {
+                        // Update the card text with a nice animation
+                        cardTextarea.style.transition = 'all 0.3s ease';
+                        cardTextarea.style.opacity = '0';
+                        
+                        setTimeout(() => {
+                            cardTextarea.value = data.card_text;
+                            cardTextarea.style.opacity = '1';
+                            
+                            // Add a highlight effect
+                            cardTextarea.style.backgroundColor = 'rgba(67, 97, 238, 0.1)';
+                            setTimeout(() => {
+                                cardTextarea.style.backgroundColor = '';
+                            }, 1500);
+                        }, 300);
+                    } else {
+                        // Show error message
+                        alert('Failed to regenerate card: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    regeneratingModal.hide();
+                    alert('Error regenerating card: ' + error);
+                });
+            });
+        });
+        
+        // Update card counter when cards are removed
+        function updateCardCount() {
+            const remainingCards = document.querySelectorAll('textarea[name="card_text"]').length;
+            const cardCounter = document.querySelector('.card-counter');
+            cardCounter.innerHTML = `<i class="fas fa-clone"></i> Generated ${remainingCards} cards`;
+            
+            // Show warning if all cards are removed
+            if (remainingCards === 0) {
+                const form = document.querySelector('form');
+                const warning = document.createElement('div');
+                warning.className = 'alert alert-warning mt-3';
+                warning.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> All cards have been removed. Please go back and generate new cards.';
+                form.prepend(warning);
+                
+                // Disable export button
+                document.querySelector('button[type="submit"]').disabled = true;
+            }
+        }
+        
+        // Add confetti effect when export button is clicked
+        const exportButton = document.querySelector('.btn-success');
+        exportButton.addEventListener('click', function() {
+            // Create confetti
+            for (let i = 0; i < 100; i++) {
+                createConfetti();
+            }
+        });
+        
+        function createConfetti() {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            document.body.appendChild(confetti);
+            
+            // Random position, color and size
+            const colors = ['#4361ee', '#f72585', '#4cc9f0', '#06d6a0', '#7209b7'];
+            const size = Math.random() * 10 + 5;
+            
+            confetti.style.width = `${size}px`;
+            confetti.style.height = `${size}px`;
+            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.left = `${Math.random() * 100}vw`;
+            confetti.style.top = `-${size}px`;
+            
+            // Remove after animation completes
+            setTimeout(() => {
+                confetti.remove();
+            }, 5000);
+        }
+    });
+</script>
+{% endblock %} 
