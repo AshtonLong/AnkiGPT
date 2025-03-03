@@ -58,14 +58,6 @@ A beautiful, modern web application that uses AI to automatically generate Anki 
 
 5. Open your browser and navigate to `http://localhost:5000`
 
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/ashtonlong/ankigpt/issues).
-
-## 📝 License
-
-This project is [MIT](LICENSE) licensed.
-
 ## 👨‍💻 Author
 
 **Ashton Long**
