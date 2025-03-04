@@ -4,7 +4,7 @@ from werkzeug.utils import secure_filename
 import tempfile
 from dotenv import load_dotenv
 import json
-from flask_session import Session  # Add Flask-Session import
+from flask_session import Session 
 
 from gemini_utils import generate_anki_cards, initialize_gemini, set_api_key
 from anki_utils import parse_cloze_cards, create_anki_deck, export_deck
