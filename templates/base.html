@@ -50,17 +50,21 @@
             {% if messages %}
                 <div class="flash-messages" data-aos="fade-down">
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show">
-                            {% if category == 'error' or category == 'danger' %}
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                            {% elif category == 'success' %}
-                                <i class="fas fa-check-circle me-2"></i>
-                            {% else %}
-                                <i class="fas fa-info-circle me-2"></i>
-                            {% endif %}
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
+                        {% if category == 'rate-limit' %}
+                            <div class="rate-limit-alert" style="display: none;" data-message="{{ message }}"></div>
+                        {% else %}
+                            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show">
+                                {% if category == 'error' or category == 'danger' %}
+                                    <i class="fas fa-exclamation-circle me-2"></i>
+                                {% elif category == 'success' %}
+                                    <i class="fas fa-check-circle me-2"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle me-2"></i>
+                                {% endif %}
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endif %}
                     {% endfor %}
                 </div>
             {% endif %}
@@ -93,6 +97,69 @@
                 once: true,
                 offset: 100
             });
+            
+            // Rate limit popup handling
+            const rateLimitAlert = document.querySelector('.rate-limit-alert');
+            if (rateLimitAlert) {
+                const message = rateLimitAlert.getAttribute('data-message');
+                showRateLimitPopup(message);
+            }
+            
+            // Function to show rate limit popup
+            function showRateLimitPopup(message) {
+                // Create modal elements
+                const modalBackdrop = document.createElement('div');
+                modalBackdrop.className = 'modal-backdrop fade show';
+                document.body.appendChild(modalBackdrop);
+                
+                const modalDiv = document.createElement('div');
+                modalDiv.className = 'modal fade show';
+                modalDiv.style.display = 'block';
+                modalDiv.setAttribute('tabindex', '-1');
+                modalDiv.setAttribute('aria-modal', 'true');
+                modalDiv.setAttribute('role', 'dialog');
+                
+                modalDiv.innerHTML = `
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Rate Limit Reached</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>${message}</p>
+                                <p class="mb-0">Please wait a moment before trying again. This helps ensure fair usage of the API for everyone.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Understood</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modalDiv);
+                
+                // Handle close button and backdrop click
+                const closeBtn = modalDiv.querySelector('[data-bs-dismiss="modal"]');
+                closeBtn.addEventListener('click', function() {
+                    modalDiv.remove();
+                    modalBackdrop.remove();
+                });
+                
+                // Close on Escape key
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Escape') {
+                        modalDiv.remove();
+                        modalBackdrop.remove();
+                    }
+                });
+                
+                // Close on backdrop click
+                modalBackdrop.addEventListener('click', function() {
+                    modalDiv.remove();
+                    modalBackdrop.remove();
+                });
+            }
             
             // Navbar scroll effect
             const navbar = document.querySelector('.navbar');
@@ -164,6 +231,71 @@
             themeToggle.style.display = 'none';
         });
     </script>
+    
+    <!-- Rate limit handling for AJAX requests -->
+    <script>
+        // Global AJAX error handler for rate limit errors
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to show rate limit popup (same as above but accessible globally)
+            window.showRateLimitPopup = function(message) {
+                // Create modal elements
+                const modalBackdrop = document.createElement('div');
+                modalBackdrop.className = 'modal-backdrop fade show';
+                document.body.appendChild(modalBackdrop);
+                
+                const modalDiv = document.createElement('div');
+                modalDiv.className = 'modal fade show';
+                modalDiv.style.display = 'block';
+                modalDiv.setAttribute('tabindex', '-1');
+                modalDiv.setAttribute('aria-modal', 'true');
+                modalDiv.setAttribute('role', 'dialog');
+                
+                modalDiv.innerHTML = `
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Rate Limit Reached</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>${message || 'Rate limit exceeded. Please wait a moment before trying again.'}</p>
+                                <p class="mb-0">Please wait a moment before trying again. This helps ensure fair usage of the API for everyone.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Understood</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modalDiv);
+                
+                // Handle close button and backdrop click
+                const closeButtons = modalDiv.querySelectorAll('[data-bs-dismiss="modal"]');
+                closeButtons.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        modalDiv.remove();
+                        modalBackdrop.remove();
+                    });
+                });
+                
+                // Close on Escape key
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Escape') {
+                        modalDiv.remove();
+                        modalBackdrop.remove();
+                    }
+                });
+                
+                // Close on backdrop click
+                modalBackdrop.addEventListener('click', function() {
+                    modalDiv.remove();
+                    modalBackdrop.remove();
+                });
+            };
+        });
+    </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html> 

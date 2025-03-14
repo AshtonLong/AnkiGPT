@@ -42,7 +42,7 @@ def generate_anki_cards(notes_text, card_count='15-25', focus_area='balanced'):
     """
     genai_module = initialize_gemini()
     genai_module.configure(api_key=_api_key)
-    model = genai_module.GenerativeModel("gemini-2.0-flash")
+    model = genai_module.GenerativeModel("gemini-2.0-pro-exp-02-05")
     
     # Adjust focus based on user preference
     focus_instruction = ""

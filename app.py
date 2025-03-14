@@ -56,6 +56,20 @@ api_key = load_api_key_from_file()
 if api_key:
     set_api_key(api_key)
 
+# Function to check if an error is a rate limit error
+def is_rate_limit_error(error):
+    """Check if the error is related to rate limiting."""
+    error_str = str(error).lower()
+    rate_limit_keywords = [
+        'rate limit', 
+        'too many requests', 
+        'quota exceeded', 
+        'resource exhausted',
+        'ratelimit',
+        '429'
+    ]
+    return any(keyword in error_str for keyword in rate_limit_keywords)
+
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
@@ -199,7 +213,11 @@ def generate():
                               notes_text=notes_text)
         
     except Exception as e:
-        flash(f'Error generating cards: {str(e)}', 'error')
+        # Check if this is a rate limit error
+        if is_rate_limit_error(e):
+            flash('Rate limit exceeded. Please wait a moment before trying again.', 'rate-limit')
+        else:
+            flash(f'Error generating cards: {str(e)}', 'error')
         return redirect(url_for('index'))
 
 @app.route('/regenerate_card', methods=['POST'])
@@ -277,6 +295,13 @@ def regenerate_card():
         }), 200
         
     except Exception as e:
+        # Check if this is a rate limit error
+        if is_rate_limit_error(e):
+            return jsonify({
+                'success': False, 
+                'message': 'Rate limit exceeded. Please wait a moment before trying again.',
+                'is_rate_limit': True
+            }), 429
         return jsonify({'success': False, 'message': f'Error regenerating card: {str(e)}'}), 500
 
 @app.route('/export', methods=['POST'])

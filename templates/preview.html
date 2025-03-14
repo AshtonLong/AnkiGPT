@@ -196,8 +196,18 @@
                             }, 1500);
                         }, 300);
                     } else {
-                        // Show error message
-                        alert('Failed to regenerate card: ' + data.message);
+                        // Check if this is a rate limit error
+                        if (data.is_rate_limit) {
+                            // Show rate limit popup
+                            if (typeof window.showRateLimitPopup === 'function') {
+                                window.showRateLimitPopup(data.message);
+                            } else {
+                                alert(data.message);
+                            }
+                        } else {
+                            // Show regular error message
+                            alert('Failed to regenerate card: ' + data.message);
+                        }
                     }
                 })
                 .catch(error => {
