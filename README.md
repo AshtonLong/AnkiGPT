@@ -1,88 +1,109 @@
 # AnkiGPT
 
-![AnkiGPT Logo](https://img.icons8.com/fluency/96/brain.png)
+AnkiGPT is a powerful tool that automatically generates high-quality Anki flashcards from your study notes or PDF files using Google's Gemini AI. Perfect for students, educators, and lifelong learners looking to optimize their study process.
 
-A beautiful, modern web application that uses AI to automatically generate Anki flashcards from your notes and study materials.
+## Features
 
-## 🚀 Features
+- **AI-Powered Card Generation**: Convert notes or PDF files into effective Anki flashcards
+- **Cloze Deletion Format**: Creates cards in the proven cloze deletion format for better retention
+- **Customizable Output**: Control the number of cards and focus areas (definitions, processes, etc.)
+- **Preview & Edit**: Review and modify generated cards before exporting
+- **Regeneration Options**: Easily regenerate individual cards if needed
+- **Direct Anki Export**: Export directly to Anki-compatible .apkg format
+- **Beautiful Styling**: Pre-styled cards that enhance the learning experience
 
-- **AI-Powered Card Generation**: Automatically create high-quality Anki cloze deletion cards from your notes
-- **Customizable Output**: Control the number and types of cards generated
-- **Modern UI**: Beautiful, responsive interface with animations and modern design elements
-- **Easy Export**: One-click export to Anki-compatible .apkg files
-- **Card Preview & Editing**: Review and edit generated cards before exporting
-
-## 📸 Screenshots
-
-![AnkiGPT Screenshot](https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80)
-
-## 🛠️ Technologies Used
-
-- **Backend**: Flask (Python)
-- **Frontend**: HTML, CSS, JavaScript
-- **UI Framework**: Bootstrap 5
-- **Animations**: AOS (Animate On Scroll)
-- **Icons**: Font Awesome
-- **AI**: Google Gemini API
-- **Anki Integration**: genanki library
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.7+
+- Python 3.8 or higher
 - Google Gemini API key
 
 ### Installation
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/ashtonlong/ankigpt.git
-   cd ankigpt
+   ```
+   git clone https://github.com/AshtonLong/AnkiGPT.git
+   cd AnkiGPT
    ```
 
-2. Install dependencies:
-   ```bash
+2. Install required dependencies:
+   ```
    pip install -r requirements.txt
    ```
 
-3. Run the application:
-   ```bash
-   python app.py
+3. Create a `.env` file in the project root (optional):
    ```
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+   Alternatively, you can input your API key through the web interface.
 
-5. Open your browser and navigate to `http://localhost:5000`
+### Running the Application
 
-## ❓ Frequently Asked Questions
+Start the Flask development server:
+```
+python app.py
+```
 
-### What is AnkiGPT?
-AnkiGPT is a web application that leverages AI to automatically generate Anki flashcards from your notes and study materials, saving you time and effort in creating effective study materials.
+Then access the web interface at http://localhost:5000 in your browser.
 
-### How does AnkiGPT work?
-AnkiGPT uses Google Gemini AI to analyze your text input and intelligently create cloze deletion cards that highlight key concepts. The AI identifies important information and creates optimal cards for memorization.
+## Usage Guide
 
-### Is AnkiGPT free to use?
-AnkiGPT requires a Google Gemini API key, which as of right now offers generous rate limits on the Flash series of models. So yes, as of right now this app can be used for free.
+1. **Enter Your API Key**:
+   - Access the About page to enter your Google Gemini API key
+   - This key is saved for future use
 
-### What types of content work best with AnkiGPT?
-AnkiGPT works best with clearly structured content like lecture notes, textbook chapters, and study guides. It's particularly effective for subjects that require memorization of key facts, definitions, and concepts.
+2. **Input Study Material**:
+   - Paste text notes or upload a PDF file
+   - Provide a name for your deck
+   - Select the desired number of cards
+   - Choose a focus area (balanced, definitions, relationships, processes, or examples)
 
-### Can I edit the cards before exporting to Anki?
-Yes! AnkiGPT provides a preview and editing interface so you can review and modify all generated cards before exporting them to an Anki-compatible file.
+3. **Generate Cards**:
+   - The application will process your input and generate Anki cards
+   - This process may take a few moments depending on the length of your notes
 
-### How do I import the generated cards into Anki?
-After generating and reviewing your cards, you can export them as an .apkg file with one click. Then, simply open Anki and double click the .apkg file to import it.
+4. **Preview & Edit**:
+   - Review all generated cards
+   - Edit or regenerate individual cards as needed
 
-## 👨‍💻 Author
+5. **Export to Anki**:
+   - Export your cards to an Anki-compatible .apkg file
+   - Import the file into Anki to start studying
 
-**Ashton Long**
+## Technical Details
 
-- GitHub: [@ashtonlong](https://github.com/ashtonlong)
+AnkiGPT is built with:
+- Flask web framework
+- Google Generative AI (Gemini 2.5 Pro)
+- Genanki for Anki package creation
+- Modern HTML/CSS/JavaScript interface
 
-## 🙏 Acknowledgements
+## Customizing Card Generation
 
-- [Anki](https://apps.ankiweb.net/) for the amazing spaced repetition software
-- [Google Gemini](https://deepmind.google/technologies/gemini/) for the powerful AI capabilities
-- [Bootstrap](https://getbootstrap.com/) for the responsive UI framework
-- [Font Awesome](https://fontawesome.com/) for the beautiful icons
-- [AOS](https://michalsnik.github.io/aos/) for the scroll animations 
+You can customize the generated cards by selecting different focus areas:
+- **Balanced**: Equal emphasis on all types of information
+- **Definitions**: Focus on key terms and concepts
+- **Relationships**: Emphasize connections between concepts
+- **Processes**: Highlight procedures and sequences
+- **Examples**: Prioritize practical examples and applications (experimental setting)
+
+## Troubleshooting
+
+### API Key Issues
+- Ensure your Google Gemini API key is valid and has sufficient quota
+- The application will store your API key locally for convenience
+
+### Rate Limiting
+- If you encounter rate limit errors, wait a few minutes before trying again
+- Consider using smaller chunks of text for each generation
+
+### PDF Processing
+- For large PDFs, consider splitting them into smaller sections
+- Some heavily formatted PDFs may not parse optimally
+
+## Acknowledgments
+
+- Built with Google's Gemini AI
+- Uses the Genanki library for Anki integration
+- Inspired by the spaced repetition learning technique

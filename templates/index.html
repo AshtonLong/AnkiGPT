@@ -33,7 +33,7 @@
                 <h2 class="mb-0"><i class="fas fa-wand-magic-sparkles me-2"></i> Generate Anki Cards</h2>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('loading') }}" method="post">
+                <form action="{{ url_for('loading') }}" method="post" enctype="multipart/form-data" id="generator-form">
                     <div class="mb-4">
                         <label for="deck_name" class="form-label">Deck Name</label>
                         <div class="input-group">
@@ -78,9 +78,18 @@
                         <label for="notes" class="form-label">Your Notes or Lecture Content</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-book"></i></span>
-                            <textarea class="form-control" id="notes" name="notes" rows="12" placeholder="Paste your notes or lecture content here..." required></textarea>
+                            <textarea class="form-control" id="notes" name="notes" rows="12" placeholder="Paste your notes or lecture content here..."></textarea>
                         </div>
                         <div class="form-text">Paste your study material here - the more detailed, the better the cards will be</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Or Upload a PDF</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-file-pdf"></i></span>
+                            <input type="file" class="form-control" id="pdf_file" name="pdf_file" accept=".pdf">
+                        </div>
+                        <div class="form-text">Upload a PDF document instead of pasting text (PDF or text input required, not both)</div>
                     </div>
                     
                     <div class="d-grid gap-2">
@@ -264,6 +273,39 @@
                     top: targetElement.offsetTop - 100,
                     behavior: 'smooth'
                 });
+            }
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('generator-form');
+        const notesTextarea = document.getElementById('notes');
+        const pdfFileInput = document.getElementById('pdf_file');
+        
+        // Make either notes or PDF required, but not both
+        form.addEventListener('submit', function(e) {
+            const hasNotes = notesTextarea.value.trim().length > 0;
+            const hasPdf = pdfFileInput.files.length > 0;
+            
+            if (!hasNotes && !hasPdf) {
+                e.preventDefault();
+                alert('Please either enter your notes or upload a PDF file.');
+                return false;
+            }
+            
+            return true;
+        });
+        
+        // Optional: Clear the other input when one is filled
+        notesTextarea.addEventListener('input', function() {
+            if (this.value.trim().length > 0) {
+                pdfFileInput.value = '';
+            }
+        });
+        
+        pdfFileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                notesTextarea.value = '';
             }
         });
     });

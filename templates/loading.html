@@ -26,7 +26,13 @@
     </div>
     
     <h1 class="mb-3" data-aos="fade-up" data-aos-delay="200">Generating Your Anki Cards</h1>
-    <p class="lead mb-4" data-aos="fade-up" data-aos-delay="300">Our AI is analyzing your notes and creating high-quality flashcards</p>
+    <p class="lead mb-4" data-aos="fade-up" data-aos-delay="300">
+        {% if session.get('using_pdf', False) %}
+        Our AI is analyzing your PDF and creating high-quality flashcards
+        {% else %}
+        Our AI is analyzing your notes and creating high-quality flashcards
+        {% endif %}
+    </p>
     
     <div class="progress-container" data-aos="fade-up" data-aos-delay="400">
         <div class="progress">
@@ -40,10 +46,16 @@
     <div class="ai-steps" data-aos="fade-up" data-aos-delay="500">
         <div class="ai-step completed" id="step1">
             <div class="step-icon">
-                <i class="fas fa-file-alt"></i>
+                <i class="{% if session.get('using_pdf', False) %}fas fa-file-pdf{% else %}fas fa-file-alt{% endif %}"></i>
             </div>
             <div class="step-content">
-                <h6 class="mb-0">Analyzing your notes</h6>
+                <h6 class="mb-0">
+                    {% if session.get('using_pdf', False) %}
+                    Analyzing your PDF
+                    {% else %}
+                    Analyzing your notes
+                    {% endif %}
+                </h6>
                 <small class="text-muted">Identifying key concepts and information</small>
             </div>
         </div>

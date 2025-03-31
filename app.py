@@ -124,14 +124,30 @@ def save_api_key():
 def loading():
     # For POST requests, store form data in session
     if request.method == 'POST':
-        session['notes_text'] = request.form.get('notes', '')
         session['deck_name'] = request.form.get('deck_name', '').strip() or None
         session['card_count'] = request.form.get('card_count', '15-25')
         session['focus_area'] = request.form.get('focus_area', 'balanced')
         
-        # Validate input
-        if not session['notes_text'].strip():
-            flash('Please enter some notes or lecture content', 'error')
+        # Handle either text input or PDF upload
+        pdf_file = request.files.get('pdf_file')
+        notes_text = request.form.get('notes', '').strip()
+        
+        if pdf_file and pdf_file.filename:
+            # Store the PDF file temporarily
+            filename = secure_filename(pdf_file.filename)
+            temp_path = os.path.join(TEMP_DIR, filename)
+            pdf_file.save(temp_path)
+            session['pdf_path'] = temp_path
+            session['using_pdf'] = True
+            session['notes_text'] = ''  # Clear text notes if using PDF
+        elif notes_text:
+            session['notes_text'] = notes_text
+            session['using_pdf'] = False
+            if 'pdf_path' in session:
+                # Remove any previously stored PDF path
+                session.pop('pdf_path', None)
+        else:
+            flash('Please enter some notes or upload a PDF file', 'error')
             return redirect(url_for('index'))
     
     # For both GET and POST, check if API key is set in session or file
@@ -151,8 +167,9 @@ def loading():
         set_api_key(api_key)
     
     # For GET requests, check if we have the necessary session data
-    if request.method == 'GET' and ('notes_text' not in session or not session['notes_text'].strip()):
-        flash('Please enter your notes to generate cards', 'error')
+    if request.method == 'GET' and not (('notes_text' in session and session['notes_text'].strip()) or 
+                                        ('using_pdf' in session and session['using_pdf'] and 'pdf_path' in session)):
+        flash('Please enter your notes or upload a PDF to generate cards', 'error')
         return redirect(url_for('index'))
     
     return render_template('loading.html')
@@ -165,6 +182,8 @@ def generate():
     
     # Check for form data first, then fall back to session data
     notes_text = request.form.get('notes', '') or session.get('notes_text', '')
+    using_pdf = session.get('using_pdf', False)
+    pdf_path = session.get('pdf_path', None)
     deck_name = request.form.get('deck_name', '').strip() or session.get('deck_name')
     card_count = request.form.get('card_count', '') or session.get('card_count', '15-25')
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
@@ -175,9 +194,9 @@ def generate():
     session.pop('card_count', None)
     session.pop('focus_area', None)
     
-    # Validate input again (in case session was tampered with)
-    if not notes_text.strip():
-        flash('Please enter some notes or lecture content', 'error')
+    # Validate input (either text or PDF must be provided)
+    if not using_pdf and not notes_text.strip():
+        flash('Please enter some notes or lecture content or upload a PDF', 'error')
         return redirect(url_for('index'))
     
     try:
@@ -188,7 +207,20 @@ def generate():
             set_api_key(api_key)
         
         # Generate Anki cards using Gemini API
-        generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area)
+        if using_pdf and pdf_path and os.path.exists(pdf_path):
+            # Generate cards from PDF
+            generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True)
+            # Clean up the PDF file after use
+            try:
+                os.remove(pdf_path)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary PDF file: {str(e)}")
+            # Clear PDF data from session
+            session.pop('using_pdf', None)
+            session.pop('pdf_path', None)
+        else:
+            # Generate cards from text
+            generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area)
         
         # Parse the generated text into cards
         cards = parse_cloze_cards(generated_text)
