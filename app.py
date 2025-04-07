@@ -125,8 +125,9 @@ def loading():
     # For POST requests, store form data in session
     if request.method == 'POST':
         session['deck_name'] = request.form.get('deck_name', '').strip() or None
-        session['card_count'] = request.form.get('card_count', '15-25')
         session['focus_area'] = request.form.get('focus_area', 'balanced')
+        # We no longer collect card_count from the user form
+        session['card_count'] = 'all'  # Use 'all' to indicate we want to generate cards from all material
         
         # Handle either text input or PDF upload
         pdf_file = request.files.get('pdf_file')
@@ -185,7 +186,8 @@ def generate():
     using_pdf = session.get('using_pdf', False)
     pdf_path = session.get('pdf_path', None)
     deck_name = request.form.get('deck_name', '').strip() or session.get('deck_name')
-    card_count = request.form.get('card_count', '') or session.get('card_count', '15-25')
+    # Use 'all' as the default card_count to generate cards from all material
+    card_count = request.form.get('card_count', '') or session.get('card_count', 'all')
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
     
     # Clear session data

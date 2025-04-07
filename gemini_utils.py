@@ -58,7 +58,7 @@ def generate_anki_cards(input_content, card_count='15-25', focus_area='balanced'
     You are an expert educator specializing in creating high-quality Anki flashcards. Your task is to convert the following notes into comprehensive Anki Cloze deletion cards.
 
     INSTRUCTIONS:
-    1. Create {card_count} (not an exact range, just a general idea. If you think it's too few, you can make more, if you think it's too many, you can make less) cloze deletion cards that thoroughly cover ALL important concepts, definitions, relationships, and examples from the notes.
+    1. Create as many cloze deletion cards as needed to thoroughly cover ALL important concepts, definitions, relationships, and examples from the notes. Don't limit yourself to a fixed number - create as many high-quality cards as the material requires.
     2. Use the format: {{{{c1::text to be hidden}}}} for the cloze deletions.
     3. Each card should be on a new line.
     4. CRITICAL: Each card MUST be COMPLETELY SELF-CONTAINED with ALL necessary context. Students will see these cards in RANDOM ORDER, so each card must make perfect sense on its own without requiring knowledge from other cards or external sources.
