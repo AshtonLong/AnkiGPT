@@ -3,9 +3,10 @@ import random
 import os
 from datetime import datetime
 
-# Define the Anki note model for Cloze cards
+# Define the Anki note model for Cloze cards with a fixed ID
+# Use a specific, persistent ID instead of a random one to prevent duplicate note types in Anki
 CLOZE_MODEL = genanki.Model(
-    random.randrange(1 << 30, 1 << 31),  # Random model ID
+    1380112066,  # Magic number to attempt to fix duplicate note types
     'AnkiGPT Cloze Model',
     fields=[
         {'name': 'Text'},
@@ -337,4 +338,4 @@ def export_deck(deck, output_dir='.'):
     package = genanki.Package(deck)
     package.write_to_file(output_file)
     
-    return output_file 
+    return output_file

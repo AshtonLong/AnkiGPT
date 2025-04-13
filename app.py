@@ -128,6 +128,8 @@ def loading():
         session['focus_area'] = request.form.get('focus_area', 'balanced')
         # We no longer collect card_count from the user form
         session['card_count'] = 'all'  # Use 'all' to indicate we want to generate cards from all material
+        # Store the selected AI model
+        session['model_name'] = request.form.get('model_name', 'gemini-2.5-pro-exp-03-25')
         
         # Handle either text input or PDF upload
         pdf_file = request.files.get('pdf_file')
@@ -190,6 +192,9 @@ def generate():
     card_count = request.form.get('card_count', '') or session.get('card_count', 'all')
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
     
+    # Get the selected model name
+    model_name = session.get('model_name', 'gemini-2.5-pro-exp-03-25')
+    
     # Clear session data
     session.pop('notes_text', None)
     session.pop('deck_name', None)
@@ -211,7 +216,7 @@ def generate():
         # Generate Anki cards using Gemini API
         if using_pdf and pdf_path and os.path.exists(pdf_path):
             # Generate cards from PDF
-            generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True)
+            generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
             # Clean up the PDF file after use
             try:
                 os.remove(pdf_path)
@@ -222,7 +227,7 @@ def generate():
             session.pop('pdf_path', None)
         else:
             # Generate cards from text
-            generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area)
+            generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
         
         # Parse the generated text into cards
         cards = parse_cloze_cards(generated_text)
@@ -274,6 +279,9 @@ def regenerate_card():
         # Set the API key
         set_api_key(api_key)
         
+        # Always use the Flash model for regeneration for faster response
+        model_name = "gemini-2.0-flash"
+        
         # Generate a new card using a specialized prompt
         prompt = f"""
         You are an expert educator specializing in creating high-quality Anki flashcards. Your task is to fix and improve the original card shown below by creating a better version that addresses common issues.
@@ -312,7 +320,7 @@ def regenerate_card():
         # Initialize Gemini and generate the new card
         genai_module = initialize_gemini()
         genai_module.configure(api_key=api_key)
-        model = genai_module.GenerativeModel("gemini-2.0-flash")
+        model = genai_module.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         
         # Get the generated text and clean it up
@@ -414,4 +422,4 @@ if __name__ == '__main__':
     # Ensure the API key file directory exists
     os.makedirs(os.path.dirname(API_KEY_FILE), exist_ok=True)
     
-    app.run(debug=True) 
+    app.run(debug=True)
