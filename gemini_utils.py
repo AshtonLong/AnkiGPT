@@ -65,22 +65,24 @@ def generate_anki_cards(input_content, card_count='15-25', focus_area='balanced'
     5. Include ALL relevant context within each card - never assume the student remembers information from other cards or external sources.
     6. Avoid vague references like "this process" or "these components" - always explicitly name what you're referring to.
     7. For each cloze deletion, ensure the surrounding text provides sufficient context to understand what's being tested.
-    8. Create a mix of cards that test:
+    8. CRITICAL: Create cards with ONLY ONE cloze deletion per card. If you need to test multiple items, create separate cards for each item.
+    9. Create a mix of cards that test:
        - Key definitions (e.g., "A {{{{c1::mitochondrion}}}} is the powerhouse of the cell that produces ATP through cellular respiration")
        - Important relationships (e.g., "In the endocrine system, {{{{c1::increased insulin}}}} leads to decreased blood glucose levels by facilitating glucose uptake into cells")
        - Processes and sequences (e.g., "During DNA replication, the enzyme {{{{c1::helicase}}}} unwinds the double helix before DNA polymerase begins synthesis of the new strand")
        - Examples that illustrate concepts (e.g., "{{{{c1::The French Revolution (1789-1799)}}}} exemplifies social upheaval driven by class inequality, where the bourgeoisie overthrew the aristocracy")
-    9. For complex topics, create multiple cards that approach the concept from different angles, ensuring each card stands alone.
-    10. Avoid creating cards that are too simple or test trivial information.
-    11. Ensure cards are factually accurate and directly based on the provided notes.
-    12. For numerical data or specific facts, always include the complete information in the card.
-    13. Use clear, concise language that a student can understand without additional explanation.
-    14. When referencing a concept that appears in multiple cards, always reintroduce it with sufficient context.
-    15. Do NOT enumerate the cards, i.e. 1. text, 2. text, 3. text, etc.
-    16. If there are math equations, always include them in the card in LaTeX format using the \\(\\) syntax. For example:
+    10. For complex topics, create multiple cards that approach the concept from different angles, ensuring each card stands alone.
+    11. Avoid creating cards that are too simple or test trivial information.
+    12. Ensure cards are factually accurate and directly based on the provided notes.
+    13. For numerical data or specific facts, always include the complete information in the card.
+    14. Use clear, concise language that a student can understand without additional explanation.
+    15. When referencing a concept that appears in multiple cards, always reintroduce it with sufficient context.
+    16. Do NOT enumerate the cards, i.e. 1. text, 2. text, 3. text, etc.
+    17. If there are math equations, always include them in the card in LaTeX format using the \\(\\) syntax. For example:
         - "The formula for the area of a circle is \\(A = \\pi r^2\\), where \\(r\\) is the radius of the circle."
         - "According to Einstein's mass-energy equivalence, \\(E = mc^2\\), where \\(E\\) represents {{{{c1::energy}}}}, \\(m\\) represents mass, and \\(c\\) represents the speed of light."\
-    17. You are forbidden from using * or ** in the cards. This is NOT markdown. This does not bold text.
+    18. You are forbidden from using * or ** in the cards. This is NOT markdown. This does not bold text.
+    19. IMPORTANT: If a concept requires multiple cloze deletions, break it into multiple separate cards, each with only ONE cloze deletion.
     {focus_instruction}
     """
     
@@ -106,4 +108,4 @@ def generate_anki_cards(input_content, card_count='15-25', focus_area='balanced'
         prompt = prompt_template + f"\n\nNOTES:\n{input_content}"
         response = model.generate_content(prompt)
     
-    return response.text 
+    return response.text
