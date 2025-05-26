@@ -129,7 +129,7 @@ def loading():
         # We no longer collect card_count from the user form
         session['card_count'] = 'all'  # Use 'all' to indicate we want to generate cards from all material
         # Store the selected AI model
-        session['model_name'] = request.form.get('model_name', 'gemini-2.5-pro-exp-03-25')
+        session['model_name'] = request.form.get('model_name', 'gemini-2.5-pro-preview-05-06')
         
         # Handle either text input or PDF upload
         pdf_file = request.files.get('pdf_file')
@@ -193,7 +193,7 @@ def generate():
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
     
     # Get the selected model name
-    model_name = session.get('model_name', 'gemini-2.5-pro-exp-03-25')
+    model_name = session.get('model_name', 'gemini-2.5-pro-preview-05-06')
     
     # Clear session data
     session.pop('notes_text', None)
@@ -280,7 +280,7 @@ def regenerate_card():
         set_api_key(api_key)
         
         # Always use the Flash model for regeneration for faster response
-        model_name = "gemini-2.0-flash"
+        model_name = "gemini-2.5-flash-preview-05-20"
         
         # Generate a new card using a specialized prompt
         prompt = f"""

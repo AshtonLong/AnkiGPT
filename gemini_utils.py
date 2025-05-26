@@ -34,7 +34,7 @@ def generate_anki_cards(input_content, card_count='15-25', focus_area='balanced'
         card_count (str): Number of cards to generate (e.g., '10-15', '20-30')
         focus_area (str): Focus area for cards ('balanced', 'definitions', 'relationships', 'processes', 'examples')
         is_pdf_path (bool): Whether input_content is a path to a PDF file
-        model_name (str, optional): The Gemini model to use (defaults to gemini-2.5-pro-exp-03-25 if None)
+        model_name (str, optional): The Gemini model to use (defaults to gemini-2.5-pro-preview-05-06 if None)
         
     Returns:
         str: Generated Anki cards in Cloze deletion format
@@ -42,9 +42,9 @@ def generate_anki_cards(input_content, card_count='15-25', focus_area='balanced'
     genai_module = initialize_gemini()
     genai_module.configure(api_key=_api_key)
     
-    # Use the specified model or default to gemini-2.5-pro-exp-03-25
+    # Use the specified model or default to gemini-2.5-pro-preview-05-06
     if not model_name:
-        model_name = "gemini-2.5-pro-exp-03-25"
+        model_name = "gemini-2.5-pro-preview-05-06"
     
     model = genai_module.GenerativeModel(model_name)
     
