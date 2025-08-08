@@ -3,11 +3,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 import tempfile
 from dotenv import load_dotenv
-import json
-from flask_session import Session 
+from flask_session import Session
 
 from gemini_utils import generate_anki_cards, initialize_gemini, set_api_key
 from anki_utils import parse_cloze_cards, create_anki_deck, export_deck
+from api_key_utils import save_api_key_to_file, load_api_key_from_file, API_KEY_FILE
 
 # Load environment variables
 load_dotenv()
@@ -26,30 +26,6 @@ Session(app)  # Initialize Flask-Session
 TEMP_DIR = tempfile.mkdtemp()
 # Ensure the temporary directory exists
 os.makedirs(TEMP_DIR, exist_ok=True)
-
-# File to store the API key
-API_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'api_key.json')
-
-def save_api_key_to_file(api_key):
-    """Save the API key to a file."""
-    try:
-        with open(API_KEY_FILE, 'w') as f:
-            json.dump({'api_key': api_key}, f)
-        return True
-    except Exception as e:
-        print(f"Error saving API key to file: {str(e)}")
-        return False
-
-def load_api_key_from_file():
-    """Load the API key from a file."""
-    try:
-        if os.path.exists(API_KEY_FILE):
-            with open(API_KEY_FILE, 'r') as f:
-                data = json.load(f)
-                return data.get('api_key')
-    except Exception as e:
-        print(f"Error loading API key from file: {str(e)}")
-    return None
 
 # Load API key at startup
 api_key = load_api_key_from_file()
@@ -88,11 +64,12 @@ def about():
 @app.route('/save_api_key', methods=['POST'])
 def save_api_key():
     api_key = request.form.get('api_key', '').strip()
-    
+    existing_key = load_api_key_from_file()
+
     # Check if this is a status check request
     if api_key == 'check_status_only':
         # Check both session and file for API key
-        is_configured = ('gemini_api_key' in session and session['gemini_api_key']) or load_api_key_from_file() is not None
+        is_configured = ('gemini_api_key' in session and session['gemini_api_key']) or existing_key is not None
         return jsonify({
             'success': True,
             'is_update': is_configured,
@@ -103,7 +80,7 @@ def save_api_key():
         return jsonify({'success': False, 'message': 'API key cannot be empty'}), 400
     
     # Check if this is a new API key or an update
-    is_update = 'gemini_api_key' in session or load_api_key_from_file() is not None
+    is_update = 'gemini_api_key' in session or existing_key is not None
     
     # Store the API key in the session and in the file
     session['gemini_api_key'] = api_key
