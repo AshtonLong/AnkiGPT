@@ -1,6 +1,6 @@
 # AnkiGPT
 
-AnkiGPT is a powerful tool that automatically generates high-quality Anki flashcards from your study notes or PDF files using Google's Gemini AI. Perfect for students, educators, and lifelong learners looking to optimize their study process.
+AnkiGPT is a powerful tool that automatically generates high-quality Anki flashcards from your study notes or PDF files using OpenRouter with open-source models. Perfect for students, educators, and lifelong learners looking to optimize their study process.
 
 ## Features
 
@@ -17,7 +17,7 @@ AnkiGPT is a powerful tool that automatically generates high-quality Anki flashc
 ### Prerequisites
 
 - Python 3.8 or higher
-- Google Gemini API key
+- OpenRouter API key
 
 ### Installation
 
@@ -34,7 +34,7 @@ AnkiGPT is a powerful tool that automatically generates high-quality Anki flashc
 
 3. Create a `.env` file in the project root (optional):
    ```
-   GEMINI_API_KEY=your_gemini_api_key_here
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
    ```
    Alternatively, you can input your API key through the web interface.
 
@@ -50,7 +50,7 @@ Then access the web interface at http://localhost:5000 in your browser.
 ## Usage Guide
 
 1. **Enter Your API Key**:
-   - Access the About page to enter your Google Gemini API key
+   - Access the About page to enter your OpenRouter API key
    - This key is saved for future use
 
 2. **Input Study Material**:
@@ -75,7 +75,7 @@ Then access the web interface at http://localhost:5000 in your browser.
 
 AnkiGPT is built with:
 - Flask web framework
-- Google Generative AI (Gemini 2.5 Pro)
+- OpenRouter (models: openai/gpt-oss-120b, openai/gpt-oss-20b)
 - Genanki for Anki package creation
 - Modern HTML/CSS/JavaScript interface
 
@@ -91,7 +91,7 @@ You can customize the generated cards by selecting different focus areas:
 ## Troubleshooting
 
 ### API Key Issues
-- Ensure your Google Gemini API key is valid and has sufficient quota
+- Ensure your OpenRouter API key is valid and has sufficient quota
 - The application will store your API key locally for convenience
 
 ### Rate Limiting
@@ -100,10 +100,10 @@ You can customize the generated cards by selecting different focus areas:
 
 ### PDF Processing
 - For large PDFs, consider splitting them into smaller sections
-- Some heavily formatted PDFs may not parse optimally
+- Some heavily formatted PDFs may not extract text optimally
 
 ## Acknowledgments
 
-- Built with Google's Gemini AI
+- Built with OpenRouter + OpenAI OSS models
 - Uses the Genanki library for Anki integration
 - Inspired by the spaced repetition learning technique

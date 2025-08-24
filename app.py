@@ -5,7 +5,7 @@ import tempfile
 from dotenv import load_dotenv
 from flask_session import Session
 
-from gemini_utils import generate_anki_cards, initialize_gemini, set_api_key
+from openrouter_utils import generate_anki_cards, set_api_key, generate_improved_card
 from anki_utils import parse_cloze_cards, create_anki_deck, export_deck
 from api_key_utils import save_api_key_to_file, load_api_key_from_file, API_KEY_FILE
 
@@ -69,7 +69,7 @@ def save_api_key():
     # Check if this is a status check request
     if api_key == 'check_status_only':
         # Check both session and file for API key
-        is_configured = ('gemini_api_key' in session and session['gemini_api_key']) or existing_key is not None
+        is_configured = ('openrouter_api_key' in session and session['openrouter_api_key']) or existing_key is not None
         return jsonify({
             'success': True,
             'is_update': is_configured,
@@ -80,10 +80,10 @@ def save_api_key():
         return jsonify({'success': False, 'message': 'API key cannot be empty'}), 400
     
     # Check if this is a new API key or an update
-    is_update = 'gemini_api_key' in session or existing_key is not None
+    is_update = 'openrouter_api_key' in session or existing_key is not None
     
     # Store the API key in the session and in the file
-    session['gemini_api_key'] = api_key
+    session['openrouter_api_key'] = api_key
     save_api_key_to_file(api_key)
     
     # Set the API key for the current session
@@ -106,7 +106,7 @@ def loading():
         # We no longer collect card_count from the user form
         session['card_count'] = 'all'  # Use 'all' to indicate we want to generate cards from all material
         # Store the selected AI model
-        session['model_name'] = request.form.get('model_name', 'gemini-2.5-pro-preview-05-06')
+        session['model_name'] = request.form.get('model_name', 'openai/gpt-oss-120b')
         
         # Handle either text input or PDF upload
         pdf_file = request.files.get('pdf_file')
@@ -131,18 +131,18 @@ def loading():
             return redirect(url_for('index'))
     
     # For both GET and POST, check if API key is set in session or file
-    api_key = session.get('gemini_api_key') or load_api_key_from_file()
+    api_key = session.get('openrouter_api_key') or load_api_key_from_file()
     if not api_key:
         # Store a flag to indicate we're coming from the loading page
         session['redirect_from_loading'] = True
         # Make sure the flag is set to True (not just present)
         session.modified = True
-        flash('Please set your Gemini API key before generating cards', 'warning')
+        flash('Please set your OpenRouter API key before generating cards', 'warning')
         # Add an anchor to the URL to scroll to the API key section
         return redirect(url_for('about') + '#api-key-section')
     else:
         # Ensure the API key is set in the session
-        session['gemini_api_key'] = api_key
+        session['openrouter_api_key'] = api_key
         # Set the API key for the current session
         set_api_key(api_key)
     
@@ -170,7 +170,7 @@ def generate():
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
     
     # Get the selected model name
-    model_name = session.get('model_name', 'gemini-2.5-pro-preview-05-06')
+    model_name = session.get('model_name', 'openai/gpt-oss-120b')
     
     # Clear session data
     session.pop('notes_text', None)
@@ -185,12 +185,12 @@ def generate():
     
     try:
         # Check if user has provided a custom API key (in session or file)
-        api_key = session.get('gemini_api_key') or load_api_key_from_file()
+        api_key = session.get('openrouter_api_key') or load_api_key_from_file()
         if api_key:
             # Use the custom API key
             set_api_key(api_key)
         
-        # Generate Anki cards using Gemini API
+        # Generate Anki cards using OpenRouter API
         if using_pdf and pdf_path and os.path.exists(pdf_path):
             # Generate cards from PDF
             generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
@@ -249,16 +249,16 @@ def regenerate_card():
             return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
         
         # Check if API key is set
-        api_key = session.get('gemini_api_key') or load_api_key_from_file()
+        api_key = session.get('openrouter_api_key') or load_api_key_from_file()
         if not api_key:
             return jsonify({'success': False, 'message': 'API key not set'}), 400
         
         # Set the API key
         set_api_key(api_key)
-        
-        # Always use the Flash model for regeneration for faster response
-        model_name = "gemini-2.5-flash-preview-05-20"
-        
+
+        # Always use the smaller OSS model for regeneration for faster response
+        model_name = "openai/gpt-oss-20b"
+
         # Generate a new card using a specialized prompt
         prompt = f"""
         You are an expert educator specializing in creating high-quality Anki flashcards. Your task is to fix and improve the original card shown below by creating a better version that addresses common issues.
@@ -294,14 +294,8 @@ def regenerate_card():
         Return ONLY the improved card text with no additional explanation or commentary.
         """
         
-        # Initialize Gemini and generate the new card
-        genai_module = initialize_gemini()
-        genai_module.configure(api_key=api_key)
-        model = genai_module.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
-        
-        # Get the generated text and clean it up
-        new_card_text = response.text.strip()
+        # Generate using OpenRouter
+        new_card_text = generate_improved_card(notes_text, card_text, model_name=model_name).strip()
         
         # Validate that the response contains a cloze deletion
         if '{{c' not in new_card_text or '::' not in new_card_text or '}}' not in new_card_text:
