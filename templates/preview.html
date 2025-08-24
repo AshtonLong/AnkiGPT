@@ -40,6 +40,7 @@
                 <form action="{{ url_for('export') }}" method="post" id="export-form">
                     <input type="hidden" name="deck_name" value="{{ deck_name }}">
                     <input type="hidden" name="notes_text" id="notes-text-hidden" value="{{ notes_text }}">
+                    <input type="hidden" name="card_type" value="{{ card_type or 'cloze' }}">
                     
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -50,25 +51,48 @@
                         </div>
                         
                         <div class="row">
-                            {% for card in cards %}
-                            <div class="col-md-6" data-aos="fade-up" data-aos-delay="{{ 200 + loop.index * 50 }}">
-                                <div class="card-preview position-relative">
-                                    <div class="card-count-badge">{{ loop.index }}</div>
-                                    <div class="form-floating">
-                                        <textarea class="form-control" name="card_text" id="card{{ loop.index }}">{{ card.text }}</textarea>
-                                        <label for="card{{ loop.index }}">Card {{ loop.index }}</label>
-                                    </div>
-                                    <div class="card-actions">
-                                        <button type="button" class="btn btn-sm btn-outline-primary regenerate-card" data-card-id="{{ loop.index }}">
-                                            <i class="fas fa-sync-alt me-1"></i> Regenerate
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger remove-card" data-card-id="{{ loop.index }}">
-                                            <i class="fas fa-trash-alt me-1"></i> Remove
-                                        </button>
+                            {% if (card_type or 'cloze') == 'basic' %}
+                                {% for card in cards %}
+                                <div class="col-md-6" data-aos="fade-up" data-aos-delay="{{ 200 + loop.index * 50 }}">
+                                    <div class="card-preview position-relative">
+                                        <div class="card-count-badge">{{ loop.index }}</div>
+                                        <div class="form-floating mb-2">
+                                            <textarea class="form-control" name="card_front" id="card{{ loop.index }}_front">{{ card.front }}</textarea>
+                                            <label for="card{{ loop.index }}_front">Front (Question) {{ loop.index }}</label>
+                                        </div>
+                                        <div class="form-floating">
+                                            <textarea class="form-control" name="card_back" id="card{{ loop.index }}_back">{{ card.back }}</textarea>
+                                            <label for="card{{ loop.index }}_back">Back (Answer) {{ loop.index }}</label>
+                                        </div>
+                                        <div class="card-actions">
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-card" data-card-id="{{ loop.index }}">
+                                                <i class="fas fa-trash-alt me-1"></i> Remove
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            {% endfor %}
+                                {% endfor %}
+                            {% else %}
+                                {% for card in cards %}
+                                <div class="col-md-6" data-aos="fade-up" data-aos-delay="{{ 200 + loop.index * 50 }}">
+                                    <div class="card-preview position-relative">
+                                        <div class="card-count-badge">{{ loop.index }}</div>
+                                        <div class="form-floating">
+                                            <textarea class="form-control" name="card_text" id="card{{ loop.index }}">{{ card.text }}</textarea>
+                                            <label for="card{{ loop.index }}">Card {{ loop.index }}</label>
+                                        </div>
+                                        <div class="card-actions">
+                                            <button type="button" class="btn btn-sm btn-outline-primary regenerate-card" data-card-id="{{ loop.index }}">
+                                                <i class="fas fa-sync-alt me-1"></i> Regenerate
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-card" data-card-id="{{ loop.index }}">
+                                                <i class="fas fa-trash-alt me-1"></i> Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
                     

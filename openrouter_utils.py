@@ -220,6 +220,89 @@ Create the cloze deletion cards out of the following educational material:
 
     return _chat_completion(prompt, model=model_name)
 
+def generate_basic_cards(input_content: str, card_count: str = '15-25', focus_area: str = 'balanced', is_pdf_path: bool = False, model_name: Optional[str] = None) -> str:
+    """Generate Basic Q/A Anki cards using OpenRouter models.
+
+    Output contract: each line is a single card in the form
+    "Q: question text || A: answer text" with no extra commentary.
+    """
+    if not model_name:
+        model_name = "openai/gpt-oss-120b"
+
+    focus_instruction = ""
+    if focus_area == 'definitions':
+        focus_instruction = "Focus primarily on key terms, concepts, and definitions."
+    elif focus_area == 'relationships':
+        focus_instruction = "Focus primarily on relationships between concepts, cause-effect connections, and comparisons."
+    elif focus_area == 'processes':
+        focus_instruction = "Focus primarily on processes, sequences, steps, and methodologies."
+    elif focus_area == 'examples':
+        focus_instruction = "Focus primarily on examples, applications, and case studies that illustrate the concepts."
+
+    notes_text = _extract_text_from_pdf(input_content) if is_pdf_path else input_content
+    summary = summarize_notes(notes_text)
+
+    system_prompt = r"""STEM Anki Basic Card Generator (Q/A)
+
+You create concise, high-yield Anki basic cards (front/back) for STEM learning.
+
+OUTPUT CONTRACT
+- Exactly one card per line; no blank lines; no headers.
+- Format PER LINE: Q: question text || A: answer text
+- The question must be self-contained, with enough context to be unambiguous.
+- Prefer single-fact recall; keep answers precise. Include units/conditions where relevant.
+- Avoid trivial facts; focus on high-yield concepts, definitions, relationships, and key parameters.
+
+CLARITY RULES
+- Provide minimal necessary context in the question so the answer is unique.
+- Keep numbers with units together; use inline LaTeX \( ... \) when appropriate.
+- Avoid requiring outside knowledge beyond the provided material.
+
+EXAMPLES
+Q: What is the derivative of \(\sin x\)? || A: \(\cos x\)
+Q: State Newton's second law. || A: \(F = ma\)
+Q: At sea level, water boils at which temperature? || A: 100 °C
+Q: In PCR, what are the three main steps? || A: denaturation; annealing; extension
+"""
+
+    prompt = f"""
+{focus_instruction}
+
+Create Basic (front/back) cards from the following summarized material:
+{summary}
+"""
+
+    # Use system + user messages with system prompt swapped in
+    api_key = _ensure_api_key()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": os.environ.get("OPENROUTER_SITE_URL", "http://localhost"),
+        "X-Title": os.environ.get("OPENROUTER_APP_TITLE", "AnkiGPT"),
+    }
+    body = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.4,
+    }
+    resp = requests.post(OPENROUTER_API_URL, json=body, headers=headers, timeout=120)
+    if resp.status_code == 429:
+        raise RuntimeError("Rate limit exceeded (429) from OpenRouter")
+    if not resp.ok:
+        try:
+            detail = resp.json()
+        except Exception:
+            detail = resp.text
+        raise RuntimeError(f"OpenRouter error {resp.status_code}: {detail}")
+    data = resp.json()
+    try:
+        return data["choices"][0]["message"]["content"].strip()
+    except Exception:
+        raise RuntimeError("Unexpected OpenRouter response format")
+
 def generate_improved_card(notes_text: str, original_card_text: str, model_name: Optional[str] = None) -> str:
     """Generate an improved version of a single cloze card."""
     if not model_name:

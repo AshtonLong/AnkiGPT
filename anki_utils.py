@@ -5,47 +5,7 @@ from datetime import datetime
 
 # Define the Anki note model for Cloze cards with a fixed ID
 # Use a specific, persistent ID instead of a random one to prevent duplicate note types in Anki
-CLOZE_MODEL = genanki.Model(
-    1380112066,  # Magic number to attempt to fix duplicate note types
-    'AnkiGPT Cloze Model',
-    fields=[
-        {'name': 'Text'},
-        {'name': 'Extra'},
-        {'name': 'Source'},
-    ],
-    templates=[
-        {
-            'name': 'Cloze Card',
-            'qfmt': '''
-<div class="ankigpt-card">
-    <div class="ankigpt-content">
-        {{cloze:Text}}
-    </div>
-    {{#Extra}}
-    <div class="ankigpt-extra">
-        {{Extra}}
-    </div>
-    {{/Extra}}
-</div>
-''',
-            'afmt': '''
-<div class="ankigpt-card">
-    <div class="ankigpt-content">
-        {{cloze:Text}}
-    </div>
-    {{#Extra}}
-    <div class="ankigpt-extra">
-        {{Extra}}
-    </div>
-    {{/Extra}}
-    <div class="ankigpt-source">
-        Source: {{Source}}
-    </div>
-</div>
-''',
-        },
-    ],
-    css='''
+CSS_STYLE = '''
 /* AnkiGPT Card Styling - Enhanced to match site style */
 .card {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -113,9 +73,7 @@ CLOZE_MODEL = genanki.Model(
     background-color: rgba(76, 201, 240, 0.08);
 }
 
-.ankigpt-content .cloze-brackets {
-    display: none;
-}
+.ankigpt-content .cloze-brackets { display: none; }
 
 .ankigpt-content .cloze-hidden {
     border-bottom: 2px dashed rgba(76, 201, 240, 0.6);
@@ -165,9 +123,7 @@ img {
 }
 
 /* Base styling for elements */
-p {
-    margin-bottom: 12px;
-}
+p { margin-bottom: 12px; }
 
 strong, b {
     font-weight: 600;
@@ -175,30 +131,13 @@ strong, b {
     text-shadow: 0 0 1px rgba(247, 37, 133, 0.2);
 }
 
-em, i {
-    font-style: italic;
-    color: #4cc9f0;
-}
+em, i { font-style: italic; color: #4cc9f0; }
 
 /* List styling */
-ul, ol {
-    padding-left: 25px;
-    margin-bottom: 18px;
-}
-
-li {
-    margin-bottom: 8px;
-    position: relative;
-}
-
-ul li::marker {
-    color: #4cc9f0;
-}
-
-ol li::marker {
-    color: #f72585;
-    font-weight: 600;
-}
+ul, ol { padding-left: 25px; margin-bottom: 18px; }
+li { margin-bottom: 8px; position: relative; }
+ul li::marker { color: #4cc9f0; }
+ol li::marker { color: #f72585; font-weight: 600; }
 
 /* Code blocks if any */
 code, pre {
@@ -210,61 +149,100 @@ code, pre {
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-
-pre {
-    padding: 15px;
-    overflow-x: auto;
-    margin: 15px 0;
-    line-height: 1.5;
-}
+pre { padding: 15px; overflow-x: auto; margin: 15px 0; line-height: 1.5; }
 
 /* Table styling */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 15px 0;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-th {
-    background-color: rgba(67, 97, 238, 0.2);
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    font-weight: 600;
-    color: #dee2e6;
-}
-
-td {
-    padding: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background-color: rgba(30, 30, 50, 0.5);
-}
+table { width: 100%; border-collapse: collapse; margin: 15px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+th { background-color: rgba(67, 97, 238, 0.2); padding: 12px; border: 1px solid rgba(255, 255, 255, 0.1); font-weight: 600; color: #dee2e6; }
+td { padding: 10px; border: 1px solid rgba(255, 255, 255, 0.1); background-color: rgba(30, 30, 50, 0.5); }
 
 /* Blockquote styling */
-blockquote {
-    border-left: 4px solid #4361ee;
-    padding: 10px 15px;
-    margin: 15px 0;
-    background-color: rgba(67, 97, 238, 0.08);
-    border-radius: 0 8px 8px 0;
-    font-style: italic;
-}
+blockquote { border-left: 4px solid #4361ee; padding: 10px 15px; margin: 15px 0; background-color: rgba(67, 97, 238, 0.08); border-radius: 0 8px 8px 0; font-style: italic; }
 
-/* Definition term styling */
-dt {
-    font-weight: 600;
-    color: #4cc9f0;
-    margin-top: 10px;
-}
+/* Definition list styling */
+dt { font-weight: 600; color: #4cc9f0; margin-top: 10px; }
+dd { margin-left: 20px; margin-bottom: 10px; }
+'''
 
-dd {
-    margin-left: 20px;
-    margin-bottom: 10px;
-}
+CLOZE_MODEL = genanki.Model(
+    1380112066,  # Magic number to attempt to fix duplicate note types
+    'AnkiGPT Cloze Model',
+    fields=[
+        {'name': 'Text'},
+        {'name': 'Extra'},
+        {'name': 'Source'},
+    ],
+    templates=[
+        {
+            'name': 'Cloze Card',
+            'qfmt': '''
+<div class="ankigpt-card">
+    <div class="ankigpt-content">
+        {{cloze:Text}}
+    </div>
+    {{#Extra}}
+    <div class="ankigpt-extra">
+        {{Extra}}
+    </div>
+    {{/Extra}}
+</div>
 ''',
+            'afmt': '''
+<div class="ankigpt-card">
+    <div class="ankigpt-content">
+        {{cloze:Text}}
+    </div>
+    {{#Extra}}
+    <div class="ankigpt-extra">
+        {{Extra}}
+    </div>
+    {{/Extra}}
+    <div class="ankigpt-source">
+        Source: {{Source}}
+    </div>
+</div>
+''',
+        },
+    ],
+    css=CSS_STYLE,
     model_type=genanki.Model.CLOZE
+)
+
+# Define the Anki note model for Basic (Front/Back) cards with a fixed ID
+BASIC_MODEL = genanki.Model(
+    1380112067,  # Different fixed ID from cloze model
+    'AnkiGPT Basic Model',
+    fields=[
+        {'name': 'Front'},
+        {'name': 'Back'},
+        {'name': 'Source'},
+    ],
+    templates=[
+        {
+            'name': 'Basic Card',
+            'qfmt': '''
+<div class="ankigpt-card">
+    <div class="ankigpt-content">
+        {{Front}}
+    </div>
+</div>
+''',
+            'afmt': '''
+<div class="ankigpt-card">
+    <div class="ankigpt-content">
+        {{Front}}
+    </div>
+    <div class="ankigpt-extra">
+        {{Back}}
+    </div>
+    <div class="ankigpt-source">
+        Source: {{Source}}
+    </div>
+</div>
+''',
+        },
+    ],
+    css=CSS_STYLE,
 )
 
 def parse_cloze_cards(text):
@@ -290,6 +268,30 @@ def parse_cloze_cards(text):
                 'source': 'AnkiGPT'
             })
     
+    return cards
+
+def parse_basic_cards(text):
+    """
+    Parse generated text into Basic Q/A cards.
+
+    Expected format per line: "Q: question text || A: answer text"
+    """
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    cards = []
+    for line in lines:
+        # Split on delimiter
+        if '||' in line and ('Q:' in line or 'q:' in line) and ('A:' in line or 'a:' in line):
+            parts = [p.strip() for p in line.split('||', 1)]
+            if len(parts) == 2:
+                q = parts[0]
+                a = parts[1]
+                # Remove labels if present
+                if q.lower().startswith('q:'):
+                    q = q[2:].strip()
+                if a.lower().startswith('a:'):
+                    a = a[2:].strip()
+                if q and a:
+                    cards.append({'front': q, 'back': a, 'source': 'AnkiGPT'})
     return cards
 
 def create_anki_deck(cards, deck_name=None):
@@ -318,6 +320,30 @@ def create_anki_deck(cards, deck_name=None):
         )
         deck.add_note(note)
     
+    return deck
+
+def create_basic_deck(cards, deck_name=None):
+    """
+    Create an Anki deck for Basic cards.
+
+    Args:
+        cards (list): List of dicts with 'front', 'back', 'source'
+        deck_name (str, optional)
+    """
+    if not deck_name:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        deck_name = f"AnkiGPT_Deck_{timestamp}"
+
+    deck_id = random.randrange(1 << 30, 1 << 31)
+    deck = genanki.Deck(deck_id, deck_name)
+
+    for card in cards:
+        note = genanki.Note(
+            model=BASIC_MODEL,
+            fields=[card['front'], card['back'], card.get('source', 'AnkiGPT')]
+        )
+        deck.add_note(note)
+
     return deck
 
 def export_deck(deck, output_dir='.'):

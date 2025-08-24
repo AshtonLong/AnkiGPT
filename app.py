@@ -7,8 +7,8 @@ import tempfile
 from dotenv import load_dotenv
 from flask_session import Session
 
-from openrouter_utils import generate_anki_cards, set_api_key, generate_improved_card
-from anki_utils import parse_cloze_cards, create_anki_deck, export_deck
+from openrouter_utils import generate_anki_cards, generate_basic_cards, set_api_key, generate_improved_card
+from anki_utils import parse_cloze_cards, parse_basic_cards, create_anki_deck, create_basic_deck, export_deck
 from api_key_utils import save_api_key_to_file, load_api_key_from_file, API_KEY_FILE
 
 # Load environment variables
@@ -37,7 +37,7 @@ if api_key:
 # In-memory job store for background generation
 JOBS = {}
 
-def _run_generation_job(job_id, *, notes_text, using_pdf, pdf_path, deck_name, card_count, focus_area, model_name, api_key):
+def _run_generation_job(job_id, *, notes_text, using_pdf, pdf_path, deck_name, card_count, focus_area, model_name, api_key, card_type):
     try:
         # Set API key for this thread
         if api_key:
@@ -45,20 +45,27 @@ def _run_generation_job(job_id, *, notes_text, using_pdf, pdf_path, deck_name, c
 
         # Generate
         if using_pdf and pdf_path and os.path.exists(pdf_path):
-            generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
+            if card_type == 'basic':
+                generated_text = generate_basic_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
+            else:
+                generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
             try:
                 os.remove(pdf_path)
             except Exception:
                 pass
         else:
-            generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
+            if card_type == 'basic':
+                generated_text = generate_basic_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
+            else:
+                generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
 
-        cards = parse_cloze_cards(generated_text)
+        cards = parse_basic_cards(generated_text) if card_type == 'basic' else parse_cloze_cards(generated_text)
         JOBS[job_id] = {
             'status': 'done',
             'cards': cards,
             'deck_name': deck_name,
             'notes_text': notes_text,
+            'card_type': card_type,
         }
     except Exception as e:
         JOBS[job_id] = {
@@ -142,6 +149,8 @@ def loading():
         session['card_count'] = 'all'  # Use 'all' to indicate we want to generate cards from all material
         # Store the selected AI model
         session['model_name'] = request.form.get('model_name', 'openai/gpt-5-mini')
+        # Card type selection
+        session['card_type'] = request.form.get('card_type', 'cloze')
         
         # Handle either text input or PDF upload
         pdf_file = request.files.get('pdf_file')
@@ -190,6 +199,7 @@ def loading():
         card_count = session.get('card_count', 'all')
         focus_area = session.get('focus_area', 'balanced')
         model_name = session.get('model_name', 'openai/gpt-5-mini')
+        card_type = session.get('card_type', 'cloze')
 
         # Determine a sensible default deck name later in preview if needed
 
@@ -208,6 +218,7 @@ def loading():
             focus_area=focus_area,
             model_name=model_name,
             api_key=api_key,
+            card_type=card_type,
         ))
         t.daemon = True
         t.start()
@@ -251,6 +262,7 @@ def preview():
     cards = job.get('cards') or []
     notes_text = job.get('notes_text') or ''
     deck_name = job.get('deck_name')
+    card_type = job.get('card_type', 'cloze')
     if not cards:
         flash('No valid cloze deletion cards were generated. Please try again with different notes.', 'error')
         return redirect(url_for('index'))
@@ -270,8 +282,9 @@ def preview():
     session.pop('focus_area', None)
     session.pop('using_pdf', None)
     session.pop('pdf_path', None)
+    session.pop('card_type', None)
 
-    return render_template('preview.html', cards=cards, deck_name=deck_name, notes_text=notes_text)
+    return render_template('preview.html', cards=cards, deck_name=deck_name, notes_text=notes_text, card_type=card_type)
 
 @app.route('/generate', methods=['GET', 'POST'])
 def generate():
@@ -287,15 +300,17 @@ def generate():
     # Use 'all' as the default card_count to generate cards from all material
     card_count = request.form.get('card_count', '') or session.get('card_count', 'all')
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
-    
+
     # Get the selected model name
     model_name = session.get('model_name', 'openai/gpt-5-mini')
+    card_type = request.form.get('card_type', '') or session.get('card_type', 'cloze')
     
     # Clear session data
     session.pop('notes_text', None)
     session.pop('deck_name', None)
     session.pop('card_count', None)
     session.pop('focus_area', None)
+    session.pop('card_type', None)
     
     # Validate input (either text or PDF must be provided)
     if not using_pdf and not notes_text.strip():
@@ -312,7 +327,10 @@ def generate():
         # Generate Anki cards using OpenRouter API
         if using_pdf and pdf_path and os.path.exists(pdf_path):
             # Generate cards from PDF
-            generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
+            if card_type == 'basic':
+                generated_text = generate_basic_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
+            else:
+                generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
             # Clean up the PDF file after use
             try:
                 os.remove(pdf_path)
@@ -323,13 +341,19 @@ def generate():
             session.pop('pdf_path', None)
         else:
             # Generate cards from text
-            generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
-        
+            if card_type == 'basic':
+                generated_text = generate_basic_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
+            else:
+                generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
+
         # Parse the generated text into cards
-        cards = parse_cloze_cards(generated_text)
+        cards = parse_basic_cards(generated_text) if card_type == 'basic' else parse_cloze_cards(generated_text)
         
         if not cards:
-            flash('No valid cloze deletion cards were generated. Please try again with different notes.', 'error')
+            if card_type == 'basic':
+                flash('No valid basic cards were generated. Please try again with different notes.', 'error')
+            else:
+                flash('No valid cloze deletion cards were generated. Please try again with different notes.', 'error')
             return redirect(url_for('index'))
         
         # Set a default deck name if none provided
@@ -345,7 +369,8 @@ def generate():
         return render_template('preview.html', 
                               cards=cards, 
                               deck_name=deck_name,
-                              notes_text=notes_text)
+                              notes_text=notes_text,
+                              card_type=card_type)
         
     except Exception as e:
         # Check if this is a rate limit error
@@ -405,18 +430,29 @@ def regenerate_card():
 def export():
     try:
         # Get data from the form
-        cards_data = request.form.getlist('card_text')
+        card_type = request.form.get('card_type', 'cloze')
+        if card_type == 'basic':
+            fronts = request.form.getlist('card_front')
+            backs = request.form.getlist('card_back')
+        else:
+            cards_data = request.form.getlist('card_text')
         deck_name = request.form.get('deck_name', '').strip() or None
-        
-        # Convert to the format expected by create_anki_deck
-        cards = [{'text': text, 'extra': '', 'source': 'AnkiGPT'} for text in cards_data if text.strip()]
+
+        # Convert to the format expected by deck builders
+        if card_type == 'basic':
+            cards = []
+            for f, b in zip(fronts, backs):
+                if f.strip() and b.strip():
+                    cards.append({'front': f.strip(), 'back': b.strip(), 'source': 'AnkiGPT'})
+        else:
+            cards = [{'text': text, 'extra': '', 'source': 'AnkiGPT'} for text in cards_data if text.strip()]
         
         if not cards:
             flash('No cards to export', 'error')
             return redirect(url_for('index'))
         
         # Create and export the deck
-        deck = create_anki_deck(cards, deck_name)
+        deck = create_basic_deck(cards, deck_name) if card_type == 'basic' else create_anki_deck(cards, deck_name)
         
         # Ensure the temp directory exists
         os.makedirs(TEMP_DIR, exist_ok=True)

@@ -59,6 +59,19 @@
                             <div class="form-text">Choose what type of cards to emphasize</div>
                         </div>
                         <div class="col-md-6">
+                            <label for="card_type" class="form-label">Card Type</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                <select class="form-select" id="card_type" name="card_type">
+                                    <option value="cloze" selected>Cloze Deletion</option>
+                                    <option value="basic">Basic (Q/A)</option>
+                                </select>
+                            </div>
+                            <div class="form-text">Choose between Cloze and Basic Q/A</div>
+                        </div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
                             <label for="model_name" class="form-label">AI Model</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-microchip"></i></span>
