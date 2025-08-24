@@ -8,13 +8,7 @@
 
 {% block content %}
 <div class="loading-container">
-    <!-- Hidden form that will be submitted automatically -->
-    <form id="processingForm" action="{{ url_for('generate') }}" method="post">
-        <input type="hidden" name="notes" value="{{ session.get('notes_text', '') }}">
-        <input type="hidden" name="deck_name" value="{{ session.get('deck_name', '') }}">
-        <input type="hidden" name="card_count" value="{{ session.get('card_count', '15-25') }}">
-        <input type="hidden" name="focus_area" value="{{ session.get('focus_area', 'balanced') }}">
-    </form>
+    <!-- Background generation starts on server; page polls for completion -->
     
     <div class="brain-loader" data-aos="fade-in">
         <div class="loader-ring"></div>
@@ -173,29 +167,59 @@
             }, 300);
         }
         
-        // AI steps animation
+        // AI steps animation + polling
         const steps = document.querySelectorAll('.ai-step');
         let currentStep = 1; // Start with step 2 (index 1) as active
-        
-        // Simulate AI processing steps
+        let stepInterval;
+
+        function advanceStep() {
+            if (currentStep < steps.length - 1) {
+                steps[currentStep].classList.remove('active');
+                steps[currentStep].classList.add('completed');
+                currentStep++;
+                steps[currentStep].classList.add('active');
+            }
+        }
+
+        function completeAllSteps() {
+            // Jump remaining steps to completed
+            while (currentStep < steps.length - 1) {
+                advanceStep();
+            }
+            steps[currentStep].classList.remove('active');
+            steps[currentStep].classList.add('completed');
+        }
+
+        // Start simulated step progression
         setTimeout(function() {
-            const stepInterval = setInterval(function() {
-                if (currentStep >= steps.length - 1) {
-                    clearInterval(stepInterval);
-                    
-                    // When all steps are complete, submit the form
-                    setTimeout(function() {
-                        document.getElementById('processingForm').submit();
-                    }, 1500);
-                } else {
-                    // Mark current step as completed and activate next step
-                    steps[currentStep].classList.remove('active');
-                    steps[currentStep].classList.add('completed');
-                    currentStep++;
-                    steps[currentStep].classList.add('active');
+            stepInterval = setInterval(advanceStep, 3000);
+        }, 2000);
+
+        // Poll server for completion
+        const pollInterval = setInterval(async function() {
+            try {
+                const res = await fetch('/generation_status');
+                const data = await res.json();
+                if (data.error) {
+                    clearInterval(pollInterval);
+                    if (stepInterval) clearInterval(stepInterval);
+                    alert(data.is_rate_limit ? 'Rate limit exceeded. Please try again shortly.' : ('Error: ' + (data.message || 'Unknown error')));
+                    window.location.href = '/';
+                    return;
                 }
-            }, 3000); // Each step takes 3 seconds
-        }, 2000); // Start after 2 seconds
+                if (data.done) {
+                    clearInterval(pollInterval);
+                    if (stepInterval) clearInterval(stepInterval);
+                    // Snap progress to 100%
+                    progressBar.style.width = '100%';
+                    completeAllSteps();
+                    // Small delay for UX, then go to preview
+                    setTimeout(function() { window.location.href = '/preview'; }, 600);
+                }
+            } catch (e) {
+                // Ignore intermittent errors and keep polling
+            }
+        }, 1000);
     });
 </script>
 {% endblock %} 

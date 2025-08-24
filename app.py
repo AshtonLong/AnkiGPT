@@ -1,4 +1,6 @@
 import os
+import threading
+import uuid
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session, jsonify
 from werkzeug.utils import secure_filename
 import tempfile
@@ -31,6 +33,39 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 api_key = load_api_key_from_file()
 if api_key:
     set_api_key(api_key)
+
+# In-memory job store for background generation
+JOBS = {}
+
+def _run_generation_job(job_id, *, notes_text, using_pdf, pdf_path, deck_name, card_count, focus_area, model_name, api_key):
+    try:
+        # Set API key for this thread
+        if api_key:
+            set_api_key(api_key)
+
+        # Generate
+        if using_pdf and pdf_path and os.path.exists(pdf_path):
+            generated_text = generate_anki_cards(pdf_path, card_count=card_count, focus_area=focus_area, is_pdf_path=True, model_name=model_name)
+            try:
+                os.remove(pdf_path)
+            except Exception:
+                pass
+        else:
+            generated_text = generate_anki_cards(notes_text, card_count=card_count, focus_area=focus_area, model_name=model_name)
+
+        cards = parse_cloze_cards(generated_text)
+        JOBS[job_id] = {
+            'status': 'done',
+            'cards': cards,
+            'deck_name': deck_name,
+            'notes_text': notes_text,
+        }
+    except Exception as e:
+        JOBS[job_id] = {
+            'status': 'error',
+            'message': str(e),
+            'is_rate_limit': is_rate_limit_error(e)
+        }
 
 # Function to check if an error is a rate limit error
 def is_rate_limit_error(error):
@@ -145,6 +180,37 @@ def loading():
         session['openrouter_api_key'] = api_key
         # Set the API key for the current session
         set_api_key(api_key)
+
+    # If this came from POST, start the background generation job
+    if request.method == 'POST':
+        notes_text = session.get('notes_text', '')
+        using_pdf = session.get('using_pdf', False)
+        pdf_path = session.get('pdf_path') if using_pdf else None
+        deck_name = session.get('deck_name')
+        card_count = session.get('card_count', 'all')
+        focus_area = session.get('focus_area', 'balanced')
+        model_name = session.get('model_name', 'openai/gpt-oss-120b')
+
+        # Determine a sensible default deck name later in preview if needed
+
+        # Create job id and start thread
+        job_id = uuid.uuid4().hex
+        session['job_id'] = job_id
+        # Ensure clean previous job
+        JOBS.pop(job_id, None)
+        t = threading.Thread(target=_run_generation_job, kwargs=dict(
+            job_id=job_id,
+            notes_text=notes_text,
+            using_pdf=using_pdf,
+            pdf_path=pdf_path,
+            deck_name=deck_name,
+            card_count=card_count,
+            focus_area=focus_area,
+            model_name=model_name,
+            api_key=api_key,
+        ))
+        t.daemon = True
+        t.start()
     
     # For GET requests, check if we have the necessary session data
     if request.method == 'GET' and not (('notes_text' in session and session['notes_text'].strip()) or 
@@ -153,6 +219,59 @@ def loading():
         return redirect(url_for('index'))
     
     return render_template('loading.html')
+
+@app.route('/generation_status', methods=['GET'])
+def generation_status():
+    job_id = session.get('job_id')
+    if not job_id:
+        return jsonify({'done': False, 'message': 'No job'}), 200
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({'done': False}), 200
+    if job.get('status') == 'done':
+        return jsonify({'done': True}), 200
+    if job.get('status') == 'error':
+        return jsonify({'done': False, 'error': True, 'message': job.get('message'), 'is_rate_limit': job.get('is_rate_limit', False)}), 200
+    return jsonify({'done': False}), 200
+
+@app.route('/preview', methods=['GET'])
+def preview():
+    job_id = session.get('job_id')
+    job = JOBS.pop(job_id, None)
+    if not job:
+        flash('No generation job found. Please try again.', 'error')
+        return redirect(url_for('index'))
+    if job.get('status') == 'error':
+        if job.get('is_rate_limit'):
+            flash('Rate limit exceeded. Please wait a moment before trying again.', 'rate-limit')
+        else:
+            flash(f"Error generating cards: {job.get('message')}", 'error')
+        return redirect(url_for('index'))
+
+    cards = job.get('cards') or []
+    notes_text = job.get('notes_text') or ''
+    deck_name = job.get('deck_name')
+    if not cards:
+        flash('No valid cloze deletion cards were generated. Please try again with different notes.', 'error')
+        return redirect(url_for('index'))
+
+    # Default deck name if needed
+    if not deck_name:
+        words = (notes_text or '').split()[:3]
+        if len(words) > 0:
+            deck_name = f"AnkiGPT_{' '.join(words)}"
+        else:
+            deck_name = "AnkiGPT_Deck"
+
+    # Clear transient session fields used for generation
+    session.pop('notes_text', None)
+    session.pop('deck_name', None)
+    session.pop('card_count', None)
+    session.pop('focus_area', None)
+    session.pop('using_pdf', None)
+    session.pop('pdf_path', None)
+
+    return render_template('preview.html', cards=cards, deck_name=deck_name, notes_text=notes_text)
 
 @app.route('/generate', methods=['GET', 'POST'])
 def generate():
