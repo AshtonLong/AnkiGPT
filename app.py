@@ -377,41 +377,6 @@ def regenerate_card():
 
         # Always use the smaller OSS model for regeneration for faster response
         model_name = "openai/gpt-oss-20b"
-
-        # Generate a new card using a specialized prompt
-        prompt = f"""
-        You are an expert educator specializing in creating high-quality Anki flashcards. Your task is to fix and improve the original card shown below by creating a better version that addresses common issues.
-
-        ANALYSIS OF ORIGINAL CARD:
-        The original card may have one or more of these issues:
-        1. Poorly placed cloze deletion (hiding text that's too obvious, too difficult, or lacks sufficient context)
-        2. Assumes prior knowledge that isn't included in the card itself
-        3. Contains vague references or unclear language
-        4. Lacks sufficient context to understand what's being tested
-        5. Tests multiple concepts in a confusing way
-
-        INSTRUCTIONS FOR CREATING AN IMPROVED CARD:
-        1. Create ONE improved cloze deletion card that tests the SAME CONCEPT as the original card.
-        2. Use the format: {{{{c1::text to be hidden}}}} for the cloze deletions.
-        3. Make the card COMPLETELY SELF-CONTAINED - include all necessary context within the card itself.
-        4. Place the cloze deletion strategically:
-           - Hide key terms, concepts, or relationships that are worth memorizing
-           - Ensure the surrounding text provides clear context for what's being tested
-           - Don't hide information that's too obvious or too obscure
-        5. Use precise, specific language - avoid vague terms like "this," "these," or "it" without clear referents.
-        6. Keep the card focused on a single, clear concept from the notes.
-        7. Use clear, concise language that requires no external knowledge to understand.
-        8. Ensure the card is factually accurate and directly based on the provided notes.
-        
-        ORIGINAL CARD TO IMPROVE:
-        {card_text}
-        
-        NOTES (SOURCE MATERIAL):
-        {notes_text}
-        
-        RESPONSE FORMAT:
-        Return ONLY the improved card text with no additional explanation or commentary.
-        """
         
         # Generate using OpenRouter
         new_card_text = generate_improved_card(notes_text, card_text, model_name=model_name).strip()
