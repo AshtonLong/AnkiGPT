@@ -141,7 +141,7 @@ def loading():
         # We no longer collect card_count from the user form
         session['card_count'] = 'all'  # Use 'all' to indicate we want to generate cards from all material
         # Store the selected AI model
-        session['model_name'] = request.form.get('model_name', 'openai/gpt-oss-120b')
+        session['model_name'] = request.form.get('model_name', 'openai/gpt-5-mini')
         
         # Handle either text input or PDF upload
         pdf_file = request.files.get('pdf_file')
@@ -189,7 +189,7 @@ def loading():
         deck_name = session.get('deck_name')
         card_count = session.get('card_count', 'all')
         focus_area = session.get('focus_area', 'balanced')
-        model_name = session.get('model_name', 'openai/gpt-oss-120b')
+        model_name = session.get('model_name', 'openai/gpt-5-mini')
 
         # Determine a sensible default deck name later in preview if needed
 
@@ -289,7 +289,7 @@ def generate():
     focus_area = request.form.get('focus_area', '') or session.get('focus_area', 'balanced')
     
     # Get the selected model name
-    model_name = session.get('model_name', 'openai/gpt-oss-120b')
+    model_name = session.get('model_name', 'openai/gpt-5-mini')
     
     # Clear session data
     session.pop('notes_text', None)

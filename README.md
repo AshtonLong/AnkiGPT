@@ -75,7 +75,7 @@ Then access the web interface at http://localhost:5000 in your browser.
 
 AnkiGPT is built with:
 - Flask web framework
-- OpenRouter (models: openai/gpt-oss-120b, openai/gpt-oss-20b)
+- OpenRouter (models: openai/gpt-oss-120b, openai/gpt-oss-20b, openai/gpt-5-mini)
 - Genanki for Anki package creation
 - Modern HTML/CSS/JavaScript interface
 

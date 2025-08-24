@@ -63,8 +63,7 @@ OUTPUT CONTRACT
 - Prefer one fact per card; use multiple clozes only for tightly related items (short ordered lists, parameter sets in one relationship).
 
 LATEX SUPPORT (Anki understands \( … \) and \[ … \])
-- Use inline LaTeX with \( … \) for math in running text.
-- Use display LaTeX with \[ … \] only if absolutely necessary; inline is preferred for single-line cards.
+- Use inline LaTeX with \( … \) for math in running text. Only use inline LaTeX.
 - Cloze **inside** LaTeX when the target is mathematical: e.g., \( F = {{c1::m}}{{c2::a}} \) or \( e^{i\pi} + 1 = {{c1::0}} \).
 - Do not reveal the answer outside the math region: keep the cloze confined to where the learner should recall the item.
 - Keep LaTeX minimal and readable (avoid over-formatting).
@@ -159,11 +158,10 @@ def summarize_notes(text: str, model_name: Optional[str] = None) -> str:
         if not text or not text.strip():
                 raise ValueError("No text provided to summarize")
 
-        # Use a smaller/faster model by default for summarization
-        if not model_name:
-                model_name = "openai/gpt-oss-120b"
+        # Always use the OSS 120B model for summarization (enforced)
+        model_name = "openai/gpt-oss-120b"
 
-                prompt = fr"""
+        prompt = fr"""
 You are an expert academic summarizer. Convert the following raw notes into a
 single, comprehensive study sheet suitable for exam review. Requirements:
 - The resulting study sheet must be comprehensive. Preserve all important facts, definitions, relationships, formulas,
