@@ -145,6 +145,13 @@ def deck_editor(deck_id):
     if redirect_resp:
         return redirect_resp
     deck = Deck.query.get_or_404(deck_id)
+    dropped = (deck.settings_json or {}).get("dropped_cards")
+    if dropped:
+        flash(f"{dropped} cards were dropped during generation checks.", "info")
+        updated_settings = dict(deck.settings_json or {})
+        updated_settings.pop("dropped_cards", None)
+        deck.settings_json = updated_settings
+        db.session.commit()
     q = request.args.get("q", "").strip()
     card_type = request.args.get("type", "")
     status = request.args.get("status", "")
