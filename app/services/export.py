@@ -19,8 +19,8 @@ def build_basic_model():
         templates=[
             {
                 "name": "Card 1",
-                "qfmt": "<div class='card-front'>{{Front}}</div>",
-                "afmt": "{{FrontSide}}<hr id='answer'><div class='card-back'>{{Back}}</div>",
+                "qfmt": "<div class='container'><div class='card-front'>{{Front}}</div></div>",
+                "afmt": "<div class='container'>{{FrontSide}}<hr id='answer'><div class='card-back'>{{Back}}</div></div>",
             }
         ],
         css=card_css(),
@@ -33,7 +33,7 @@ def build_cloze_model():
         998877661,
         "AnkiGPT Cloze",
         fields=[{"name": "Text"}, {"name": "Extra"}],
-        templates=[{"name": "Cloze", "qfmt": "{{cloze:Text}}", "afmt": "{{cloze:Text}}<hr id='answer'>{{Extra}}"}],
+        templates=[{"name": "Cloze", "qfmt": "<div class='container'>{{cloze:Text}}</div>", "afmt": "<div class='container'>{{cloze:Text}}<hr id='answer'>{{Extra}}</div>"}],
         css=card_css(),
         model_type=model_type,
     )
@@ -42,22 +42,92 @@ def build_cloze_model():
 def card_css():
     return """
 .card {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 20px;
+  line-height: 1.6;
+  color: #333;
+  background-color: #fcfcfc;
   text-align: left;
-  color: #111;
-  background: #fff;
   padding: 20px;
-  line-height: 1.5;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
-.card-front, .card-back {
-  max-width: 720px;
+
+.container {
+  max-width: 650px;
+  width: 100%;
   margin: 0 auto;
 }
+
+.card-front, .card-back {
+  padding: 10px 0;
+}
+
+/* Cloze styling */
+.cloze {
+  font-weight: 600;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+/* Divider */
 #answer {
   border: none;
-  border-top: 1px solid #e5e7eb;
+  border-top: 2px dashed #e5e7eb;
+  margin: 30px 0;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .card {
+    background-color: #1a1a1a;
+    color: #e5e5e5;
+  }
+  
+  .cloze {
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.15);
+  }
+  
+  #answer {
+    border-top-color: #333;
+  }
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: block;
+  margin: 20px auto;
+}
+
+/* Lists */
+ul, ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+li {
+  margin-bottom: 6px;
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 3px solid #e5e7eb;
   margin: 16px 0;
+  padding-left: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+@media (prefers-color-scheme: dark) {
+  blockquote {
+    border-left-color: #404040;
+    color: #a3a3a3;
+  }
 }
 """
 
