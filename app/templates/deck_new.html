@@ -1,34 +1,152 @@
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel">
-    <h2>Create a new deck</h2>
-    <form method="post" enctype="multipart/form-data" class="form">
-      <label>Deck title</label>
-      <input type="text" name="title" placeholder="e.g. Biology Unit 3">
+<div class="page-header">
+  <div>
+    <h2>Create New Deck</h2>
+    <p class="muted">Import study material to generate high-quality Anki cards.</p>
+  </div>
+</div>
 
-      <label>Card style</label>
+<section class="panel" style="max-width: 680px; margin: 0 auto;">
+  <form method="post" enctype="multipart/form-data" class="form">
+
+    <div>
+      <label>Deck Title</label>
+      <input type="text" name="title" placeholder="e.g. Introduction to cell biology" required autofocus>
+    </div>
+
+    <div>
+      <label>Card Style</label>
       <select name="card_style">
-        <option value="basic">Basic</option>
-        <option value="cloze">Cloze</option>
+        <option value="basic">Basic (Question & Answer)</option>
+        <option value="cloze">Cloze (Fill-in-the-blank)</option>
       </select>
+      <p class="muted" style="margin-top: 8px; font-size: 12px;">Basic is best for definitions. Cloze is best for
+        memorizing processes.</p>
+    </div>
 
-      <label>Source type</label>
-      <div class="segmented">
-        <label><input type="radio" name="source_type" value="text" checked> Text</label>
-        <label><input type="radio" name="source_type" value="pdf"> PDF</label>
+    <div style="border-top: 1px solid var(--border-subtle); margin: 10px 0;"></div>
+
+    <label>Source Material</label>
+
+    <!-- Custom Segmented Control -->
+    <div class="segmented-control">
+      <label class="segment">
+        <input type="radio" name="source_type" value="text" checked onchange="toggleSource('text')">
+        <span>Paste Text</span>
+      </label>
+      <label class="segment">
+        <input type="radio" name="source_type" value="pdf" onchange="toggleSource('pdf')">
+        <span>Upload PDF</span>
+      </label>
+    </div>
+
+    <!-- Text Input Section -->
+    <div id="source-text" class="source-section">
+      <textarea name="text_input" rows="12" placeholder="Paste your notes, article, or study guide here..."></textarea>
+    </div>
+
+    <!-- PDF Input Section -->
+    <div id="source-pdf" class="source-section" style="display: none;">
+      <div class="upload-box" onclick="document.getElementById('pdf_file').click()">
+        <p>Click to select PDF</p>
+        <span class="muted">Max size 10MB</span>
+        <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" style="display: none;"
+          onchange="updateFileName(this)">
+        <p id="file-name" style="margin-top: 8px; color: var(--accent-primary); font-size: 13px;"></p>
       </div>
 
-      <label>Paste text</label>
-      <textarea name="text_input" rows="10" placeholder="Paste your study material here..."></textarea>
-
-      <label>Upload PDF</label>
-      <input type="file" name="pdf_file" accept="application/pdf">
-      <div class="row">
-        <input type="number" name="page_start" min="1" placeholder="Page start (optional)">
-        <input type="number" name="page_end" min="1" placeholder="Page end (optional)">
+      <div class="row" style="margin-top: 16px;">
+        <div style="flex: 1;">
+          <label>Start Page</label>
+          <input type="number" name="page_start" min="1" placeholder="1">
+        </div>
+        <div style="flex: 1;">
+          <label>End Page</label>
+          <input type="number" name="page_end" min="1" placeholder="All">
+        </div>
       </div>
+    </div>
 
-      <button class="btn primary">Continue</button>
-    </form>
-  </section>
+    <div style="margin-top: 24px;">
+      <button class="btn primary" style="width: 100%;">Generates Cards &rarr;</button>
+    </div>
+  </form>
+</section>
+
+<style>
+  .segmented-control {
+    display: flex;
+    background: #000;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    margin-bottom: 20px;
+  }
+
+  .segment {
+    flex: 1;
+    position: relative;
+  }
+
+  .segment input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .segment span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .segment input:checked+span {
+    background: var(--bg-panel);
+    color: var(--text-main);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .segment:hover span {
+    color: var(--text-main);
+  }
+
+  .upload-box {
+    border: 2px dashed var(--border-subtle);
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .upload-box:hover {
+    border-color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.02);
+  }
+</style>
+
+<script>
+  function toggleSource(type) {
+    document.getElementById('source-text').style.display = type === 'text' ? 'block' : 'none';
+    document.getElementById('source-pdf').style.display = type === 'pdf' ? 'block' : 'none';
+  }
+
+  function updateFileName(input) {
+    const display = document.getElementById('file-name');
+    if (input.files && input.files.length > 0) {
+      display.textContent = input.files[0].name;
+    } else {
+      display.textContent = '';
+    }
+  }
+</script>
 {% endblock %}
