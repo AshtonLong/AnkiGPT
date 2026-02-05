@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <h1>Turn study material into Anki decks in minutes.</h1>
+    <p>Paste text or upload a PDF, generate clean modern cards, edit fast, and export to Anki.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="{{ url_for('main.new_deck') }}">Get started</a>
+      <a class="btn ghost" href="{{ url_for('main.decks') }}">View decks</a>
+    </div>
+  </section>
+{% endblock %}

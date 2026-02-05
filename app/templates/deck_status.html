@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h2>Generation status</h2>
+    <p>Status: <strong>{{ deck.status }}</strong></p>
+    <div class="progress">
+      <div class="bar" style="width: {{ 0 if total_sources == 0 else (done_sources / total_sources) * 100 }}%"></div>
+    </div>
+    <p class="muted">{{ done_sources }} / {{ total_sources }} chunks processed</p>
+    {% if deck.status == "ready" %}
+      <a class="btn primary" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">Open editor</a>
+    {% elif deck.status == "failed" %}
+      <p class="error">Generation failed. Check your OpenRouter API key and try again.</p>
+    {% else %}
+      <div class="row">
+        <a class="btn ghost" href="{{ url_for('main.status', deck_id=deck.id) }}">Refresh</a>
+        <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to decks</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}
