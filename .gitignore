@@ -138,3 +138,5 @@ cython_debug/
 .DS_Store
 Thumbs.db
 instance/ankigpt.db
+example.env
+.gitignore
