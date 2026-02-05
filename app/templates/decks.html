@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="page-header">
+    <h2>Your decks</h2>
+    <a class="btn primary" href="{{ url_for('main.new_deck') }}">New deck</a>
+  </div>
+  <div class="table">
+    <div class="table-row table-head">
+      <div>Title</div>
+      <div>Style</div>
+      <div>Status</div>
+      <div>Updated</div>
+      <div></div>
+    </div>
+    {% for deck in decks %}
+      <div class="table-row">
+        <div>{{ deck.title }}</div>
+        <div>{{ deck.card_style }}</div>
+        <div>{{ deck.status }}</div>
+        <div>{{ deck.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
+        <div class="row">
+          <a class="link" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">Open</a>
+          <form action="{{ url_for('main.delete_deck', deck_id=deck.id) }}" method="post"
+            onsubmit="return confirm('Delete this deck? This cannot be undone.');">
+            <button class="link">Delete</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <div class="empty">No decks yet.</div>
+    {% endfor %}
+  </div>
+{% endblock %}

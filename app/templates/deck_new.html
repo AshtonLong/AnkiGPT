@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h2>Create a new deck</h2>
+    <form method="post" enctype="multipart/form-data" class="form">
+      <label>Deck title</label>
+      <input type="text" name="title" placeholder="e.g. Biology Unit 3">
+
+      <label>Card style</label>
+      <select name="card_style">
+        <option value="basic">Basic</option>
+        <option value="cloze">Cloze</option>
+      </select>
+
+      <label>Source type</label>
+      <div class="segmented">
+        <label><input type="radio" name="source_type" value="text" checked> Text</label>
+        <label><input type="radio" name="source_type" value="pdf"> PDF</label>
+      </div>
+
+      <label>Paste text</label>
+      <textarea name="text_input" rows="10" placeholder="Paste your study material here..."></textarea>
+
+      <label>Upload PDF</label>
+      <input type="file" name="pdf_file" accept="application/pdf">
+      <div class="row">
+        <input type="number" name="page_start" min="1" placeholder="Page start (optional)">
+        <input type="number" name="page_end" min="1" placeholder="Page end (optional)">
+      </div>
+
+      <button class="btn primary">Continue</button>
+    </form>
+  </section>
+{% endblock %}

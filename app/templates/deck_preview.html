@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h2>Extract preview</h2>
+    <p class="muted">Review extracted text and choose generation settings.</p>
+    <div class="preview">
+      {{ deck.source_text[:3000] }}{% if deck.source_text|length > 3000 %}...{% endif %}
+    </div>
+    <form method="post" class="form">
+      <label>Focus</label>
+      <input type="text" name="focus" placeholder="definitions, equations, procedures">
+      <label>Exclude</label>
+      <input type="text" name="exclude" placeholder="trivia, dates, overly detailed facts">
+      <label>Glossary / must-include terms</label>
+      <textarea name="glossary" rows="3"></textarea>
+      <label>Chunk max characters</label>
+      <input type="number" name="max_chars" value="3500" min="1000">
+      <button class="btn primary">Generate deck</button>
+    </form>
+  </section>
+{% endblock %}
