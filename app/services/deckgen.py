@@ -120,6 +120,7 @@ def generate_deck(deck_id):
     app_name = current_app.config["OPENROUTER_APP_NAME"]
 
     created_cards = []
+    dropped_cards = 0
     for source in sources:
         messages = build_prompt(source.title, source.text, settings, deck.card_style)
         try:
@@ -130,10 +131,13 @@ def generate_deck(deck_id):
             for card in cards:
                 normalized = normalize_card(card)
                 if normalized["type"] == "cloze" and not is_valid_cloze(normalized["cloze_text"]):
+                    dropped_cards += 1
                     continue
                 if not is_math_valid(card_text_for_scope(normalized)):
+                    dropped_cards += 1
                     continue
                 if not is_in_scope(card_text_for_scope(normalized), source.text):
+                    dropped_cards += 1
                     continue
                 tags = list(card.tags or [])
                 tags.append(f"section:{source.idx + 1}")
@@ -184,6 +188,12 @@ def generate_deck(deck_id):
         db.session.commit()
 
     dedupe_cards(deck_id)
+    updated_settings = dict(deck.settings_json or {})
+    if dropped_cards:
+        updated_settings["dropped_cards"] = dropped_cards
+    else:
+        updated_settings.pop("dropped_cards", None)
+    deck.settings_json = updated_settings
     deck.status = "ready"
     db.session.commit()
     return deck_id

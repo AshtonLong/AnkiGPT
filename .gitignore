@@ -103,6 +103,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
 .venv
 env/
 venv/
@@ -137,6 +138,27 @@ cython_debug/
 # OS Specific
 .DS_Store
 Thumbs.db
-instance/ankigpt.db
+Desktop.ini
+*.lnk
+
+# Local data / uploads / exports
+instance/
+instance/*.db
+instance/*.sqlite
+instance/*.sqlite3
+instance/*.sqlite3-journal
+instance/uploads/
+instance/exports/
+
+# Local artifacts
+*.log
+*.tmp
+*.bak
+*.swp
+
+# IDEs
+.vscode/
+.idea/
+
+# Project examples
 example.env
-.gitignore
