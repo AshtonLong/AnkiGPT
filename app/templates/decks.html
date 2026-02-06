@@ -1,33 +1,54 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="page-header">
-  <h2>Your decks</h2>
-  <a class="btn primary" href="{{ url_for('main.new_deck') }}">New deck</a>
-</div>
-<div class="table">
-  <div class="table-row table-head">
-    <div>Title</div>
-    <div>Style</div>
-    <div>Status</div>
-    <div>Updated</div>
-    <div></div>
-  </div>
-  {% for deck in decks %}
-  <div class="table-row">
-    <div>{{ deck.title }}</div>
-    <div>{{ deck.card_style }}</div>
-    <div>{{ deck.status }}</div>
-    <div>{{ deck.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
-    <div class="row">
-      <a class="link" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">Open</a>
-      <form action="{{ url_for('main.delete_deck', deck_id=deck.id) }}" method="post"
-        onsubmit="return confirm('Delete this deck? This cannot be undone.');">
-        <button class="link">Delete</button>
-      </form>
+<section class="decks-page">
+  <div class="page-header decks-header">
+    <div class="decks-title">
+      <h2>Your decks</h2>
+      <p class="muted">Open, manage, and export your generated study sets.</p>
+      <div class="decks-summary">
+        <span class="pill">{{ decks|length }} total</span>
+      </div>
     </div>
+    <a class="btn primary" href="{{ url_for('main.new_deck') }}">New deck</a>
   </div>
-  {% else %}
-  <div class="empty">No decks yet.</div>
-  {% endfor %}
-</div>
+
+  <section class="panel decks-table-panel">
+    <div class="table decks-table">
+      <div class="table-row table-head">
+        <div>Title</div>
+        <div>Style</div>
+        <div>Status</div>
+        <div>Updated</div>
+        <div>Actions</div>
+      </div>
+      {% for deck in decks %}
+      <div class="table-row decks-row">
+        <div class="deck-title-cell">
+          <a class="deck-open-link" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ deck.title }}</a>
+        </div>
+        <div><span class="pill">{{ deck.card_style }}</span></div>
+        <div>
+          {% if deck.status == "ready" %}
+          <span class="pill success">Ready</span>
+          {% elif deck.status == "failed" %}
+          <span class="pill warn">Failed</span>
+          {% else %}
+          <span class="pill">{{ deck.status }}</span>
+          {% endif %}
+        </div>
+        <div class="muted">{{ deck.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
+        <div class="deck-actions">
+          <a class="btn ghost sm" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">Open</a>
+          <form action="{{ url_for('main.delete_deck', deck_id=deck.id) }}" method="post"
+            onsubmit="return confirm('Delete this deck? This cannot be undone.');">
+            <button class="btn ghost sm deck-delete-btn" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty">No decks yet. Create your first deck to get started.</div>
+      {% endfor %}
+    </div>
+  </section>
+</section>
 {% endblock %}
