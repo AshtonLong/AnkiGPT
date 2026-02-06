@@ -1,39 +1,42 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ title or "AnkiGPT" }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-  </head>
-  <body>
-    <header class="topbar">
-      <div class="container">
-        <a href="{{ url_for('main.index') }}" class="logo">AnkiGPT</a>
-        <nav class="nav">
-          <a href="{{ url_for('main.decks') }}">Decks</a>
-          {% if current_user.is_authenticated %}
-            <form action="{{ url_for('auth.logout') }}" method="post">
-              <button class="link">Logout</button>
-            </form>
-          {% else %}
-            <a href="{{ url_for('auth.login') }}">Login</a>
-          {% endif %}
-        </nav>
-      </div>
-    </header>
-    <main class="container">
-      {% with messages = get_flashed_messages(with_categories=True) %}
-        {% if messages %}
-          <div class="flash">
-            {% for category, message in messages %}
-              <div class="flash-item {{ category }}">{{ message }}</div>
-            {% endfor %}
-          </div>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "AnkiGPT" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="container">
+      <a href="{{ url_for('main.index') }}" class="logo">AnkiGPT</a>
+      <nav class="nav">
+        <a href="{{ url_for('main.decks') }}">Decks</a>
+        {% if current_user.is_authenticated %}
+        <form action="{{ url_for('auth.logout') }}" method="post">
+          <button class="link">Logout</button>
+        </form>
+        {% else %}
+        <a href="{{ url_for('auth.login') }}">Login</a>
         {% endif %}
-      {% endwith %}
-      {% block content %}{% endblock %}
-    </main>
-  </body>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=True) %}
+    {% if messages %}
+    <div class="flash">
+      {% for category, message in messages %}
+      <div class="flash-item {{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+
 </html>
