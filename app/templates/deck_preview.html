@@ -1,21 +1,377 @@
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel">
-    <h2>Extract preview</h2>
-    <p class="muted">Review extracted text and choose generation settings.</p>
-    <div class="preview">
-      {{ deck.source_text[:3000] }}{% if deck.source_text|length > 3000 %}...{% endif %}
+<div class="preview-page">
+  <!-- Header -->
+  <div class="preview-header">
+    <div class="preview-header-content">
+      <div class="preview-badge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+        Step 2 of 3
+      </div>
+      <h1>Review & Configure</h1>
+      <p>Preview your extracted content and fine-tune generation settings before creating cards.</p>
     </div>
-    <form method="post" class="form">
-      <label>Focus</label>
-      <input type="text" name="focus" placeholder="definitions, equations, procedures">
-      <label>Exclude</label>
-      <input type="text" name="exclude" placeholder="trivia, dates, overly detailed facts">
-      <label>Glossary / must-include terms</label>
-      <textarea name="glossary" rows="3"></textarea>
-      <label>Chunk max characters</label>
-      <input type="number" name="max_chars" value="3500" min="1000">
-      <button class="btn primary">Generate deck</button>
-    </form>
-  </section>
+  </div>
+
+  <div class="preview-layout">
+    <!-- Left: Source Preview -->
+    <div class="preview-source">
+      <div class="source-header">
+        <div class="source-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <line x1="10" y1="9" x2="8" y2="9" />
+          </svg>
+          Source Content
+        </div>
+        <span class="char-count">{{ deck.source_text|length|default(0) }} characters</span>
+      </div>
+      <div class="source-content">
+        <pre>{{ deck.source_text[:3000] }}{% if deck.source_text|length > 3000 %}<span class="truncated">... content truncated for preview</span>{% endif %}</pre>
+      </div>
+    </div>
+
+    <!-- Right: Settings Form -->
+    <div class="preview-settings">
+      <form method="post" class="settings-form">
+        <div class="settings-header">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          Generation Settings
+        </div>
+
+        <!-- Focus -->
+        <div class="setting-group">
+          <label for="focus">
+            <span class="label-text">Focus On</span>
+            <span class="label-hint">What types of content should become cards?</span>
+          </label>
+          <input type="text" id="focus" name="focus"
+            placeholder="e.g. definitions, equations, key concepts, procedures">
+        </div>
+
+        <!-- Exclude -->
+        <div class="setting-group">
+          <label for="exclude">
+            <span class="label-text">Exclude</span>
+            <span class="label-hint">What should be skipped?</span>
+          </label>
+          <input type="text" id="exclude" name="exclude" placeholder="e.g. trivia, dates, examples, tangential details">
+        </div>
+
+        <!-- Glossary -->
+        <div class="setting-group">
+          <label for="glossary">
+            <span class="label-text">Must-Include Terms</span>
+            <span class="label-hint">Important terms that must appear in cards (optional)</span>
+          </label>
+          <textarea id="glossary" name="glossary" rows="3" placeholder="Enter key terms, one per line..."></textarea>
+        </div>
+
+        <!-- Max Chars -->
+        <div class="setting-group">
+          <label for="max_chars">
+            <span class="label-text">Chunk Size</span>
+            <span class="label-hint">Max characters per processing chunk</span>
+          </label>
+          <div class="input-with-unit">
+            <input type="number" id="max_chars" name="max_chars" value="3500" min="1000" max="8000">
+            <span class="input-unit">chars</span>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="btn primary generate-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
+          Generate Deck
+        </button>
+
+        <p class="generation-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          Generation typically takes 30-60 seconds
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Preview Page Layout */
+  .preview-page {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .preview-header {
+    text-align: center;
+    padding: var(--space-xl) 0;
+    margin-bottom: var(--space-lg);
+  }
+
+  .preview-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--accent-muted);
+    border: 1px solid rgba(240, 178, 84, 0.25);
+    border-radius: 100px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--space-md);
+  }
+
+  .preview-header h1 {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin-bottom: var(--space-sm);
+    background: linear-gradient(180deg, var(--text-primary) 0%, rgba(255, 255, 255, 0.75) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .preview-header p {
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    max-width: 50ch;
+    margin: 0 auto;
+  }
+
+  /* Two Column Layout */
+  .preview-layout {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: var(--space-lg);
+    align-items: start;
+  }
+
+  /* Source Preview Panel */
+  .preview-source {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .source-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .source-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .source-title svg {
+    color: var(--accent);
+  }
+
+  .char-count {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    padding: 4px 10px;
+    background: var(--bg-deep);
+    border-radius: 100px;
+  }
+
+  .source-content {
+    padding: var(--space-lg);
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  .source-content pre {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+
+  .source-content .truncated {
+    display: block;
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px dashed var(--border-default);
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  /* Settings Panel */
+  .preview-settings {
+    position: sticky;
+    top: 96px;
+  }
+
+  .settings-form {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 16px;
+    padding: var(--space-lg);
+  }
+
+  .settings-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .settings-header svg {
+    color: var(--accent);
+  }
+
+  /* Setting Groups */
+  .setting-group {
+    margin-bottom: var(--space-lg);
+  }
+
+  .setting-group label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: var(--space-sm);
+  }
+
+  .label-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .label-hint {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+
+  .setting-group input,
+  .setting-group textarea {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.2s var(--ease-out);
+  }
+
+  .setting-group input:focus,
+  .setting-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-muted);
+  }
+
+  .setting-group textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: var(--font-body);
+    line-height: 1.5;
+  }
+
+  /* Input with unit */
+  .input-with-unit {
+    position: relative;
+  }
+
+  .input-with-unit input {
+    padding-right: 60px;
+  }
+
+  .input-unit {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-tertiary);
+  }
+
+  /* Generate Button */
+  .generate-btn {
+    width: 100%;
+    padding: 16px 24px;
+    font-size: 1rem;
+    margin-top: var(--space-sm);
+  }
+
+  .generation-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: var(--space-md);
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .preview-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .preview-settings {
+      position: static;
+    }
+
+    .source-content {
+      max-height: 300px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .preview-header h1 {
+      font-size: 1.75rem;
+    }
+
+    .preview-badge {
+      font-size: 0.75rem;
+      padding: 6px 12px;
+    }
+  }
+</style>
 {% endblock %}

@@ -1,59 +1,59 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="page-header">
-    <div>
-      <h2>{{ deck.title }}</h2>
-      <p class="muted">Style: {{ deck.card_style }} · Status: {{ deck.status }}</p>
-    </div>
-    <div class="row">
-      <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post">
-        <button class="btn primary">Export .apkg</button>
-      </form>
-    </div>
+<div class="page-header">
+  <div>
+    <h2>{{ deck.title }}</h2>
+    <p class="muted">Style: {{ deck.card_style }} · Status: {{ deck.status }}</p>
+  </div>
+  <div class="row">
+    <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post">
+      <button class="btn primary">Export .apkg</button>
+    </form>
+  </div>
+</div>
+
+<section class="panel">
+  <form method="get" class="form inline">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search cards">
+    <select name="type">
+      <option value="">All types</option>
+      <option value="basic" {% if card_type=="basic" %}selected{% endif %}>Basic</option>
+      <option value="cloze" {% if card_type=="cloze" %}selected{% endif %}>Cloze</option>
+    </select>
+    <select name="status">
+      <option value="">All status</option>
+      <option value="ok" {% if status=="ok" %}selected{% endif %}>OK</option>
+      <option value="needs_review" {% if status=="needs_review" %}selected{% endif %}>Needs review</option>
+      <option value="deleted" {% if status=="deleted" %}selected{% endif %}>Deleted</option>
+    </select>
+    <button class="btn ghost">Filter</button>
+  </form>
+</section>
+
+<form action="{{ url_for('main.bulk_cards') }}" method="post" class="panel">
+  <div class="row">
+    <select name="action">
+      <option value="delete">Delete</option>
+      <option value="restore">Restore</option>
+      <option value="tag">Add tag</option>
+      <option value="regenerate">Regenerate from source</option>
+    </select>
+    <input type="text" name="tag" placeholder="Tag (for add tag)">
+    <button class="btn ghost">Apply</button>
   </div>
 
-  <section class="panel">
-    <form method="get" class="form inline">
-      <input type="text" name="q" value="{{ q }}" placeholder="Search cards">
-      <select name="type">
-        <option value="">All types</option>
-        <option value="basic" {% if card_type == "basic" %}selected{% endif %}>Basic</option>
-        <option value="cloze" {% if card_type == "cloze" %}selected{% endif %}>Cloze</option>
-      </select>
-      <select name="status">
-        <option value="">All status</option>
-        <option value="ok" {% if status == "ok" %}selected{% endif %}>OK</option>
-        <option value="needs_review" {% if status == "needs_review" %}selected{% endif %}>Needs review</option>
-        <option value="deleted" {% if status == "deleted" %}selected{% endif %}>Deleted</option>
-      </select>
-      <button class="btn ghost">Filter</button>
-    </form>
-  </section>
-
-  <form action="{{ url_for('main.bulk_cards') }}" method="post" class="panel">
-    <div class="row">
-      <select name="action">
-        <option value="delete">Delete</option>
-        <option value="restore">Restore</option>
-        <option value="tag">Add tag</option>
-        <option value="regenerate">Regenerate from source</option>
-      </select>
-      <input type="text" name="tag" placeholder="Tag (for add tag)">
-      <button class="btn ghost">Apply</button>
+  <div class="table">
+    <div class="table-row table-head">
+      <div></div>
+      <div>Card</div>
+      <div>Tags</div>
+      <div>Actions</div>
     </div>
-
-    <div class="table">
-      <div class="table-row table-head">
-        <div></div>
-        <div>Card</div>
-        <div>Tags</div>
-        <div>Actions</div>
-      </div>
-      {% for card in cards %}
-        {% include "partials/card_row.html" %}
-      {% else %}
-        <div class="empty">No cards yet.</div>
-      {% endfor %}
-    </div>
-  </form>
+    {% for card in cards %}
+    {% include "partials/card_row.html" %}
+    {% else %}
+    <div class="empty">No cards yet.</div>
+    {% endfor %}
+  </div>
+</form>
 {% endblock %}

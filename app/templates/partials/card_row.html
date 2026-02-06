@@ -3,27 +3,26 @@
     <input type="checkbox" name="card_ids" value="{{ card.id }}">
   </div>
   <div>
-    <form hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}" hx-swap="outerHTML" class="card-form">
+    <form hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
+      hx-swap="outerHTML" class="card-form">
       {% if card.type == "basic" %}
-        <input type="text" name="front" value="{{ card.front or '' }}" placeholder="Front">
-        <textarea name="back" rows="2" placeholder="Back">{{ card.back or '' }}</textarea>
+      <input type="text" name="front" value="{{ card.front or '' }}" placeholder="Front">
+      <textarea name="back" rows="2" placeholder="Back">{{ card.back or '' }}</textarea>
       {% else %}
-        <textarea name="cloze_text" rows="2" placeholder="Cloze">{{ card.cloze_text or '' }}</textarea>
-        <textarea name="extra" rows="2" placeholder="Extra">{{ card.extra or '' }}</textarea>
+      <textarea name="cloze_text" rows="2" placeholder="Cloze">{{ card.cloze_text or '' }}</textarea>
+      <textarea name="extra" rows="2" placeholder="Extra">{{ card.extra or '' }}</textarea>
       {% endif %}
       <input type="text" name="tags" value="{{ (card.tags or [])|join(', ') }}" placeholder="tags">
       <div class="row">
         <button class="btn ghost" type="submit">Save</button>
-        <button class="btn ghost" type="button"
-          hx-post="{{ url_for('main.improve', card_id=card.id) }}"
-          hx-target="#card-{{ card.id }}"
-          hx-swap="outerHTML">Improve</button>
+        <button class="btn ghost" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
+          hx-target="#card-{{ card.id }}" hx-swap="outerHTML">Improve</button>
       </div>
     </form>
     {% if card.status == "needs_review" %}
-      <div class="pill warn">Needs review</div>
+    <div class="pill warn">Needs review</div>
     {% elif card.status == "deleted" %}
-      <div class="pill">Deleted</div>
+    <div class="pill">Deleted</div>
     {% endif %}
   </div>
   <div>{{ (card.tags or [])|join(', ') }}</div>

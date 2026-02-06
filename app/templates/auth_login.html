@@ -1,14 +1,68 @@
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel">
-    <h2>Login</h2>
-    <form method="post" class="form">
-      <label>Email</label>
-      <input type="email" name="email" required>
-      <label>Password</label>
-      <input type="password" name="password" required>
-      <button class="btn primary">Login</button>
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <!-- Decorative gradient orb -->
+    <div class="auth-glow"></div>
+
+    <!-- Logo/Brand -->
+    <div class="auth-brand">
+      <span class="auth-logo">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+      </span>
+      <span class="auth-brand-text">AnkiGPT</span>
+    </div>
+
+    <!-- Header -->
+    <div class="auth-header">
+      <h1>Welcome back</h1>
+      <p>Sign in to continue creating flashcards</p>
+    </div>
+
+    <!-- Form -->
+    <form method="post" class="auth-form">
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="M22 7l-10 5L2 7" />
+          </svg>
+          <input type="email" id="email" name="email" placeholder="you@example.com" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <input type="password" id="password" name="password" placeholder="••••••••" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn primary auth-submit">
+        Sign in
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7" />
+        </svg>
+      </button>
     </form>
-    <p class="muted">No account? <a href="{{ url_for('auth.signup') }}">Sign up</a></p>
-  </section>
+
+    <!-- Footer -->
+    <div class="auth-footer">
+      <span>Don't have an account?</span>
+      <a href="{{ url_for('auth.signup') }}" class="auth-link">Create one</a>
+    </div>
+  </div>
+</div>
 {% endblock %}
