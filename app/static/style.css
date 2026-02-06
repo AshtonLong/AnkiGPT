@@ -1134,3 +1134,320 @@ textarea {
     font-size: 1.5rem;
   }
 }
+
+/* Deck editor page */
+.deck-editor-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.deck-editor-page .deck-editor-header {
+  margin-top: var(--space-lg);
+  margin-bottom: 0;
+}
+
+.deck-editor-title .muted {
+  margin-top: 4px;
+}
+
+.deck-editor-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.deck-editor-summary .pill {
+  border: 1px solid var(--border-subtle);
+}
+
+.deck-editor-actions form {
+  display: flex;
+}
+
+.deck-editor-page .panel {
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+
+.deck-editor-page .panel:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-sm);
+}
+
+.deck-editor-page .row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.deck-editor-page .editor-filter-form {
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.deck-editor-page .editor-filter-form>input[type="text"] {
+  flex: 1.8 1 320px;
+  min-width: 240px;
+}
+
+.deck-editor-page .editor-filter-form>select {
+  flex: 0.9 1 180px;
+  min-width: 170px;
+}
+
+.deck-editor-page .editor-bulk-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.deck-editor-page .editor-bulk-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(220px, 1fr) auto;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.deck-editor-page .cards-table {
+  border-color: var(--border-subtle);
+  background: linear-gradient(180deg, rgba(36, 37, 48, 0.45) 0%, rgba(26, 27, 33, 0.45) 100%);
+}
+
+.deck-editor-page .editor-table-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.deck-editor-page .editor-table-panel .cards-table {
+  border: 0;
+  border-radius: 0;
+}
+
+.deck-editor-page .cards-table .table-row {
+  grid-template-columns: 52px minmax(0, 1fr) 220px 150px;
+  gap: var(--space-lg);
+  align-items: flex-start;
+}
+
+.deck-editor-page .card-row {
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-lg);
+}
+
+.deck-editor-page .card-select {
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.deck-editor-page .card-select input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.deck-editor-page .card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deck-editor-page .card-form input,
+.deck-editor-page .card-form textarea {
+  background: rgba(18, 19, 24, 0.85);
+}
+
+.deck-editor-page .card-form textarea {
+  min-height: 88px;
+}
+
+.deck-editor-page .card-form-actions .btn {
+  min-width: 92px;
+}
+
+.deck-editor-page .card-tags {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  padding-top: 8px;
+  word-break: break-word;
+}
+
+.deck-editor-page .card-type {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+@media (max-width: 980px) {
+  .deck-editor-page .editor-filter-form>input[type="text"],
+  .deck-editor-page .editor-filter-form>select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .deck-editor-page .editor-bulk-row {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-editor-page .deck-editor-actions {
+    width: 100%;
+  }
+
+  .deck-editor-page .deck-editor-actions form,
+  .deck-editor-page .deck-editor-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .deck-editor-page .cards-table .table-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .deck-editor-page .card-select {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+
+  .deck-editor-page .card-tags,
+  .deck-editor-page .card-type {
+    padding-top: 0;
+  }
+}
+
+/* Decks page */
+.decks-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.decks-page .decks-header {
+  margin-top: var(--space-lg);
+  margin-bottom: 0;
+}
+
+.decks-page .decks-title .muted {
+  margin-top: 4px;
+}
+
+.decks-page .decks-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.decks-page .decks-summary .pill {
+  border: 1px solid var(--border-subtle);
+}
+
+.decks-page .decks-table-panel {
+  padding: 0;
+  overflow: hidden;
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+
+.decks-page .decks-table-panel:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-sm);
+}
+
+.decks-page .decks-table {
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(36, 37, 48, 0.45) 0%, rgba(26, 27, 33, 0.45) 100%);
+}
+
+.decks-page .decks-table .table-row {
+  grid-template-columns: minmax(0, 1.4fr) 130px 130px 180px 180px;
+  align-items: center;
+}
+
+.decks-page .decks-row {
+  min-height: 92px;
+}
+
+.decks-page .deck-title-cell {
+  min-width: 0;
+}
+
+.decks-page .deck-open-link {
+  display: inline-block;
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.3;
+  transition: color 0.2s var(--ease-out);
+}
+
+.decks-page .deck-open-link:hover {
+  color: var(--accent-hover);
+}
+
+.decks-page .deck-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.decks-page .deck-actions form {
+  display: flex;
+  margin: 0;
+}
+
+.decks-page .deck-actions .btn {
+  min-width: 92px;
+  min-height: 38px;
+  justify-content: center;
+  line-height: 1;
+}
+
+.decks-page .deck-delete-btn {
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
+.decks-page .deck-delete-btn:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+@media (max-width: 980px) {
+  .decks-page .decks-table .table-row {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+
+  .decks-page .decks-table .table-head {
+    display: none;
+  }
+
+  .decks-page .decks-row {
+    min-height: 0;
+    padding: var(--space-lg);
+  }
+
+  .decks-page .deck-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .decks-page .decks-table .table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .decks-page .decks-header .btn {
+    width: 100%;
+  }
+}

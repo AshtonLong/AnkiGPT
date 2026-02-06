@@ -1,30 +1,33 @@
-<div class="table-row" id="card-{{ card.id }}">
-  <div>
-    <input type="checkbox" name="card_ids" value="{{ card.id }}">
+<div class="table-row card-row" id="card-{{ card.id }}">
+  <div class="card-select">
+    <input type="checkbox" name="card_ids" value="{{ card.id }}" form="bulk-actions-form"
+      aria-label="Select card {{ card.id }}">
   </div>
-  <div>
+  <div class="card-content">
     <form hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
       hx-swap="outerHTML" class="card-form">
       {% if card.type == "basic" %}
       <input type="text" name="front" value="{{ card.front or '' }}" placeholder="Front">
-      <textarea name="back" rows="2" placeholder="Back">{{ card.back or '' }}</textarea>
+      <textarea name="back" rows="3" placeholder="Back">{{ card.back or '' }}</textarea>
       {% else %}
-      <textarea name="cloze_text" rows="2" placeholder="Cloze">{{ card.cloze_text or '' }}</textarea>
-      <textarea name="extra" rows="2" placeholder="Extra">{{ card.extra or '' }}</textarea>
+      <textarea name="cloze_text" rows="3" placeholder="Cloze">{{ card.cloze_text or '' }}</textarea>
+      <textarea name="extra" rows="3" placeholder="Extra">{{ card.extra or '' }}</textarea>
       {% endif %}
-      <input type="text" name="tags" value="{{ (card.tags or [])|join(', ') }}" placeholder="tags">
-      <div class="row">
-        <button class="btn ghost" type="submit">Save</button>
-        <button class="btn ghost" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
+      <input type="text" name="tags" value="{{ (card.tags or [])|join(', ') }}" placeholder="Tags (comma separated)">
+      <div class="row card-form-actions">
+        <button class="btn ghost sm" type="submit">Save</button>
+        <button class="btn ghost sm" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
           hx-target="#card-{{ card.id }}" hx-swap="outerHTML">Improve</button>
       </div>
     </form>
+  </div>
+  <div class="card-tags muted">{{ (card.tags or [])|join(', ') or "No tags" }}</div>
+  <div class="card-type">
+    <span class="pill">{{ card.type }}</span>
     {% if card.status == "needs_review" %}
-    <div class="pill warn">Needs review</div>
+    <span class="pill warn">Needs review</span>
     {% elif card.status == "deleted" %}
-    <div class="pill">Deleted</div>
+    <span class="pill">Deleted</span>
     {% endif %}
   </div>
-  <div>{{ (card.tags or [])|join(', ') }}</div>
-  <div class="muted">{{ card.type }}</div>
 </div>
