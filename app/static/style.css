@@ -1285,6 +1285,7 @@ textarea {
 }
 
 @media (max-width: 980px) {
+
   .deck-editor-page .editor-filter-form>input[type="text"],
   .deck-editor-page .editor-filter-form>select {
     flex: 1 1 100%;
