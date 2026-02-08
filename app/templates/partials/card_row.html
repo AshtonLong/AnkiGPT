@@ -7,27 +7,189 @@
     <form hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
       hx-swap="outerHTML" class="card-form">
       {% if card.type == "basic" %}
-      <input type="text" name="front" value="{{ card.front or '' }}" placeholder="Front">
-      <textarea name="back" rows="3" placeholder="Back">{{ card.back or '' }}</textarea>
+      <div class="card-field">
+        <label class="field-label">Front</label>
+        <input type="text" name="front" value="{{ card.front or '' }}" placeholder="Question / prompt">
+      </div>
+      <div class="card-field">
+        <label class="field-label">Back</label>
+        <textarea name="back" rows="2" placeholder="Answer / response">{{ card.back or '' }}</textarea>
+      </div>
       {% else %}
-      <textarea name="cloze_text" rows="3" placeholder="Cloze">{{ card.cloze_text or '' }}</textarea>
-      <textarea name="extra" rows="3" placeholder="Extra">{{ card.extra or '' }}</textarea>
+      <div class="card-field">
+        <label class="field-label">Cloze</label>
+        <textarea name="cloze_text" rows="2"
+          placeholder="Text with {{ '{{c1::cloze}}' }} deletions">{{ card.cloze_text or '' }}</textarea>
+      </div>
+      <div class="card-field">
+        <label class="field-label">Extra</label>
+        <textarea name="extra" rows="2" placeholder="Additional context">{{ card.extra or '' }}</textarea>
+      </div>
       {% endif %}
-      <input type="text" name="tags" value="{{ (card.tags or [])|join(', ') }}" placeholder="Tags (comma separated)">
-      <div class="row card-form-actions">
-        <button class="btn ghost sm" type="submit">Save</button>
-        <button class="btn ghost sm" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
-          hx-target="#card-{{ card.id }}" hx-swap="outerHTML">Improve</button>
+      <div class="card-field">
+        <label class="field-label">Tags</label>
+        <input type="text" name="tags" value="{{ (card.tags or [])|join(', ') }}" placeholder="Tags (comma separated)">
+      </div>
+      <div class="card-form-actions">
+        <button class="btn ghost sm" type="submit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          Save
+        </button>
+        <button class="btn ghost sm improve-btn" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
+          hx-target="#card-{{ card.id }}" hx-swap="outerHTML">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
+            <path d="M18 12l.9 2.1L21 15l-2.1.9L18 18l-.9-2.1L15 15l2.1-.9L18 12z" />
+          </svg>
+          AI Improve
+        </button>
       </div>
     </form>
   </div>
-  <div class="card-tags muted">{{ (card.tags or [])|join(', ') or "No tags" }}</div>
+  <div class="card-tags">
+    {% if card.tags and card.tags|length > 0 %}
+    {% for tag in card.tags[:3] %}
+    <span class="tag-chip">{{ tag }}</span>
+    {% endfor %}
+    {% if card.tags|length > 3 %}
+    <span class="tag-more">+{{ card.tags|length - 3 }}</span>
+    {% endif %}
+    {% else %}
+    <span class="no-tags">No tags</span>
+    {% endif %}
+  </div>
   <div class="card-type">
-    <span class="pill">{{ card.type }}</span>
+    <span class="pill {% if card.type == 'basic' %}basic-pill{% else %}cloze-pill{% endif %}">{{ card.type }}</span>
     {% if card.status == "needs_review" %}
-    <span class="pill warn">Needs review</span>
+    <span class="pill warn">Review</span>
     {% elif card.status == "deleted" %}
-    <span class="pill">Deleted</span>
+    <span class="pill danger">Deleted</span>
     {% endif %}
   </div>
 </div>
+
+<style>
+  /* Card Row Styling */
+  .card-row {
+    transition: background var(--duration-fast);
+  }
+
+  .card-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .card-select input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  /* Card Form */
+  .card-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .card-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin: 0;
+  }
+
+  .card-form input,
+  .card-form textarea {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+  }
+
+  .card-form input:focus,
+  .card-form textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-muted);
+  }
+
+  .card-form-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+  }
+
+  .improve-btn {
+    color: var(--accent-cool) !important;
+    border-color: rgba(107, 181, 255, 0.3) !important;
+  }
+
+  .improve-btn:hover {
+    background: rgba(107, 181, 255, 0.1) !important;
+  }
+
+  /* Tags */
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .tag-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .tag-more {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .no-tags {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  /* Card Type Pills */
+  .card-type {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+  }
+
+  .basic-pill {
+    background: rgba(107, 255, 158, 0.08) !important;
+    color: var(--accent-tertiary) !important;
+    border-color: rgba(107, 255, 158, 0.15) !important;
+  }
+
+  .cloze-pill {
+    background: rgba(107, 181, 255, 0.08) !important;
+    color: var(--accent-cool) !important;
+    border-color: rgba(107, 181, 255, 0.15) !important;
+  }
+</style>

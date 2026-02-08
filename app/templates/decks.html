@@ -1,17 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="decks-page">
+  <!-- Page Header -->
   <div class="page-header decks-header">
     <div class="decks-title">
       <h2>Your decks</h2>
       <p class="muted">Open, manage, and export your generated study sets.</p>
       <div class="decks-summary">
-        <span class="pill">{{ decks|length }} total</span>
+        <span class="pill">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            style="margin-right: 4px;">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </svg>
+          {{ decks|length }} total
+        </span>
       </div>
     </div>
-    <a class="btn primary" href="{{ url_for('main.new_deck') }}">New deck</a>
+    <a class="btn primary" href="{{ url_for('main.new_deck') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      New deck
+    </a>
   </div>
 
+  {% if decks %}
+  <!-- Decks Table -->
   <section class="panel decks-table-panel">
     <div class="table decks-table">
       <div class="table-row table-head">
@@ -24,31 +40,144 @@
       {% for deck in decks %}
       <div class="table-row decks-row">
         <div class="deck-title-cell">
-          <a class="deck-open-link" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ deck.title }}</a>
+          <a class="deck-open-link" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="margin-right: 8px; opacity: 0.4;">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </svg>
+            {{ deck.title }}
+          </a>
         </div>
         <div><span class="pill">{{ deck.card_style }}</span></div>
         <div>
           {% if deck.status == "ready" %}
           <span class="pill success">Ready</span>
           {% elif deck.status == "failed" %}
-          <span class="pill warn">Failed</span>
+          <span class="pill danger">Failed</span>
+          {% elif deck.status == "processing" %}
+          <span class="pill warn">Processing</span>
           {% else %}
           <span class="pill">{{ deck.status }}</span>
           {% endif %}
         </div>
-        <div class="muted">{{ deck.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
+        <div class="muted">{{ deck.updated_at.strftime("%b %d, %Y") }}</div>
         <div class="deck-actions">
-          <a class="btn ghost sm" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">Open</a>
+          <a class="btn ghost sm" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" />
+            </svg>
+            Open
+          </a>
           <form action="{{ url_for('main.delete_deck', deck_id=deck.id) }}" method="post"
             onsubmit="return confirm('Delete this deck? This cannot be undone.');">
-            <button class="btn ghost sm deck-delete-btn" type="submit">Delete</button>
+            <button class="btn ghost sm deck-delete-btn" type="submit">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+              Delete
+            </button>
           </form>
         </div>
       </div>
-      {% else %}
-      <div class="empty">No decks yet. Create your first deck to get started.</div>
       {% endfor %}
     </div>
   </section>
+  {% else %}
+  <!-- Empty State -->
+  <section class="panel empty-state-panel">
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+      </div>
+      <h3>No decks yet</h3>
+      <p>Create your first deck to start studying smarter with AI-generated flashcards.</p>
+      <a class="btn primary" href="{{ url_for('main.new_deck') }}" style="margin-top: 1.5rem;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Create your first deck
+      </a>
+    </div>
+  </section>
+  {% endif %}
 </section>
+
+<style>
+  /* Decks Table Styling */
+  .decks-table .decks-row {
+    grid-template-columns: 2.5fr 1fr 1fr 1fr auto;
+  }
+
+  .deck-title-cell a {
+    display: flex;
+    align-items: center;
+  }
+
+  .deck-title-cell a:hover svg {
+    opacity: 0.8;
+  }
+
+  /* Empty State */
+  .empty-state-panel {
+    padding: 4rem 2rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px;
+    height: 96px;
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 217, 61, 0.05));
+    border-radius: 24px;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+  }
+
+  .empty-state h3 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(180deg, var(--text-primary) 0%, rgba(255, 255, 255, 0.75) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .empty-state p {
+    color: var(--text-tertiary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .decks-table .decks-row {
+      grid-template-columns: 1fr auto;
+    }
+
+    .decks-row>div:nth-child(2),
+    .decks-row>div:nth-child(4) {
+      display: none;
+    }
+
+    .table-head>div:nth-child(2),
+    .table-head>div:nth-child(4) {
+      display: none;
+    }
+  }
+</style>
 {% endblock %}
