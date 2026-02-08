@@ -160,5 +160,3 @@ instance/exports/
 .vscode/
 .idea/
 
-# Project examples
-example.env
