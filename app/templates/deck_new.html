@@ -1,136 +1,167 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="page-header">
-  <div>
-    <h2>Create New Deck</h2>
-    <p class="muted">Import study material to generate high-quality Anki cards.</p>
+<section class="new-deck-page">
+  <!-- Page Header -->
+  <div class="page-header new-deck-header">
+    <div>
+      <div class="page-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        New Deck
+      </div>
+      <h2>Create New Deck</h2>
+      <p class="muted">Import study material to generate high-quality Anki cards.</p>
+    </div>
   </div>
-</div>
 
-<section class="deck-form-wrapper">
-  <form method="post" enctype="multipart/form-data" class="deck-form">
+  <!-- Form Container -->
+  <div class="deck-form-wrapper">
+    <form method="post" enctype="multipart/form-data" class="deck-form">
 
-    <!-- Deck Title -->
-    <div class="form-group">
-      <label for="deck-title">Deck Title</label>
-      <div class="input-wrapper">
-        <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-        </svg>
-        <input type="text" id="deck-title" name="title" placeholder="e.g. Introduction to cell biology" required
-          autofocus>
-      </div>
-    </div>
-
-    <!-- Card Style -->
-    <div class="form-group">
-      <label for="card-style">Card Style</label>
-      <div class="select-wrapper">
-        <svg class="select-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <line x1="9" y1="3" x2="9" y2="21" />
-        </svg>
-        <select id="card-style" name="card_style">
-          <option value="basic">Basic (Question & Answer)</option>
-          <option value="cloze">Cloze (Fill-in-the-blank)</option>
-        </select>
-        <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </div>
-      <span class="input-hint">Basic is best for definitions. Cloze is best for memorizing processes.</span>
-    </div>
-
-    <!-- Divider -->
-    <div class="form-divider"></div>
-
-    <!-- Source Material -->
-    <div class="form-group">
-      <label>Source Material</label>
-
-      <!-- Tab Switcher -->
-      <div class="tab-switcher">
-        <label class="tab-option">
-          <input type="radio" name="source_type" value="text" checked onchange="toggleSource('text')">
-          <span class="tab-label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <line x1="10" y1="9" x2="8" y2="9" />
-            </svg>
-            Paste Text
-          </span>
-        </label>
-        <label class="tab-option">
-          <input type="radio" name="source_type" value="pdf" onchange="toggleSource('pdf')">
-          <span class="tab-label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M10 12l2 2 4-4" />
-            </svg>
-            Upload PDF
-          </span>
-        </label>
-        <div class="tab-indicator"></div>
-      </div>
-
-      <!-- Text Input Section -->
-      <div id="source-text" class="source-section active">
-        <textarea name="text_input" rows="10"
-          placeholder="Paste your notes, article, or study guide here..."></textarea>
-      </div>
-
-      <!-- PDF Input Section -->
-      <div id="source-pdf" class="source-section">
-        <div class="upload-zone" onclick="document.getElementById('pdf_file').click()">
-          <div class="upload-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-          </div>
-          <p class="upload-text">Click to select PDF</p>
-          <span class="upload-hint">or drag and drop • Max 10MB</span>
-          <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" onchange="updateFileName(this)">
-          <p id="file-name" class="file-name"></p>
-        </div>
-
-        <div class="page-range">
-          <div class="form-group">
-            <label for="page-start">Start Page</label>
-            <input type="number" id="page-start" name="page_start" min="1" placeholder="1">
-          </div>
-          <div class="form-group">
-            <label for="page-end">End Page</label>
-            <input type="number" id="page-end" name="page_end" min="1" placeholder="All">
-          </div>
+      <!-- Deck Title -->
+      <div class="form-group">
+        <label for="deck-title">Deck Title</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </svg>
+          <input type="text" id="deck-title" name="title" placeholder="e.g. Introduction to cell biology" required
+            autofocus>
         </div>
       </div>
-    </div>
 
-    <!-- Submit -->
-    <button type="submit" class="btn primary submit-btn">
-      Generate Cards
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 12h14M12 5l7 7-7 7" />
-      </svg>
-    </button>
-  </form>
+      <!-- Card Style -->
+      <div class="form-group">
+        <label for="card-style">Card Style</label>
+        <div class="select-wrapper">
+          <svg class="select-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <select id="card-style" name="card_style">
+            <option value="basic">Basic (Question & Answer)</option>
+            <option value="cloze">Cloze (Fill-in-the-blank)</option>
+          </select>
+          <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </div>
+        <span class="input-hint">Basic is best for definitions. Cloze is best for memorizing processes.</span>
+      </div>
+
+      <!-- Divider -->
+      <div class="form-divider"></div>
+
+      <!-- Source Material -->
+      <div class="form-group">
+        <label>Source Material</label>
+
+        <!-- Tab Switcher -->
+        <div class="tab-switcher">
+          <label class="tab-option">
+            <input type="radio" name="source_type" value="text" checked onchange="toggleSource('text')">
+            <span class="tab-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <line x1="10" y1="9" x2="8" y2="9" />
+              </svg>
+              Paste Text
+            </span>
+          </label>
+          <label class="tab-option">
+            <input type="radio" name="source_type" value="pdf" onchange="toggleSource('pdf')">
+            <span class="tab-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M10 12l2 2 4-4" />
+              </svg>
+              Upload PDF
+            </span>
+          </label>
+        </div>
+
+        <!-- Text Input Section -->
+        <div id="source-text" class="source-section active">
+          <textarea name="text_input" rows="10"
+            placeholder="Paste your notes, article, or study guide here..."></textarea>
+        </div>
+
+        <!-- PDF Input Section -->
+        <div id="source-pdf" class="source-section">
+          <div class="upload-zone" onclick="document.getElementById('pdf_file').click()">
+            <div class="upload-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </div>
+            <p class="upload-text">Click to select PDF</p>
+            <span class="upload-hint">or drag and drop • Max 10MB</span>
+            <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" onchange="updateFileName(this)">
+            <p id="file-name" class="file-name"></p>
+          </div>
+
+          <div class="page-range">
+            <div class="form-group">
+              <label for="page-start">Start Page</label>
+              <input type="number" id="page-start" name="page_start" min="1" placeholder="1">
+            </div>
+            <div class="form-group">
+              <label for="page-end">End Page</label>
+              <input type="number" id="page-end" name="page_end" min="1" placeholder="All">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="btn primary submit-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+        Generate Cards
+      </button>
+    </form>
+  </div>
 </section>
 
 <style>
+  .new-deck-page {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* Page Badge */
+  .page-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--accent-muted);
+    border: 1px solid rgba(255, 107, 107, 0.25);
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--space-md);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
   /* Deck Form Wrapper */
   .deck-form-wrapper {
     max-width: 600px;
@@ -140,7 +171,7 @@
   .deck-form {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
     padding: var(--space-xl);
   }
 
@@ -148,38 +179,9 @@
     margin-bottom: var(--space-lg);
   }
 
-  .deck-form label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: var(--space-sm);
-  }
-
   /* Input with icon */
-  .deck-form .input-wrapper {
-    position: relative;
-  }
-
-  .deck-form .input-wrapper .input-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-tertiary);
-    pointer-events: none;
-    transition: color 0.2s var(--ease-out);
-  }
-
   .deck-form .input-wrapper input {
-    width: 100%;
-    padding: 14px 14px 14px 46px;
-  }
-
-  .deck-form .input-wrapper:focus-within .input-icon {
-    color: var(--accent);
+    padding-left: 46px;
   }
 
   /* Custom Select */
@@ -203,21 +205,9 @@
     appearance: none;
     -webkit-appearance: none;
     cursor: pointer;
-    background: var(--bg-deep);
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
-    color: var(--text-primary);
-    font-size: 0.95rem;
-    transition: all 0.2s var(--ease-out);
   }
 
-  .select-wrapper select:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-muted);
-  }
-
-  .select-wrapper select:focus+.select-chevron {
+  .select-wrapper:focus-within .select-icon {
     color: var(--accent);
   }
 
@@ -228,18 +218,11 @@
     transform: translateY(-50%);
     color: var(--text-tertiary);
     pointer-events: none;
-    transition: color 0.2s var(--ease-out);
+    transition: color var(--duration-normal) var(--ease-out);
   }
 
-  .select-wrapper:hover select {
-    border-color: var(--border-focus);
-  }
-
-  .input-hint {
-    display: block;
-    margin-top: var(--space-sm);
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
+  .select-wrapper:focus-within .select-chevron {
+    color: var(--accent);
   }
 
   /* Divider */
@@ -255,7 +238,7 @@
     position: relative;
     background: var(--bg-deep);
     border: 1px solid var(--border-default);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     padding: 4px;
     margin-bottom: var(--space-md);
   }
@@ -283,15 +266,15 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-tertiary);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.25s var(--ease-out);
+    transition: all var(--duration-normal) var(--ease-out);
   }
 
   .tab-option input:checked+.tab-label {
     color: var(--text-primary);
     background: var(--bg-elevated);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-sm);
   }
 
   .tab-option:hover .tab-label {
@@ -328,25 +311,8 @@
     width: 100%;
     min-height: 200px;
     padding: 16px;
-    background: var(--bg-deep);
-    border: 1px solid var(--border-default);
-    border-radius: 12px;
-    color: var(--text-primary);
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    line-height: 1.6;
     resize: vertical;
-    transition: all 0.2s var(--ease-out);
-  }
-
-  .deck-form textarea:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-muted);
-  }
-
-  .deck-form textarea::placeholder {
-    color: var(--text-tertiary);
+    line-height: 1.6;
   }
 
   /* Upload Zone */
@@ -355,17 +321,17 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 40px 24px;
+    padding: 48px 24px;
     border: 2px dashed var(--border-default);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
-    transition: all 0.25s var(--ease-out);
+    transition: all var(--duration-normal) var(--ease-out);
     text-align: center;
   }
 
   .upload-zone:hover {
     border-color: var(--accent);
-    background: rgba(229, 165, 75, 0.03);
+    background: rgba(255, 107, 107, 0.03);
   }
 
   .upload-zone input {
@@ -376,10 +342,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     background: var(--accent-muted);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     color: var(--accent);
     margin-bottom: var(--space-md);
   }
@@ -403,6 +369,10 @@
     color: var(--accent);
   }
 
+  .file-name:empty {
+    display: none;
+  }
+
   /* Page Range */
   .page-range {
     display: grid;
@@ -411,20 +381,26 @@
     margin-top: var(--space-md);
   }
 
-  .page-range input {
-    width: 100%;
-    padding: 12px 14px;
-    background: var(--bg-deep);
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
+  .page-range .form-group {
+    margin-bottom: 0;
   }
 
   /* Submit Button */
   .submit-btn {
     width: 100%;
     margin-top: var(--space-lg);
-    padding: 16px 24px;
+    padding: 18px 24px;
     font-size: 1rem;
+  }
+
+  @media (max-width: 600px) {
+    .deck-form {
+      padding: var(--space-lg);
+    }
+
+    .upload-zone {
+      padding: 32px 16px;
+    }
   }
 </style>
 
@@ -441,6 +417,42 @@
     } else {
       display.textContent = '';
     }
+  }
+
+  // Drag and drop support
+  const uploadZone = document.querySelector('.upload-zone');
+  if (uploadZone) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, () => {
+        uploadZone.style.borderColor = 'var(--accent)';
+        uploadZone.style.background = 'rgba(255, 107, 107, 0.05)';
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, () => {
+        uploadZone.style.borderColor = '';
+        uploadZone.style.background = '';
+      }, false);
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      const input = document.getElementById('pdf_file');
+      if (files.length > 0 && files[0].type === 'application/pdf') {
+        input.files = files;
+        updateFileName(input);
+      }
+    }, false);
   }
 </script>
 {% endblock %}

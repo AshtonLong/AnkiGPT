@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="preview-page">
+<section class="preview-page">
   <!-- Header -->
   <div class="preview-header">
     <div class="preview-header-content">
@@ -112,7 +112,7 @@
       </form>
     </div>
   </div>
-</div>
+</section>
 
 <style>
   /* Preview Page Layout */
@@ -134,7 +134,7 @@
     gap: 8px;
     padding: 8px 16px;
     background: var(--accent-muted);
-    border: 1px solid rgba(240, 178, 84, 0.25);
+    border: 1px solid rgba(255, 107, 107, 0.25);
     border-radius: 100px;
     font-size: 0.8rem;
     font-weight: 600;
@@ -144,7 +144,7 @@
 
   .preview-header h1 {
     font-family: var(--font-display);
-    font-size: 2.25rem;
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
     font-weight: 700;
     margin-bottom: var(--space-sm);
     background: linear-gradient(180deg, var(--text-primary) 0%, rgba(255, 255, 255, 0.75) 100%);
@@ -155,7 +155,7 @@
 
   .preview-header p {
     font-size: 1.05rem;
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     max-width: 50ch;
     margin: 0 auto;
   }
@@ -172,7 +172,7 @@
   .preview-source {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
   }
 
@@ -214,7 +214,7 @@
   }
 
   .source-content pre {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-family: var(--font-mono);
     font-size: 0.85rem;
     line-height: 1.7;
     color: var(--text-secondary);
@@ -241,7 +241,7 @@
   .settings-form {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: var(--space-lg);
   }
 
@@ -289,25 +289,12 @@
   .setting-group textarea {
     width: 100%;
     padding: 12px 14px;
-    background: var(--bg-deep);
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    transition: all 0.2s var(--ease-out);
-  }
-
-  .setting-group input:focus,
-  .setting-group textarea:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-muted);
+    transition: all var(--duration-normal) var(--ease-out);
   }
 
   .setting-group textarea {
     resize: vertical;
     min-height: 80px;
-    font-family: var(--font-body);
     line-height: 1.5;
   }
 
@@ -365,7 +352,7 @@
 
   @media (max-width: 480px) {
     .preview-header h1 {
-      font-size: 1.75rem;
+      font-size: 1.5rem;
     }
 
     .preview-badge {
