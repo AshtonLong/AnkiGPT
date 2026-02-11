@@ -1,6 +1,6 @@
 from flask import current_app
 from .chunking import clean_text, chunk_text, hash_text
-from .llm import extract_json, openrouter_chat, repair_json
+from .llm import OpenRouterError, extract_json, openrouter_chat, repair_json
 from .schemas import ChunkSchema
 from .validators import is_valid_cloze, normalize_text, normalize_math, is_math_valid, is_in_scope
 from ..extensions import db
@@ -60,11 +60,29 @@ Rules:
     return messages
 
 
-def parse_cards(raw_text, model, api_key, site_url, app_name):
+def parse_cards(
+    raw_text,
+    model,
+    api_key,
+    site_url,
+    app_name,
+    max_retries=2,
+    backoff_seconds=1.5,
+    timeout_seconds=120,
+):
     try:
         data = extract_json(raw_text)
     except Exception:
-        data = repair_json(raw_text, model, api_key, site_url, app_name)
+        data = repair_json(
+            raw_text,
+            model,
+            api_key,
+            site_url,
+            app_name,
+            max_retries=max_retries,
+            backoff_seconds=backoff_seconds,
+            timeout_seconds=timeout_seconds,
+        )
     parsed = ChunkSchema.model_validate(data)
     return parsed.cards, data
 
@@ -85,11 +103,37 @@ def card_text_for_scope(normalized):
     return f"{normalized.get('cloze_text','')} {normalized.get('extra','')}"
 
 
+def format_generation_error(exc):
+    if isinstance(exc, OpenRouterError):
+        status = exc.status_code
+        detail = (exc.response_body or "").lower()
+        if status == 429:
+            if any(marker in detail for marker in ("insufficient", "credit", "quota", "billing", "payment")):
+                return "OpenRouter credits/quota were exhausted while processing this deck."
+            return "OpenRouter rate limit was hit while processing this deck. Wait a minute and try again."
+        if status in (401, 403):
+            return "OpenRouter authentication failed. Check your API key and model access."
+        if status == 400:
+            if "context" in detail or "token" in detail or "too long" in detail:
+                return "OpenRouter rejected this request because the chunk is too large. Lower chunk size and retry."
+            return "OpenRouter rejected this request. Try reducing chunk size or splitting the source text."
+        if status and status >= 500:
+            return "OpenRouter is temporarily unavailable. Please try again shortly."
+        return str(exc)
+    return str(exc)
+
+
 def generate_deck(deck_id):
     deck = Deck.query.get(deck_id)
     if not deck:
         return None
     settings = deck.settings_json or {}
+    llm_max_retries = int(current_app.config.get("OPENROUTER_MAX_RETRIES", 2))
+    llm_backoff_seconds = float(current_app.config.get("OPENROUTER_RETRY_BACKOFF_SECONDS", 1.5))
+    llm_timeout_seconds = float(current_app.config.get("OPENROUTER_TIMEOUT_SECONDS", 120))
+    updated_settings = dict(settings)
+    updated_settings.pop("last_error", None)
+    deck.settings_json = updated_settings
     deck.status = "processing"
     db.session.commit()
 
@@ -124,10 +168,28 @@ def generate_deck(deck_id):
     for source in sources:
         messages = build_prompt(source.title, source.text, settings, deck.card_style)
         try:
-            response = openrouter_chat(messages, model, api_key, site_url, app_name)
+            response = openrouter_chat(
+                messages,
+                model,
+                api_key,
+                site_url,
+                app_name,
+                max_retries=llm_max_retries,
+                backoff_seconds=llm_backoff_seconds,
+                timeout_seconds=llm_timeout_seconds,
+            )
             content = response["choices"][0]["message"]["content"]
             usage = response.get("usage", {})
-            cards, parsed_json = parse_cards(content, model, api_key, site_url, app_name)
+            cards, parsed_json = parse_cards(
+                content,
+                model,
+                api_key,
+                site_url,
+                app_name,
+                max_retries=llm_max_retries,
+                backoff_seconds=llm_backoff_seconds,
+                timeout_seconds=llm_timeout_seconds,
+            )
             for card in cards:
                 normalized = normalize_card(card)
                 if normalized["type"] == "cloze" and not is_valid_cloze(normalized["cloze_text"]):
@@ -170,15 +232,20 @@ def generate_deck(deck_id):
             db.session.add(llm_run)
             db.session.commit()
         except Exception as exc:
+            user_error = format_generation_error(exc)
+            chunk_error = f"Chunk {source.idx + 1}: {user_error}"
             llm_run = LLMRun(
                 deck_id=deck_id,
                 source_id=source.id,
                 model=model,
                 prompt_version=PROMPT_VERSION,
                 request_json={"messages": messages, "model": model},
-                error=str(exc),
+                error=chunk_error,
             )
             db.session.add(llm_run)
+            updated_settings = dict(deck.settings_json or {})
+            updated_settings["last_error"] = chunk_error
+            deck.settings_json = updated_settings
             deck.status = "failed"
             db.session.commit()
             return None
@@ -226,14 +293,35 @@ def regenerate_source(source_id):
     Card.query.filter_by(source_id=source_id).delete()
     db.session.commit()
     settings = deck.settings_json or {}
+    llm_max_retries = int(current_app.config.get("OPENROUTER_MAX_RETRIES", 2))
+    llm_backoff_seconds = float(current_app.config.get("OPENROUTER_RETRY_BACKOFF_SECONDS", 1.5))
+    llm_timeout_seconds = float(current_app.config.get("OPENROUTER_TIMEOUT_SECONDS", 120))
     model = current_app.config["OPENROUTER_MODEL"]
     api_key = current_app.config["OPENROUTER_API_KEY"]
     site_url = current_app.config["OPENROUTER_SITE_URL"]
     app_name = current_app.config["OPENROUTER_APP_NAME"]
     messages = build_prompt(source.title, source.text, settings, deck.card_style)
-    response = openrouter_chat(messages, model, api_key, site_url, app_name)
+    response = openrouter_chat(
+        messages,
+        model,
+        api_key,
+        site_url,
+        app_name,
+        max_retries=llm_max_retries,
+        backoff_seconds=llm_backoff_seconds,
+        timeout_seconds=llm_timeout_seconds,
+    )
     content = response["choices"][0]["message"]["content"]
-    cards, parsed_json = parse_cards(content, model, api_key, site_url, app_name)
+    cards, parsed_json = parse_cards(
+        content,
+        model,
+        api_key,
+        site_url,
+        app_name,
+        max_retries=llm_max_retries,
+        backoff_seconds=llm_backoff_seconds,
+        timeout_seconds=llm_timeout_seconds,
+    )
     created_cards = []
     for card in cards:
         normalized = normalize_card(card)
@@ -287,6 +375,9 @@ def improve_card(card_id):
     api_key = current_app.config["OPENROUTER_API_KEY"]
     site_url = current_app.config["OPENROUTER_SITE_URL"]
     app_name = current_app.config["OPENROUTER_APP_NAME"]
+    llm_max_retries = int(current_app.config.get("OPENROUTER_MAX_RETRIES", 2))
+    llm_backoff_seconds = float(current_app.config.get("OPENROUTER_RETRY_BACKOFF_SECONDS", 1.5))
+    llm_timeout_seconds = float(current_app.config.get("OPENROUTER_TIMEOUT_SECONDS", 120))
     if card.type == "basic":
         prompt = (
             "Improve this Anki basic card for clarity and concision. "
@@ -304,7 +395,16 @@ def improve_card(card_id):
         {"role": "system", "content": "You output strict JSON only. No prose."},
         {"role": "user", "content": prompt},
     ]
-    response = openrouter_chat(messages, model, api_key, site_url, app_name)
+    response = openrouter_chat(
+        messages,
+        model,
+        api_key,
+        site_url,
+        app_name,
+        max_retries=llm_max_retries,
+        backoff_seconds=llm_backoff_seconds,
+        timeout_seconds=llm_timeout_seconds,
+    )
     content = response["choices"][0]["message"]["content"]
     data = extract_json(content)
     if card.type == "basic":

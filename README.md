@@ -104,6 +104,9 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 OPENROUTER_MODEL=google/gemini-3-flash-preview
 OPENROUTER_SITE_URL=
 OPENROUTER_APP_NAME=AnkiGPT
+OPENROUTER_TIMEOUT_SECONDS=120
+OPENROUTER_MAX_RETRIES=2
+OPENROUTER_RETRY_BACKOFF_SECONDS=1.5
 
 CELERY_BROKER_URL=
 CELERY_RESULT_BACKEND=
@@ -149,6 +152,9 @@ celery -A celery_app.celery worker --loglevel=info
 | `OPENROUTER_MODEL` | `google/gemini-3-flash-preview` | Model sent to OpenRouter. |
 | `OPENROUTER_SITE_URL` | `` | Optional `HTTP-Referer` header for OpenRouter. |
 | `OPENROUTER_APP_NAME` | `AnkiGPT` | Optional `X-Title` header for OpenRouter. |
+| `OPENROUTER_TIMEOUT_SECONDS` | `120` | Request timeout per OpenRouter call. |
+| `OPENROUTER_MAX_RETRIES` | `2` | Retries for transient OpenRouter failures (`429`, `5xx`, network). |
+| `OPENROUTER_RETRY_BACKOFF_SECONDS` | `1.5` | Base exponential backoff between retries. |
 | `CELERY_BROKER_URL` | `` | Broker URL (Redis/Rabbit/etc). |
 | `CELERY_RESULT_BACKEND` | `` | Celery result backend URL. |
 | `CELERY_ALWAYS_EAGER` | `true` | Run tasks synchronously in request process. |
@@ -201,6 +207,8 @@ celery -A celery_app.celery worker --loglevel=info
 ## Troubleshooting
 
 - "Generation failed":
+  - Check the exact status-page error message (it now shows the OpenRouter failure reason).
+  - For rate limits, wait briefly and retry.
   - Check `OPENROUTER_API_KEY`.
   - Verify model name in `OPENROUTER_MODEL`.
   - Confirm internet access and OpenRouter account limits.

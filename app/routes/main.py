@@ -2,7 +2,7 @@ import os
 from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user
 from ..extensions import db
-from ..models import Card, Deck, Source, User
+from ..models import Card, Deck, LLMRun, Source, User
 from ..services.pdf import extract_pdf_text
 from ..services.validators import is_valid_cloze
 from ..services.deckgen import regenerate_source, improve_card
@@ -135,8 +135,15 @@ def status(deck_id):
         return redirect_resp
     deck = Deck.query.get_or_404(deck_id)
     total_sources = Source.query.filter_by(deck_id=deck_id).count()
-    done_sources = deck.cards and len({c.source_id for c in deck.cards if c.source_id}) or 0
-    return render_template("deck_status.html", deck=deck, total_sources=total_sources, done_sources=done_sources)
+    done_sources = min(LLMRun.query.filter_by(deck_id=deck_id).count(), total_sources)
+    failure_message = (deck.settings_json or {}).get("last_error") or "Generation failed."
+    return render_template(
+        "deck_status.html",
+        deck=deck,
+        total_sources=total_sources,
+        done_sources=done_sources,
+        failure_message=failure_message,
+    )
 
 
 @bp.route("/decks/<int:deck_id>")
