@@ -152,10 +152,18 @@ def deck_editor(deck_id):
     if redirect_resp:
         return redirect_resp
     deck = Deck.query.get_or_404(deck_id)
-    dropped = (deck.settings_json or {}).get("dropped_cards")
-    if dropped:
-        flash(f"{dropped} cards were dropped during generation checks.", "info")
+    settings = deck.settings_json or {}
+    auto_deleted = settings.get("auto_deleted_cards")
+    legacy_dropped = settings.get("dropped_cards")
+    flagged_count = auto_deleted if auto_deleted is not None else legacy_dropped
+    if flagged_count:
+        flash(
+            f"{flagged_count} cards failed validation and were moved to Deleted. "
+            "Filter by status=Deleted to review, fix, and restore them.",
+            "info",
+        )
         updated_settings = dict(deck.settings_json or {})
+        updated_settings.pop("auto_deleted_cards", None)
         updated_settings.pop("dropped_cards", None)
         deck.settings_json = updated_settings
         db.session.commit()
