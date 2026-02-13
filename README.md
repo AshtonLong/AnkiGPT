@@ -6,6 +6,7 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 ## Features
 
 - Text and PDF input
+- PDF-to-Markdown extraction pipeline for cleaner LLM context (with `pypdf` fallback)
 - Basic and cloze card generation
 - Per-deck generation settings (`focus`, `exclude`, `glossary`, `chunk size`)
 - Card validation pipeline:
@@ -26,16 +27,17 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 - AI: OpenRouter Chat Completions API
 - Validation: Pydantic
 - Export: `genanki`
-- PDF parsing: `pypdf`
+- PDF parsing: `pymupdf4llm` (preferred Markdown extraction) + `pypdf` (fallback)
 - Database: SQLite by default (configurable via `DATABASE_URL`)
 
 ## How It Works
 
 1. Create a deck from text or PDF.
-2. Review extracted source text and choose generation settings.
-3. App splits source into chunks and calls OpenRouter per chunk.
-4. Responses are parsed/validated, invalid cards are dropped, duplicates are marked deleted.
-5. You review/edit cards and export an `.apkg` file.
+2. PDFs are converted to Markdown (fallback: cleaned plain text) for higher-quality chunking.
+3. Review extracted source text and choose generation settings.
+4. App splits source into chunks and calls OpenRouter per chunk.
+5. Responses are parsed/validated, invalid cards are dropped, duplicates are marked deleted.
+6. You review/edit cards and export an `.apkg` file.
 
 ## Project Structure
 
