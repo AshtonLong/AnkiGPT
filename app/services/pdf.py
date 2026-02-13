@@ -131,6 +131,14 @@ def _result_to_markdown(raw):
 
 def _extract_markdown_with_pymupdf4llm(file_path, start, end, total_pages):
     try:
+        # Enables advanced page layout analysis used by pymupdf4llm.
+        import pymupdf.layout  # noqa: F401
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    try:
         import pymupdf4llm
     except ImportError:
         return ""

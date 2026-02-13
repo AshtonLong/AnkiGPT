@@ -27,7 +27,7 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 - AI: OpenRouter Chat Completions API
 - Validation: Pydantic
 - Export: `genanki`
-- PDF parsing: `pymupdf4llm` (preferred Markdown extraction) + `pypdf` (fallback)
+- PDF parsing: `pymupdf4llm` + `pymupdf-layout` (preferred Markdown/layout extraction) + `pypdf` (fallback)
 - Database: SQLite by default (configurable via `DATABASE_URL`)
 
 ## How It Works
