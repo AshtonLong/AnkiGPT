@@ -10,6 +10,7 @@ pydantic==2.6.1
 requests==2.31.0
 genanki==0.13.0
 pypdf==4.0.1
-pymupdf==1.26.7
+pymupdf==1.27.1
+pymupdf-layout==1.27.1
 pymupdf4llm==0.2.9
 python-dotenv==1.0.1
