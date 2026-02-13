@@ -25,6 +25,7 @@ def build_prompt(chunk_title, chunk_text, settings, card_style):
             "Coverage: be exhaustive for all main topics and key details; exam prep.",
             "Cards are self-contained; no references to tables/figures/diagrams.",
             "Style: clean, minimal formatting, consistent wording.",
+            "Input may include Markdown headings/lists from PDF conversion; use that structure for coverage.",
             "Basic: concise Q -> A. Cloze: use {{c1::...}} (1–2 deletions).",
             "Math: only \\( ... \\) inline and \\[ ... \\] display.",
             "Avoid ambiguity; include subject, scope, conditions; no vague pronouns.",
