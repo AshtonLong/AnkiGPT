@@ -104,6 +104,35 @@ def card_text_for_scope(normalized):
     return f"{normalized.get('cloze_text','')} {normalized.get('extra','')}"
 
 
+def validation_issues(normalized, source_text):
+    issues = []
+    content = card_text_for_scope(normalized)
+    if normalized["type"] == "cloze" and not is_valid_cloze(normalized["cloze_text"]):
+        issues.append("invalid_cloze")
+    if not is_math_valid(content):
+        issues.append("invalid_math")
+    if not is_in_scope(content, source_text):
+        issues.append("out_of_scope")
+    return issues
+
+
+def apply_validation_tags(tags, issues):
+    if not issues:
+        return list(tags)
+    tagged = list(tags)
+    tagged.append("auto_deleted")
+    for issue in issues:
+        tagged.append(f"validation:{issue}")
+    deduped = []
+    seen = set()
+    for tag in tagged:
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        deduped.append(tag)
+    return deduped
+
+
 def format_generation_error(exc):
     if isinstance(exc, OpenRouterError):
         status = exc.status_code
@@ -165,7 +194,7 @@ def generate_deck(deck_id):
     app_name = current_app.config["OPENROUTER_APP_NAME"]
 
     created_cards = []
-    dropped_cards = 0
+    auto_deleted_cards = 0
     for source in sources:
         messages = build_prompt(source.title, source.text, settings, deck.card_style)
         try:
@@ -193,19 +222,15 @@ def generate_deck(deck_id):
             )
             for card in cards:
                 normalized = normalize_card(card)
-                if normalized["type"] == "cloze" and not is_valid_cloze(normalized["cloze_text"]):
-                    dropped_cards += 1
-                    continue
-                if not is_math_valid(card_text_for_scope(normalized)):
-                    dropped_cards += 1
-                    continue
-                if not is_in_scope(card_text_for_scope(normalized), source.text):
-                    dropped_cards += 1
-                    continue
+                issues = validation_issues(normalized, source.text)
+                status = "deleted" if issues else "ok"
+                if issues:
+                    auto_deleted_cards += 1
                 tags = list(card.tags or [])
                 tags.append(f"section:{source.idx + 1}")
                 if source.title:
                     tags.append(f"title:{tagify(source.title)}")
+                tags = apply_validation_tags(tags, issues)
                 created_cards.append(
                     Card(
                         deck_id=deck_id,
@@ -216,6 +241,7 @@ def generate_deck(deck_id):
                         cloze_text=normalized.get("cloze_text"),
                         extra=normalized.get("extra"),
                         tags=tags,
+                        status=status,
                     )
                 )
             llm_run = LLMRun(
@@ -257,10 +283,11 @@ def generate_deck(deck_id):
 
     dedupe_cards(deck_id)
     updated_settings = dict(deck.settings_json or {})
-    if dropped_cards:
-        updated_settings["dropped_cards"] = dropped_cards
+    if auto_deleted_cards:
+        updated_settings["auto_deleted_cards"] = auto_deleted_cards
     else:
-        updated_settings.pop("dropped_cards", None)
+        updated_settings.pop("auto_deleted_cards", None)
+    updated_settings.pop("dropped_cards", None)
     deck.settings_json = updated_settings
     deck.status = "ready"
     db.session.commit()
@@ -326,16 +353,13 @@ def regenerate_source(source_id):
     created_cards = []
     for card in cards:
         normalized = normalize_card(card)
-        if normalized["type"] == "cloze" and not is_valid_cloze(normalized["cloze_text"]):
-            continue
-        if not is_math_valid(card_text_for_scope(normalized)):
-            continue
-        if not is_in_scope(card_text_for_scope(normalized), source.text):
-            continue
+        issues = validation_issues(normalized, source.text)
+        status = "deleted" if issues else "ok"
         tags = list(card.tags or [])
         tags.append(f"section:{source.idx + 1}")
         if source.title:
             tags.append(f"title:{tagify(source.title)}")
+        tags = apply_validation_tags(tags, issues)
         created_cards.append(
             Card(
                 deck_id=deck.id,
@@ -346,6 +370,7 @@ def regenerate_source(source_id):
                 cloze_text=normalized.get("cloze_text"),
                 extra=normalized.get("extra"),
                 tags=tags,
+                status=status,
             )
         )
     if created_cards:
