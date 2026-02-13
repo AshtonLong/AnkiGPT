@@ -23,13 +23,16 @@ def build_prompt(chunk_title, chunk_text, settings, card_style):
             "Output strict JSON only.",
             "Scope: ONLY use facts explicitly stated in the chunk.",
             "Coverage: be exhaustive for all main topics and key details; exam prep.",
+            "Atomicity: prefer small, single-idea cards; one fact/concept/step per card whenever possible.",
+            "Keep answers short: target 1-3 concise bullets or 1-2 sentences unless absolutely necessary.",
             "Cards are self-contained; no references to tables/figures/diagrams.",
             "Style: clean, minimal formatting, consistent wording.",
             "Input may include Markdown headings/lists from PDF conversion; use that structure for coverage.",
             "Basic: concise Q -> A. Cloze: use {{c1::...}} (1–2 deletions).",
             "Math: only \\( ... \\) inline and \\[ ... \\] display.",
             "Avoid ambiguity; include subject, scope, conditions; no vague pronouns.",
-            "Prefer list-style cards when content is a list; include full list on one card.",
+            "If a list is long, split it into multiple atomic cards instead of one heavy list card.",
+            "Use full-list cards only when the list is short and should be memorized as one unit.",
             "Cover: definitions, equations + variable meanings, steps, constraints, edge cases, contrasts, pitfalls.",
         ]
     )
@@ -55,7 +58,7 @@ Rules:
 {schema}
 """
     messages = [
-        {"role": "system", "content": "You output strict JSON only. No prose."},
+        {"role": "system", "content": "You output strict JSON only. No prose. Prefer atomic cards."},
         {"role": "user", "content": user_prompt.strip()},
     ]
     return messages
