@@ -14,7 +14,7 @@ class Config:
     OPENROUTER_MAX_RETRIES = int(os.getenv("OPENROUTER_MAX_RETRIES", "2"))
     OPENROUTER_RETRY_BACKOFF_SECONDS = float(os.getenv("OPENROUTER_RETRY_BACKOFF_SECONDS", "1.5"))
     AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "true").lower() == "true"
-    UPLOAD_MAX_MB = int(os.getenv("UPLOAD_MAX_MB", "20"))
+    UPLOAD_MAX_MB = int(os.getenv("UPLOAD_MAX_MB", "1024"))
     MAX_CONTENT_LENGTH = UPLOAD_MAX_MB * 1024 * 1024
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "instance/uploads")
     EXPORT_FOLDER = os.getenv("EXPORT_FOLDER", "instance/exports")
