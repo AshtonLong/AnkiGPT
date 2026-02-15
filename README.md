@@ -98,7 +98,7 @@ Create/update `.env` in the project root:
 SECRET_KEY=change-me
 DATABASE_URL=sqlite:///instance/ankigpt.db
 AUTH_REQUIRED=true
-UPLOAD_MAX_MB=20
+UPLOAD_MAX_MB=1024
 UPLOAD_FOLDER=instance/uploads
 EXPORT_FOLDER=instance/exports
 
@@ -147,7 +147,7 @@ celery -A celery_app.celery worker --loglevel=info
 | `SECRET_KEY` | `dev-secret` | Flask session/CSRF secret. Change in real environments. |
 | `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy connection URL. |
 | `AUTH_REQUIRED` | `true` | Require login if true; if false uses a local demo user. |
-| `UPLOAD_MAX_MB` | `20` | Max upload size in MB (`MAX_CONTENT_LENGTH`). |
+| `UPLOAD_MAX_MB` | `1024` | Max upload size in MB (`MAX_CONTENT_LENGTH`, about 1GB). |
 | `UPLOAD_FOLDER` | `instance/uploads` | PDF upload storage directory. |
 | `EXPORT_FOLDER` | `instance/exports` | Export directory (app currently streams files directly). |
 | `OPENROUTER_API_KEY` | `` | Required for generation/improve calls. |
