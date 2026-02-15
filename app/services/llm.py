@@ -4,6 +4,7 @@ import requests
 
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+_HEX_CHARS = set("0123456789abcdefABCDEF")
 
 
 class OpenRouterError(RuntimeError):
@@ -117,14 +118,85 @@ def openrouter_chat(
     raise OpenRouterError("OpenRouter request failed after retries.")
 
 
-def extract_json(text):
+def _sanitize_json_string_escapes(text):
+    # Repair common LLM JSON mistakes: invalid backslash escapes and raw control chars in strings.
+    out = []
+    i = 0
+    n = len(text)
+    in_string = False
+    while i < n:
+        ch = text[i]
+        if not in_string:
+            out.append(ch)
+            if ch == '"':
+                in_string = True
+            i += 1
+            continue
+
+        if ch == '"':
+            out.append(ch)
+            in_string = False
+            i += 1
+            continue
+
+        if ch == "\\":
+            if i + 1 >= n:
+                out.append("\\\\")
+                i += 1
+                continue
+            nxt = text[i + 1]
+            if nxt in {'"', "\\", "/", "b", "f", "n", "r", "t"}:
+                out.append("\\")
+                out.append(nxt)
+                i += 2
+                continue
+            if nxt == "u" and i + 5 < n and all(c in _HEX_CHARS for c in text[i + 2 : i + 6]):
+                out.append("\\")
+                out.append("u")
+                out.append(text[i + 2 : i + 6])
+                i += 6
+                continue
+            out.append("\\\\")
+            i += 1
+            continue
+
+        if ch == "\n":
+            out.append("\\n")
+            i += 1
+            continue
+        if ch == "\r":
+            out.append("\\r")
+            i += 1
+            continue
+        if ch == "\t":
+            out.append("\\t")
+            i += 1
+            continue
+
+        out.append(ch)
+        i += 1
+
+    return "".join(out)
+
+
+def _json_load_with_repair(text):
     try:
         return json.loads(text)
+    except json.JSONDecodeError:
+        repaired = _sanitize_json_string_escapes(text)
+        if repaired == text:
+            raise
+        return json.loads(repaired)
+
+
+def extract_json(text):
+    try:
+        return _json_load_with_repair(text)
     except json.JSONDecodeError:
         start = text.find("{")
         end = text.rfind("}")
         if start != -1 and end != -1 and end > start:
-            return json.loads(text[start : end + 1])
+            return _json_load_with_repair(text[start : end + 1])
         raise
 
 
