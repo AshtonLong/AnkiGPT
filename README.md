@@ -7,6 +7,7 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 
 - Text and PDF input
 - PDF-to-Markdown extraction pipeline for cleaner LLM context (with `pypdf` fallback)
+- Exam cheat sheet generation before card creation
 - Basic and cloze card generation
 - Per-deck generation settings (`focus`, `exclude`, `glossary`, `chunk size`)
 - Card validation pipeline:
@@ -15,7 +16,7 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
   - source-scope checks
   - deduplication
 - In-browser card editor with HTMX inline save/improve actions
-- Bulk actions (delete, restore, tag, regenerate by source chunk)
+- Bulk actions (delete, restore, tag, regenerate by cheat sheet section)
 - `.apkg` export compatible with Anki
 - Optional authentication-free demo mode
 - Sync mode by default, optional async Celery worker mode
@@ -35,9 +36,10 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 1. Create a deck from text or PDF.
 2. PDFs are converted to Markdown (fallback: cleaned plain text) for higher-quality chunking.
 3. Review extracted source text and choose generation settings.
-4. App splits source into chunks and calls OpenRouter per chunk.
-5. Responses are parsed/validated, invalid cards are dropped, duplicates are marked deleted.
-6. You review/edit cards and export an `.apkg` file.
+4. App converts the source chunks into a comprehensive, exam-focused Markdown cheat sheet.
+5. App chunks only that cheat sheet and generates cards from those sections.
+6. Responses are parsed/validated, invalid cards are dropped, duplicates are marked deleted.
+7. You review/edit cards and export an `.apkg` file.
 
 ## Project Structure
 
@@ -193,7 +195,7 @@ celery -A celery_app.celery worker --loglevel=info
 
 - `User`: account credentials and timestamps
 - `Deck`: deck metadata, source content, settings, status
-- `Source`: generated chunk records (one row per chunk)
+- `Source`: generated cheat sheet section records used for card creation
 - `Card`: generated/editable cards with status and tags
 - `LLMRun`: generation/improvement request logs, parsed payloads, errors, usage
 

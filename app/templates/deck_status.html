@@ -33,7 +33,7 @@
       {% elif deck.status == "failed" %}
       Generation Failed
       {% else %}
-      Generating Cards...
+      Building Study Deck...
       {% endif %}
     </h2>
 
@@ -47,7 +47,7 @@
         <div class="bar" style="width: {{ 0 if total_sources == 0 else (done_sources / total_sources) * 100 }}%"></div>
       </div>
       <p class="progress-text">
-        <span class="progress-count">{{ done_sources }}</span> / <span>{{ total_sources }}</span> chunks processed
+        <span class="progress-count">{{ done_sources }}</span> / <span>{{ total_sources }}</span> {{ progress_label }}
       </p>
     </div>
     {% endif %}
@@ -76,7 +76,7 @@
         <circle cx="12" cy="12" r="10" />
         <polyline points="12 6 12 12 16 14" />
       </svg>
-      AI is processing your content. This usually takes 30-60 seconds.
+      AI is creating an exam cheat sheet first, then generating cards from that sheet.
     </div>
     {% endif %}
 

@@ -5,7 +5,7 @@ from ..extensions import db
 from ..models import Card, Deck, LLMRun, Source, User
 from ..services.pdf import extract_pdf_text
 from ..services.validators import is_valid_cloze
-from ..services.deckgen import regenerate_source, improve_card
+from ..services.deckgen import CARD_PROMPT_VERSION, regenerate_source, improve_card
 from ..services.export import export_deck as export_deck_file
 from ..tasks import generate_deck_task
 
@@ -134,15 +134,26 @@ def status(deck_id):
     if redirect_resp:
         return redirect_resp
     deck = Deck.query.get_or_404(deck_id)
+    settings = deck.settings_json or {}
     total_sources = Source.query.filter_by(deck_id=deck_id).count()
-    done_sources = min(LLMRun.query.filter_by(deck_id=deck_id).count(), total_sources)
-    failure_message = (deck.settings_json or {}).get("last_error") or "Generation failed."
+    if deck.status == "processing" and settings.get("generation_stage") == "cheat_sheet":
+        total_sources = int(settings.get("source_chunks") or 0)
+        done_sources = int(settings.get("cheat_sheet_chunks_done") or 0)
+        progress_label = "source chunks converted to cheat sheet"
+    else:
+        done_sources = min(
+            LLMRun.query.filter_by(deck_id=deck_id, prompt_version=CARD_PROMPT_VERSION).count(),
+            total_sources,
+        )
+        progress_label = "cheat sheet sections processed"
+    failure_message = settings.get("last_error") or "Generation failed."
     return render_template(
         "deck_status.html",
         deck=deck,
         total_sources=total_sources,
         done_sources=done_sources,
         failure_message=failure_message,
+        progress_label=progress_label,
     )
 
 

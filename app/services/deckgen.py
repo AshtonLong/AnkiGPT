@@ -7,11 +7,54 @@ from ..extensions import db
 from ..models import Card, Deck, LLMRun, Source
 
 
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4-cheat-sheet-pipeline"
+CHEAT_SHEET_PROMPT_VERSION = f"{PROMPT_VERSION}:cheat_sheet"
+CARD_PROMPT_VERSION = f"{PROMPT_VERSION}:cards"
 
 
 def tagify(text):
     return "".join([c if c.isalnum() or c in ("-", "_") else "_" for c in text.lower()]).strip("_")
+
+
+def build_cheat_sheet_prompt(chunk_title, chunk_text, settings, chunk_number, total_chunks):
+    focus = settings.get("focus", "")
+    exclude = settings.get("exclude", "")
+    glossary = settings.get("glossary", "")
+    rules = "\n".join(
+        [
+            "Convert the source material into a dense exam cheat sheet section.",
+            "Include only information that would be useful for a student on an exam.",
+            "Be comprehensive: preserve definitions, formulas, variable meanings, procedures, constraints, contrasts, edge cases, and common pitfalls.",
+            "Keep the content grounded in the source. Do not add facts that are not supported by the source.",
+            "Use clear Markdown headings, bullets, compact tables, and equations where useful.",
+            "Write formulas with \\( ... \\) inline math and \\[ ... \\] display math.",
+            "Remove filler, duplicated prose, anecdotes, generic examples, and low-value trivia.",
+            "If source details are uncertain or incomplete, state only what the source supports.",
+        ]
+    )
+    user_prompt = f"""Create an exam cheat sheet section from this source chunk.
+
+Chunk: {chunk_number} of {total_chunks}
+Title: {chunk_title or "Untitled"}
+Focus: {focus or "all exam-useful concepts, formulas, and procedures"}
+Exclude: {exclude or "none"}
+Must-include terms: {glossary or "none"}
+
+Source:
+{chunk_text}
+
+Rules:
+{rules}
+
+Return only the Markdown cheat sheet section. Do not create flashcards.
+"""
+    return [
+        {
+            "role": "system",
+            "content": "You create dense, source-grounded exam cheat sheets. Return Markdown only.",
+        },
+        {"role": "user", "content": user_prompt.strip()},
+    ]
 
 
 def build_prompt(chunk_title, chunk_text, settings, card_style):
@@ -21,19 +64,20 @@ def build_prompt(chunk_title, chunk_text, settings, card_style):
     rules = "\n".join(
         [
             "Output strict JSON only.",
-            "Scope: ONLY use facts explicitly stated in the chunk.",
-            "Coverage: be exhaustive for all main topics and key details; exam prep.",
-            "Atomicity: prefer small, single-idea cards; one fact/concept/step per card whenever possible.",
+            "Scope: ONLY use facts explicitly stated in the cheat sheet section.",
+            "The cheat sheet is the only allowed source. Do not use the original source material or outside knowledge.",
+            "Coverage: make cards only for exam-useful concepts, formulas, procedures, constraints, contrasts, and pitfalls in the cheat sheet.",
+            "Atomicity: prefer small, single-idea cards; one fact/concept/formula/step per card whenever possible.",
             "Keep answers short: target 1-3 concise bullets or 1-2 sentences unless absolutely necessary.",
             "Cards are self-contained; no references to tables/figures/diagrams.",
             "Style: clean, minimal formatting, consistent wording.",
-            "Input may include Markdown headings/lists from PDF conversion; use that structure for coverage.",
-            "Basic: concise Q -> A. Cloze: use {{c1::...}} (1–2 deletions).",
+            "Input is a Markdown cheat sheet; use its headings and lists for coverage.",
+            "Basic: concise Q -> A. Cloze: use {{c1::...}} (1-2 deletions).",
             "Math: only \\( ... \\) inline and \\[ ... \\] display.",
             "Avoid ambiguity; include subject, scope, conditions; no vague pronouns.",
-            "If a list is long, split it into multiple atomic cards instead of one heavy list card.",
+            "If a list is long, split it into multiple targeted cards instead of one heavy list card.",
             "Use full-list cards only when the list is short and should be memorized as one unit.",
-            "Cover: definitions, equations + variable meanings, steps, constraints, edge cases, contrasts, pitfalls.",
+            "Skip low-value recall cards and anything that is not meaningfully testable.",
         ]
     )
     schema = (
@@ -41,10 +85,10 @@ def build_prompt(chunk_title, chunk_text, settings, card_style):
         "\"front\": string?, \"back\": string?, "
         "\"cloze_text\": string?, \"extra\": string?, \"tags\": [string]}]}"
     )
-    user_prompt = f"""Generate Anki cards from this chunk.
+    user_prompt = f"""Generate Anki cards from this cheat sheet section.
 
 Title: {chunk_title or "Untitled"}
-Content:
+Cheat sheet section:
 {chunk_text}
 
 Card style: {card_style}
@@ -58,10 +102,22 @@ Rules:
 {schema}
 """
     messages = [
-        {"role": "system", "content": "You output strict JSON only. No prose. Prefer atomic cards."},
+        {
+            "role": "system",
+            "content": "You output strict JSON only. No prose. Create cards only from the provided cheat sheet.",
+        },
         {"role": "user", "content": user_prompt.strip()},
     ]
     return messages
+
+
+def normalize_cheat_sheet_section(content, chunk_number):
+    section = clean_text(content)
+    if not section:
+        return ""
+    if not section.lstrip().startswith("#"):
+        section = f"## Cheat Sheet Section {chunk_number}\n\n{section}"
+    return section
 
 
 def parse_cards(
@@ -171,30 +227,104 @@ def generate_deck(deck_id):
     db.session.commit()
 
     Card.query.filter_by(deck_id=deck_id).delete()
-    Source.query.filter_by(deck_id=deck_id).delete()
     LLMRun.query.filter_by(deck_id=deck_id).delete()
-    db.session.commit()
-
-    cleaned = clean_text(deck.source_text)
-    max_chars = int(settings.get("max_chars", 3500))
-    chunks = chunk_text(cleaned, max_chars=max_chars)
-    sources = []
-    for idx, (title, text) in enumerate(chunks):
-        source = Source(
-            deck_id=deck_id,
-            idx=idx,
-            title=title,
-            text=text,
-            hash=hash_text(text),
-        )
-        sources.append(source)
-    db.session.add_all(sources)
+    Source.query.filter_by(deck_id=deck_id).delete()
     db.session.commit()
 
     model = current_app.config["OPENROUTER_MODEL"]
     api_key = current_app.config["OPENROUTER_API_KEY"]
     site_url = current_app.config["OPENROUTER_SITE_URL"]
     app_name = current_app.config["OPENROUTER_APP_NAME"]
+
+    cleaned = clean_text(deck.source_text)
+    max_chars = int(settings.get("max_chars", 3500))
+    source_chunks = chunk_text(cleaned, max_chars=max_chars)
+    updated_settings = dict(deck.settings_json or {})
+    updated_settings["generation_stage"] = "cheat_sheet"
+    updated_settings["source_chunks"] = len(source_chunks)
+    updated_settings["cheat_sheet_chunks_done"] = 0
+    deck.settings_json = updated_settings
+    db.session.commit()
+
+    cheat_sheet_sections = []
+    for idx, (title, text) in enumerate(source_chunks):
+        messages = build_cheat_sheet_prompt(title, text, settings, idx + 1, len(source_chunks))
+        try:
+            response = openrouter_chat(
+                messages,
+                model,
+                api_key,
+                site_url,
+                app_name,
+                max_retries=llm_max_retries,
+                backoff_seconds=llm_backoff_seconds,
+                timeout_seconds=llm_timeout_seconds,
+            )
+            content = response["choices"][0]["message"]["content"]
+            usage = response.get("usage", {})
+            section = normalize_cheat_sheet_section(content, idx + 1)
+            if not section:
+                raise ValueError("The model returned an empty cheat sheet section.")
+            cheat_sheet_sections.append(section)
+            db.session.add(
+                LLMRun(
+                    deck_id=deck_id,
+                    source_id=None,
+                    model=model,
+                    prompt_version=CHEAT_SHEET_PROMPT_VERSION,
+                    input_tokens=usage.get("prompt_tokens"),
+                    output_tokens=usage.get("completion_tokens"),
+                    cost_estimate=usage.get("total_cost"),
+                    request_json={"messages": messages, "model": model, "source_chunk": idx + 1},
+                    response_text=content,
+                    parsed_json={"cheat_sheet_section": section},
+                )
+            )
+            db.session.commit()
+            updated_settings = dict(deck.settings_json or {})
+            updated_settings["cheat_sheet_chunks_done"] = idx + 1
+            deck.settings_json = updated_settings
+            db.session.commit()
+        except Exception as exc:
+            user_error = format_generation_error(exc)
+            chunk_error = f"Cheat sheet chunk {idx + 1}: {user_error}"
+            db.session.add(
+                LLMRun(
+                    deck_id=deck_id,
+                    source_id=None,
+                    model=model,
+                    prompt_version=CHEAT_SHEET_PROMPT_VERSION,
+                    request_json={"messages": messages, "model": model, "source_chunk": idx + 1},
+                    error=chunk_error,
+                )
+            )
+            updated_settings = dict(deck.settings_json or {})
+            updated_settings["last_error"] = chunk_error
+            deck.settings_json = updated_settings
+            deck.status = "failed"
+            db.session.commit()
+            return None
+
+    cheat_sheet = clean_text("\n\n".join(cheat_sheet_sections))
+    cheat_sheet_chunks = chunk_text(cheat_sheet, max_chars=max_chars)
+    sources = []
+    for idx, (title, text) in enumerate(cheat_sheet_chunks):
+        source_title = title or f"Cheat Sheet Section {idx + 1}"
+        source = Source(
+            deck_id=deck_id,
+            idx=idx,
+            title=source_title,
+            text=text,
+            hash=hash_text(text),
+        )
+        sources.append(source)
+    db.session.add_all(sources)
+    updated_settings = dict(deck.settings_json or {})
+    updated_settings["cheat_sheet"] = cheat_sheet
+    updated_settings["cheat_sheet_sections"] = len(sources)
+    updated_settings["generation_stage"] = "cards"
+    deck.settings_json = updated_settings
+    db.session.commit()
 
     created_cards = []
     auto_deleted_cards = 0
@@ -251,7 +381,7 @@ def generate_deck(deck_id):
                 deck_id=deck_id,
                 source_id=source.id,
                 model=model,
-                prompt_version=PROMPT_VERSION,
+                prompt_version=CARD_PROMPT_VERSION,
                 input_tokens=usage.get("prompt_tokens"),
                 output_tokens=usage.get("completion_tokens"),
                 cost_estimate=usage.get("total_cost"),
@@ -268,7 +398,7 @@ def generate_deck(deck_id):
                 deck_id=deck_id,
                 source_id=source.id,
                 model=model,
-                prompt_version=PROMPT_VERSION,
+                prompt_version=CARD_PROMPT_VERSION,
                 request_json={"messages": messages, "model": model},
                 error=chunk_error,
             )
@@ -291,6 +421,9 @@ def generate_deck(deck_id):
     else:
         updated_settings.pop("auto_deleted_cards", None)
     updated_settings.pop("dropped_cards", None)
+    updated_settings.pop("generation_stage", None)
+    updated_settings.pop("source_chunks", None)
+    updated_settings.pop("cheat_sheet_chunks_done", None)
     deck.settings_json = updated_settings
     deck.status = "ready"
     db.session.commit()
@@ -383,7 +516,7 @@ def regenerate_source(source_id):
         deck_id=deck.id,
         source_id=source_id,
         model=model,
-        prompt_version=PROMPT_VERSION,
+        prompt_version=CARD_PROMPT_VERSION,
         request_json={"messages": messages, "model": model},
         response_text=content,
         parsed_json=parsed_json,
