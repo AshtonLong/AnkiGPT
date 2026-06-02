@@ -1,0 +1,23 @@
+# Virtualenvs / local Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local instance data (DB, uploads, exports) — persisted via a Docker volume instead
+instance/
+
+# VCS / editor / OS
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Secrets — passed in via env_file at runtime, never baked into the image
+.env
+
+# Docs/build artifacts not needed in the image
+*.md

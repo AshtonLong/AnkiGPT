@@ -68,16 +68,55 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 |-- run.py
 |-- wsgi.py
 |-- requirements.txt
+|-- Dockerfile
+|-- docker-compose.yml
+|-- tests/
 `-- instance/          # sqlite db, uploads, exports (created automatically)
 ```
 
 ## Requirements
 
-- Python 3.10+ (3.12 recommended)
+- **Docker + Docker Compose** (recommended), or
+- Python 3.10+ (3.12 recommended) for a local install
 - An OpenRouter API key
-- Redis only if you want true async background workers
+- Redis only if you want true async background workers (bundled in the Docker setup)
 
-## Quick Start
+## Quick Start (Docker — recommended)
+
+The Docker setup runs the full stack: the Flask web app (gunicorn), a Celery
+worker, and Redis, with async generation enabled.
+
+```bash
+# 1. Configure secrets
+cp example.env .env        # then set SECRET_KEY and OPENROUTER_API_KEY in .env
+
+# 2. Build and start
+docker compose up --build
+```
+
+Open `http://localhost:5000`.
+
+- The web app listens on container port 8000 and is published to host port `5000`.
+- The SQLite database, uploads, and exports persist in the `ankigpt-data` volume.
+- Celery/Redis wiring (`CELERY_BROKER_URL`, etc.) is set in `docker-compose.yml`
+  and overrides `.env`, so async mode works out of the box.
+
+Common commands:
+
+```bash
+docker compose up -d --build      # start in the background
+docker compose logs -f web        # tail web logs (or: worker / redis)
+docker compose down               # stop (add -v to also delete the data volume)
+
+# Run the test suite in the container (pytest is a dev-only dependency):
+docker compose exec web sh -c "pip install -q -r requirements-dev.txt && python -m pytest tests/ -q"
+```
+
+To run the web service synchronously without the worker (eager mode), set
+`CELERY_ALWAYS_EAGER: "true"` on the `web` service and skip the `worker`/`redis`
+services.
+
+## Quick Start (local Python install)
 
 ### 1. Create and activate a virtual environment
 
@@ -242,7 +281,7 @@ celery -A celery_app.celery worker --loglevel=info
 ## Testing
 
 ```powershell
-pip install pytest
+pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
