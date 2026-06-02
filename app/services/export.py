@@ -1,5 +1,6 @@
 import io
 import genanki
+from ..extensions import db
 from ..models import Card, Deck
 
 
@@ -140,7 +141,7 @@ def safe_filename(name):
 
 
 def export_deck(deck_id):
-    deck = Deck.query.get(deck_id)
+    deck = db.session.get(Deck, deck_id)
     if not deck:
         return None
     cards = Card.query.filter_by(deck_id=deck_id, status="ok").all()

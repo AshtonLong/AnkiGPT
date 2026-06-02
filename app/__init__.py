@@ -1,13 +1,39 @@
+import logging
 import os
+import sqlite3
+
 from flask import Flask
-from .config import Config
-from .extensions import db, login_manager, migrate
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+from .config import Config, DEV_SECRET_KEY
+from .extensions import csrf, db, login_manager, migrate
 from .models import User
 
 
-def create_app():
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    """Enforce ON DELETE CASCADE for SQLite, which ignores foreign keys by default."""
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+def create_app(config_object=Config):
     app = Flask(__name__, instance_relative_config=True)
-    app.config.from_object(Config)
+    app.config.from_object(config_object)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    if app.config.get("SECRET_KEY") == DEV_SECRET_KEY and not app.debug:
+        app.logger.warning(
+            "SECRET_KEY is the insecure development default. Set a strong SECRET_KEY "
+            "before exposing this app — sessions can otherwise be forged."
+        )
+
     os.makedirs(app.instance_path, exist_ok=True)
     db_url = app.config["SQLALCHEMY_DATABASE_URI"]
     if db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////"):
@@ -30,6 +56,7 @@ def create_app():
     migrate.init_app(app, db)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
+    csrf.init_app(app)
 
     from .routes.main import bp as main_bp
     from .routes.auth import bp as auth_bp
@@ -48,4 +75,7 @@ def create_app():
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        return db.session.get(User, int(user_id))
+    except (TypeError, ValueError):
+        return None
