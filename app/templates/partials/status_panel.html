@@ -1,0 +1,120 @@
+{# Polled fragment. While processing, it polls itself every 3s and swaps in place,
+   so the page never does a full reload. Polling stops once status is terminal
+   (the hx-trigger is simply omitted from the ready/failed markup). #}
+<section class="status-page" id="status-root"
+  {% if deck.status not in ["ready", "failed"] %}
+  hx-get="{{ url_for('main.status', deck_id=deck.id, partial=1) }}"
+  hx-trigger="every 3s"
+  hx-swap="outerHTML"
+  {% endif %}>
+  <div class="panel status-panel" role="status" aria-live="polite">
+    <!-- Icon -->
+    <div
+      class="status-icon {% if deck.status == 'ready' %}success{% elif deck.status == 'failed' %}error{% else %}processing{% endif %}">
+      {% if deck.status == "ready" %}
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+      {% elif deck.status == "failed" %}
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="15" y1="9" x2="9" y2="15" />
+        <line x1="9" y1="9" x2="15" y2="15" />
+      </svg>
+      {% else %}
+      <svg class="spin" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
+      {% endif %}
+    </div>
+
+    <!-- Title -->
+    <h2>
+      {% if deck.status == "ready" %}
+      Deck Ready!
+      {% elif deck.status == "failed" %}
+      Generation Failed
+      {% else %}
+      Building Study Deck...
+      {% endif %}
+    </h2>
+
+    <!-- Subtitle -->
+    <p class="status-subtitle">{{ deck.title }}</p>
+
+    <!-- Progress Bar -->
+    {% if deck.status not in ["ready", "failed"] %}
+    <div class="progress-wrapper">
+      <div class="progress">
+        <div class="bar" style="width: {{ 0 if total_sources == 0 else (done_sources / total_sources) * 100 }}%"></div>
+      </div>
+      <p class="progress-text">
+        <span class="progress-count">{{ done_sources }}</span> / <span>{{ total_sources }}</span> {{ progress_label }}
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- Status Message -->
+    {% if deck.status == "ready" %}
+    <div class="status-message success-message">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        aria-hidden="true">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+      Your flashcards are ready. Open the editor to review and export.
+    </div>
+    {% elif deck.status == "failed" %}
+    <div class="status-message error-message">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      {{ failure_message }}
+    </div>
+    {% else %}
+    <div class="status-message processing-message">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+      AI is creating an exam cheat sheet first, then generating cards from that sheet.
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="status-actions">
+      {% if deck.status == "ready" %}
+      <a class="btn primary" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          aria-hidden="true">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" />
+        </svg>
+        Open Editor
+      </a>
+      <a class="btn ghost" href="{{ url_for('main.decks') }}">All Decks</a>
+      {% elif deck.status == "failed" %}
+      <form action="{{ url_for('main.preview_deck', deck_id=deck.id) }}" method="post" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="focus" value="{{ (deck.settings_json or {}).get('focus', '') }}">
+        <input type="hidden" name="exclude" value="{{ (deck.settings_json or {}).get('exclude', '') }}">
+        <input type="hidden" name="glossary" value="{{ (deck.settings_json or {}).get('glossary', '') }}">
+        <input type="hidden" name="max_chars" value="{{ (deck.settings_json or {}).get('max_chars', 3500) }}">
+        <button class="btn primary" type="submit">Retry Generation</button>
+      </form>
+      <a class="btn ghost" href="{{ url_for('main.preview_deck', deck_id=deck.id) }}">Edit Settings</a>
+      <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to Decks</a>
+      {% else %}
+      <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to Decks</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
