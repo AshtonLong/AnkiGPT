@@ -1,6 +1,20 @@
 import os
-from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, url_for
+import secrets
+import uuid
+
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from flask_login import current_user
+from werkzeug.utils import secure_filename
+
 from ..extensions import db
 from ..models import Card, Deck, LLMRun, Source, User
 from ..services.pdf import extract_pdf_text
@@ -24,10 +38,31 @@ def get_actor():
     user = User.query.filter_by(email="demo@local").first()
     if not user:
         user = User(email="demo@local")
-        user.set_password("demo")
+        # Demo mode bypasses auth entirely; this password is never used for login,
+        # so make it unguessable rather than a fixed "demo".
+        user.set_password(secrets.token_urlsafe(32))
         db.session.add(user)
         db.session.commit()
     return user
+
+
+def get_owned_deck(deck_id):
+    """Load a deck only if it belongs to the current actor, else 404.
+
+    Returning 404 (not 403) avoids leaking whether a given deck id exists.
+    """
+    actor = get_actor()
+    return Deck.query.filter_by(id=deck_id, user_id=actor.id).first_or_404()
+
+
+def get_owned_card(card_id):
+    """Load a card only if its deck belongs to the current actor, else 404."""
+    actor = get_actor()
+    return (
+        Card.query.join(Deck, Card.deck_id == Deck.id)
+        .filter(Card.id == card_id, Deck.user_id == actor.id)
+        .first_or_404()
+    )
 
 
 @bp.route("/")
@@ -50,14 +85,22 @@ def delete_deck(deck_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    deck = Deck.query.get_or_404(deck_id)
-    user = get_actor()
-    if deck.user_id != user.id:
-        flash("Not authorized to delete this deck", "error")
-        return redirect(url_for("main.decks"))
+    deck = get_owned_deck(deck_id)
     db.session.delete(deck)
     db.session.commit()
+    flash("Deck deleted.", "info")
     return redirect(url_for("main.decks"))
+
+
+def _parse_page(value):
+    """Parse an optional 1-based page number from a form field; None if blank/invalid."""
+    if not value:
+        return None
+    try:
+        page = int(value)
+    except (TypeError, ValueError):
+        return None
+    return page if page > 0 else None
 
 
 @bp.route("/decks/new", methods=["GET", "POST"])
@@ -70,25 +113,55 @@ def new_deck():
         source_type = request.form.get("source_type")
         card_style = request.form.get("card_style") or current_app.config["DEFAULT_CARD_STYLE"]
         text_input = request.form.get("text_input", "").strip()
-        page_start = request.form.get("page_start")
-        page_end = request.form.get("page_end")
         source_text = ""
         if source_type == "text":
             source_text = text_input
         elif source_type == "pdf":
             pdf_file = request.files.get("pdf_file")
-            if not pdf_file:
+            if not pdf_file or not pdf_file.filename:
                 flash("PDF file is required", "error")
                 return render_template("deck_new.html")
-            filename = pdf_file.filename
-            upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+            allowed = current_app.config["ALLOWED_UPLOAD_EXTENSIONS"]
+            ext = pdf_file.filename.rsplit(".", 1)[-1].lower() if "." in pdf_file.filename else ""
+            if ext not in allowed:
+                flash("Only PDF files are supported.", "error")
+                return render_template("deck_new.html")
+            # Never trust the client filename. Store under a server-generated name to
+            # prevent path traversal and cross-user collisions.
+            safe_name = f"{uuid.uuid4().hex}_{secure_filename(pdf_file.filename)}"
+            upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
             pdf_file.save(upload_path)
-            start = int(page_start) if page_start else None
-            end = int(page_end) if page_end else None
-            source_text, total_pages = extract_pdf_text(upload_path, start, end)
-        if not source_text:
-            flash("No text could be extracted", "error")
+            try:
+                start = _parse_page(request.form.get("page_start"))
+                end = _parse_page(request.form.get("page_end"))
+                source_text, _total_pages = extract_pdf_text(upload_path, start, end)
+            except Exception:
+                current_app.logger.exception("PDF extraction failed for %s", safe_name)
+                source_text = ""
+            finally:
+                # Don't leave uploads accumulating on disk after extraction.
+                try:
+                    os.remove(upload_path)
+                except OSError:
+                    pass
+        else:
+            flash("Choose a source type.", "error")
             return render_template("deck_new.html")
+        if not source_text:
+            flash(
+                "No text could be extracted. If this is a scanned PDF, it has no "
+                "selectable text (OCR is not supported).",
+                "error",
+            )
+            return render_template("deck_new.html")
+        max_source_chars = current_app.config["MAX_SOURCE_CHARS"]
+        if max_source_chars and len(source_text) > max_source_chars:
+            source_text = source_text[:max_source_chars]
+            flash(
+                f"Source was truncated to {max_source_chars:,} characters to keep "
+                "generation fast and affordable.",
+                "info",
+            )
         user = get_actor()
         deck = Deck(
             user_id=user.id,
@@ -110,19 +183,30 @@ def preview_deck(deck_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    deck = Deck.query.get_or_404(deck_id)
+    deck = get_owned_deck(deck_id)
     if request.method == "POST":
+        try:
+            max_chars = int(request.form.get("max_chars") or 3500)
+        except (TypeError, ValueError):
+            max_chars = 3500
+        max_chars = max(1000, min(max_chars, 8000))
         settings = {
             "focus": request.form.get("focus", ""),
             "exclude": request.form.get("exclude", ""),
             "glossary": request.form.get("glossary", ""),
-            "max_chars": int(request.form.get("max_chars") or 3500),
+            "max_chars": max_chars,
         }
         deck.settings_json = settings
+        deck.status = "processing"
         db.session.commit()
         try:
             generate_deck_task.delay(deck.id)
         except Exception:
+            # Broker unreachable: fall back to running inline so the deck still
+            # generates, but log it so the operator knows async mode degraded.
+            current_app.logger.warning(
+                "Celery dispatch failed for deck %s; running inline.", deck.id, exc_info=True
+            )
             generate_deck_task.apply(args=(deck.id,))
         return redirect(url_for("main.status", deck_id=deck.id))
     return render_template("deck_preview.html", deck=deck)
@@ -133,7 +217,7 @@ def status(deck_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    deck = Deck.query.get_or_404(deck_id)
+    deck = get_owned_deck(deck_id)
     settings = deck.settings_json or {}
     total_sources = Source.query.filter_by(deck_id=deck_id).count()
     if deck.status == "processing" and settings.get("generation_stage") == "cheat_sheet":
@@ -147,8 +231,9 @@ def status(deck_id):
         )
         progress_label = "cheat sheet sections processed"
     failure_message = settings.get("last_error") or "Generation failed."
+    template = "partials/status_panel.html" if request.args.get("partial") else "deck_status.html"
     return render_template(
-        "deck_status.html",
+        template,
         deck=deck,
         total_sources=total_sources,
         done_sources=done_sources,
@@ -162,7 +247,7 @@ def deck_editor(deck_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    deck = Deck.query.get_or_404(deck_id)
+    deck = get_owned_deck(deck_id)
     settings = deck.settings_json or {}
     auto_deleted = settings.get("auto_deleted_cards")
     legacy_dropped = settings.get("dropped_cards")
@@ -198,7 +283,7 @@ def update_card(card_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    card = Card.query.get_or_404(card_id)
+    card = get_owned_card(card_id)
     if card.type == "basic":
         card.front = request.form.get("front", "").strip()
         card.back = request.form.get("back", "").strip()
@@ -220,12 +305,23 @@ def bulk_cards():
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
+    actor = get_actor()
     action = request.form.get("action")
     ids = request.form.getlist("card_ids")
-    cards = Card.query.filter(Card.id.in_(ids)).all()
+    if not ids:
+        flash("No cards selected.", "error")
+        return redirect(request.referrer or url_for("main.decks"))
+    # Scope to cards in decks the actor owns — never operate on arbitrary ids.
+    cards = (
+        Card.query.join(Deck, Card.deck_id == Deck.id)
+        .filter(Card.id.in_(ids), Deck.user_id == actor.id)
+        .all()
+    )
+    affected = len(cards)
     if action == "delete":
         for card in cards:
             card.status = "deleted"
+        message = f"Deleted {affected} cards."
     elif action == "tag":
         tag = request.form.get("tag", "").strip()
         for card in cards:
@@ -233,14 +329,26 @@ def bulk_cards():
             if tag:
                 tags.add(tag)
             card.tags = list(tags)
+        message = f"Tagged {affected} cards." if tag else "No tag provided."
     elif action == "restore":
         for card in cards:
             card.status = "ok"
+        message = f"Restored {affected} cards."
     elif action == "regenerate":
         source_ids = {card.source_id for card in cards if card.source_id}
+        regenerated = 0
         for source_id in source_ids:
-            regenerate_source(source_id)
+            try:
+                regenerate_source(source_id)
+                regenerated += 1
+            except Exception:
+                current_app.logger.exception("Regenerate failed for source %s", source_id)
+        message = f"Regenerated {regenerated} source section(s)."
+    else:
+        flash("Unknown bulk action.", "error")
+        return redirect(request.referrer or url_for("main.decks"))
     db.session.commit()
+    flash(message, "info")
     return redirect(request.referrer or url_for("main.decks"))
 
 
@@ -249,8 +357,16 @@ def improve(card_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    improve_card(card_id)
-    card = Card.query.get_or_404(card_id)
+    card = get_owned_card(card_id)
+    try:
+        improve_card(card_id)
+    except Exception:
+        current_app.logger.exception("AI improve failed for card %s", card_id)
+        db.session.rollback()
+        response = render_template("partials/card_row.html", card=card)
+        # Signal the client to show an error toast (handled in base.html).
+        return response, 200, {"HX-Trigger": "improveError"}
+    db.session.refresh(card)
     return render_template("partials/card_row.html", card=card)
 
 
@@ -259,10 +375,11 @@ def export_deck(deck_id):
     redirect_resp = guard_auth()
     if redirect_resp:
         return redirect_resp
-    result = export_deck_file(deck_id)
+    deck = get_owned_deck(deck_id)
+    result = export_deck_file(deck.id)
     if not result:
         flash("No cards to export", "error")
-        return redirect(url_for("main.deck_editor", deck_id=deck_id))
+        return redirect(url_for("main.deck_editor", deck_id=deck.id))
     file_obj, filename = result
     file_obj.seek(0)
     return send_file(file_obj, as_attachment=True, download_name=filename)

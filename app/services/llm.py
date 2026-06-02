@@ -6,6 +6,64 @@ import requests
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _HEX_CHARS = set("0123456789abcdefABCDEF")
 
+# Strict JSON-schema response format for the card-generation pass. Supported models
+# (incl. Gemini) constrain decoding to this shape, which removes nearly all of the
+# fragile free-text JSON parsing/repair below. Strict mode requires every property to
+# be listed in "required" and uses nullable types instead of optional keys.
+CARD_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "anki_cards",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "cards": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "type": {"type": "string", "enum": ["basic", "cloze"]},
+                            "front": {"type": ["string", "null"]},
+                            "back": {"type": ["string", "null"]},
+                            "cloze_text": {"type": ["string", "null"]},
+                            "extra": {"type": ["string", "null"]},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["type", "front", "back", "cloze_text", "extra", "tags"],
+                    },
+                }
+            },
+            "required": ["cards"],
+        },
+    },
+}
+
+
+def message_content(response):
+    """Pull assistant text out of a chat-completions response, with clear errors.
+
+    Guards against empty `choices` and null `content` (content filtering, length cutoffs),
+    which would otherwise raise an opaque KeyError/TypeError deep in the pipeline.
+    """
+    try:
+        choices = response["choices"]
+        content = choices[0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise OpenRouterError("OpenRouter returned no message content.") from exc
+    if content is None:
+        finish = ""
+        try:
+            finish = response["choices"][0].get("finish_reason") or ""
+        except (KeyError, IndexError, TypeError):
+            pass
+        raise OpenRouterError(
+            f"OpenRouter returned empty content (finish_reason: {finish or 'unknown'})."
+        )
+    return content
+
 
 class OpenRouterError(RuntimeError):
     def __init__(self, message, status_code=None, error_code=None, response_body=None):
@@ -74,6 +132,8 @@ def openrouter_chat(
     max_retries=2,
     backoff_seconds=1.5,
     timeout_seconds=120,
+    response_format=None,
+    max_tokens=None,
 ):
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
@@ -81,7 +141,13 @@ def openrouter_chat(
         "model": model,
         "messages": messages,
         "temperature": temperature,
+        # Ask OpenRouter to report token usage and cost so LLMRun.cost_estimate is populated.
+        "usage": {"include": True},
     }
+    if response_format is not None:
+        payload["response_format"] = response_format
+    if max_tokens:
+        payload["max_tokens"] = int(max_tokens)
     headers = build_headers(api_key, site_url, app_name)
     attempts = max(0, int(max_retries)) + 1
     for attempt in range(attempts):

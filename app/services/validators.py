@@ -18,15 +18,16 @@ def normalize_math(text):
         return f"\\({content}\\)"
 
     text = INLINE_MATH_PATTERN.sub(inline_repl, text)
+    # Remove leftover block delimiters but keep single "$" (e.g. currency like "$5").
     text = text.replace("$$", "")
-    text = text.replace("$", "")
     return text
 
 
 def is_math_valid(text):
     if not text:
         return True
-    if "$" in text or "\\begin{" in text or "\\end{" in text:
+    # A leftover "$...$" pair means unconverted inline math; a lone "$" is currency, OK.
+    if text.count("$") >= 2 or "\\begin{" in text or "\\end{" in text:
         return False
     if text.count("\\(") != text.count("\\)"):
         return False
@@ -35,20 +36,30 @@ def is_math_valid(text):
     return True
 
 
+def _stem(word):
+    """Crude suffix stripping so 'inhibition'/'inhibits' overlap reduces false drops."""
+    for suffix in ("tions", "tion", "ing", "ies", "ied", "ers", "er", "ed", "es", "s"):
+        if len(word) > len(suffix) + 3 and word.endswith(suffix):
+            return word[: -len(suffix)]
+    return word
+
+
 def is_in_scope(card_text, chunk_text):
     if not card_text:
         return True
-    card_words = set(re.findall(r"[a-zA-Z]{4,}", card_text.lower()))
+    card_words = {_stem(w) for w in re.findall(r"[a-zA-Z]{4,}", card_text.lower())}
     if not card_words:
         return True
-    chunk_words = set(re.findall(r"[a-zA-Z]{4,}", (chunk_text or "").lower()))
+    chunk_words = {_stem(w) for w in re.findall(r"[a-zA-Z]{4,}", (chunk_text or "").lower())}
     if not chunk_words:
         return True
     overlap = len(card_words & chunk_words) / max(len(card_words), 1)
     long_words = {w for w in card_words if len(w) >= 7}
-    if len(long_words) >= 4 and overlap < 0.2:
+    # Only drop cards that are clearly off-topic (very low overlap), to avoid
+    # silently deleting good paraphrased or symbol-heavy cards.
+    if len(long_words) >= 5 and overlap < 0.15:
         return False
-    if len(card_words) >= 8 and overlap < 0.08:
+    if len(card_words) >= 10 and overlap < 0.06:
         return False
     return True
 
@@ -56,9 +67,12 @@ def is_in_scope(card_text, chunk_text):
 def is_valid_cloze(text):
     if not text:
         return False
-    if text.count("{{") != text.count("}}"):
+    # Count opened clozes ("{{c1::") and require each to be well-formed. Counting the
+    # cloze markers directly avoids false negatives from literal LaTeX braces like \frac{a}{b}.
+    opens = len(re.findall(r"\{\{c\d+::", text))
+    if opens == 0:
         return False
-    return bool(CLOZE_PATTERN.search(text))
+    return opens == len(CLOZE_PATTERN.findall(text))
 
 
 def normalize_text(text):
