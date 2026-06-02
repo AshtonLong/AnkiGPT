@@ -5,7 +5,7 @@
   </div>
   <div class="card-content">
     <form hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
-      hx-swap="outerHTML" class="card-form">
+      hx-swap="outerHTML" hx-disabled-elt="find button" class="card-form">
       {% if card.type == "basic" %}
       <div class="card-field">
         <label class="field-label">Front</label>
@@ -40,12 +40,14 @@
           Save
         </button>
         <button class="btn ghost sm improve-btn" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
-          hx-target="#card-{{ card.id }}" hx-swap="outerHTML">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          hx-target="#card-{{ card.id }}" hx-swap="outerHTML" hx-disabled-elt="this">
+          <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" aria-hidden="true">
             <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
             <path d="M18 12l.9 2.1L21 15l-2.1.9L18 18l-.9-2.1L15 15l2.1-.9L18 12z" />
           </svg>
-          AI Improve
+          <span class="btn-spinner" aria-hidden="true"></span>
+          <span class="btn-label">AI Improve</span>
         </button>
       </div>
     </form>
