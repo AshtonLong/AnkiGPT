@@ -100,17 +100,20 @@ Create/update `.env` in the project root:
 SECRET_KEY=change-me
 DATABASE_URL=sqlite:///instance/ankigpt.db
 AUTH_REQUIRED=true
-UPLOAD_MAX_MB=1024
+SESSION_COOKIE_SECURE=false
+UPLOAD_MAX_MB=50
 UPLOAD_FOLDER=instance/uploads
 EXPORT_FOLDER=instance/exports
+MAX_SOURCE_CHARS=200000
 
 OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=google/gemini-3-flash-preview
+OPENROUTER_MODEL=google/gemini-3.5-flash
 OPENROUTER_SITE_URL=
 OPENROUTER_APP_NAME=AnkiGPT
 OPENROUTER_TIMEOUT_SECONDS=120
 OPENROUTER_MAX_RETRIES=2
 OPENROUTER_RETRY_BACKOFF_SECONDS=1.5
+OPENROUTER_MAX_TOKENS=4000
 
 CELERY_BROKER_URL=
 CELERY_RESULT_BACKEND=
@@ -149,11 +152,14 @@ celery -A celery_app.celery worker --loglevel=info
 | `SECRET_KEY` | `dev-secret` | Flask session/CSRF secret. Change in real environments. |
 | `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy connection URL. |
 | `AUTH_REQUIRED` | `true` | Require login if true; if false uses a local demo user. |
-| `UPLOAD_MAX_MB` | `1024` | Max upload size in MB (`MAX_CONTENT_LENGTH`, about 1GB). |
+| `SESSION_COOKIE_SECURE` | `false` | Mark the session cookie `Secure` (enable behind HTTPS). |
+| `UPLOAD_MAX_MB` | `50` | Max upload size in MB (`MAX_CONTENT_LENGTH`). |
+| `MAX_SOURCE_CHARS` | `200000` | Hard cap on source length to bound LLM cost (`0` disables). |
+| `OPENROUTER_MAX_TOKENS` | `4000` | Max output tokens per generation call. |
 | `UPLOAD_FOLDER` | `instance/uploads` | PDF upload storage directory. |
 | `EXPORT_FOLDER` | `instance/exports` | Export directory (app currently streams files directly). |
 | `OPENROUTER_API_KEY` | `` | Required for generation/improve calls. |
-| `OPENROUTER_MODEL` | `google/gemini-3-flash-preview` | Model sent to OpenRouter. |
+| `OPENROUTER_MODEL` | `google/gemini-3.5-flash` | Model sent to OpenRouter (a current, stable slug). |
 | `OPENROUTER_SITE_URL` | `` | Optional `HTTP-Referer` header for OpenRouter. |
 | `OPENROUTER_APP_NAME` | `AnkiGPT` | Optional `X-Title` header for OpenRouter. |
 | `OPENROUTER_TIMEOUT_SECONDS` | `120` | Request timeout per OpenRouter call. |
@@ -227,11 +233,32 @@ celery -A celery_app.celery worker --loglevel=info
 ## Development Notes
 
 - Tables are auto-created on app startup via `db.create_all()` in `app/__init__.py`.
-- `Flask-Migrate` is installed, but this project currently relies on auto-create behavior.
-- No formal test suite is included yet.
+  `create_all()` only creates *missing* tables — it does not alter existing ones. After
+  pulling schema changes (new indexes / cascades), delete an old dev `instance/ankigpt.db`
+  so it is rebuilt, or wire up `Flask-Migrate` (`flask db init/migrate/upgrade`).
+- SQLite foreign-key enforcement is enabled via a `PRAGMA foreign_keys=ON` connect hook,
+  so `ON DELETE CASCADE` works (deleting a user/deck removes its decks/cards/sources).
+
+## Testing
+
+```powershell
+pip install pytest
+python -m pytest tests/ -q
+```
+
+Covers JSON parsing/repair, validators, chunking, the generation pipeline (happy path +
+non-destructive failure), and route authorization/CSRF.
 
 ## Security Notes
 
-- Do not use the default `SECRET_KEY` outside local development.
-- Do not commit `.env` secrets.
-- Uploaded files and generated content may contain sensitive study material; handle storage accordingly.
+- **Rotate any API key that ever touched git history.** Removing a committed `.env` does
+  not remove it from history — purge it (`git filter-repo`/BFG) and rotate the key.
+- Set a strong random `SECRET_KEY`; the app warns when the insecure default is used.
+- Auth: every deck/card route is scoped to the current user (ownership checks); cross-user
+  access returns 404.
+- CSRF protection (Flask-WTF) is enabled on all state-changing requests, including HTMX
+  actions (token sent via the `X-CSRFToken` header).
+- PDF uploads are validated by extension, stored under server-generated names
+  (`secure_filename` + UUID), and deleted after extraction.
+- Uploaded files and generated content may contain sensitive study material; handle
+  storage accordingly.
