@@ -14,6 +14,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
+from sqlalchemy import func
 from werkzeug.utils import secure_filename
 
 from ..extensions import db
@@ -86,7 +87,15 @@ def index():
 def decks():
     user = get_actor()
     decks = Deck.query.filter_by(user_id=user.id).order_by(Deck.created_at.desc()).all()
-    return render_template("decks.html", decks=decks)
+    # Live (non-deleted) card count per deck in one query, for the deck grid.
+    card_counts = dict(
+        db.session.query(Card.deck_id, func.count(Card.id))
+        .join(Deck, Card.deck_id == Deck.id)
+        .filter(Deck.user_id == user.id, Card.status != "deleted")
+        .group_by(Card.deck_id)
+        .all()
+    )
+    return render_template("decks.html", decks=decks, card_counts=card_counts)
 
 
 @bp.route("/decks/<int:deck_id>/delete", methods=["POST"])

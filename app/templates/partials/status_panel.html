@@ -1,120 +1,114 @@
-{# Polled fragment. While processing, it polls itself every 3s and swaps in place,
-   so the page never does a full reload. Polling stops once status is terminal
-   (the hx-trigger is simply omitted from the ready/failed markup). #}
-<section class="status-page" id="status-root"
-  {% if deck.status not in ["ready", "failed"] %}
-  hx-get="{{ url_for('main.status', deck_id=deck.id, partial=1) }}"
-  hx-trigger="every 3s"
-  hx-swap="outerHTML"
+{# Polled fragment. While processing it re-fetches itself every 3s and swaps in place; app.js
+   carries the progress ring / counters across swaps so they animate instead of jumping.
+   Polling stops once the status is terminal (hx-trigger is omitted from ready/failed markup). #}
+{% from "partials/ui.html" import icon, stepper %}
+{% set settings = deck.settings_json or {} %}
+{% set state = 'ready' if deck.status == 'ready' else ('failed' if deck.status == 'failed' else 'processing') %}
+{% set stage = settings.get('generation_stage') or 'cheat_sheet' %}
+{% set pct = (0 if total_sources == 0 else (done_sources / total_sources * 100))|round|int %}
+{% set shown = [done_sources, 12]|min %}
+<section class="status" id="status-root" data-state="{{ state }}" data-done="{{ done_sources }}" data-pct="{{ pct }}"
+  {% if state == 'processing' %}
+  hx-get="{{ url_for('main.status', deck_id=deck.id, partial=1) }}" hx-trigger="every 3s" hx-swap="outerHTML"
   {% endif %}>
-  <div class="panel status-panel" role="status" aria-live="polite">
-    <!-- Icon -->
-    <div
-      class="status-icon {% if deck.status == 'ready' %}success{% elif deck.status == 'failed' %}error{% else %}processing{% endif %}">
-      {% if deck.status == "ready" %}
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <path d="m9 12 2 2 4-4" />
-      </svg>
-      {% elif deck.status == "failed" %}
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="15" y1="9" x2="9" y2="15" />
-        <line x1="9" y1="9" x2="15" y2="15" />
-      </svg>
-      {% else %}
-      <svg class="spin" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-      </svg>
-      {% endif %}
+  {{ stepper(3, done=(state == 'ready')) }}
+
+  <div class="panel status-card" role="status" aria-live="polite">
+    {% if state == 'processing' %}
+    <div class="stages" aria-label="Pipeline stages">
+      <span class="stage done">{{ icon('check', 14) }} Source</span>
+      <span class="stage-arrow" aria-hidden="true"></span>
+      <span class="stage {{ 'active' if stage == 'cheat_sheet' else 'done' }}">
+        {{ icon('loader' if stage == 'cheat_sheet' else 'check', 14) }} Cheat sheet
+      </span>
+      <span class="stage-arrow" aria-hidden="true"></span>
+      <span class="stage {{ 'active' if stage == 'cards' else '' }}">
+        {{ icon('loader' if stage == 'cards' else 'cards', 14) }} Cards
+      </span>
     </div>
 
-    <!-- Title -->
-    <h2>
-      {% if deck.status == "ready" %}
-      Deck Ready!
-      {% elif deck.status == "failed" %}
-      Generation Failed
-      {% else %}
-      Building Study Deck...
-      {% endif %}
-    </h2>
-
-    <!-- Subtitle -->
-    <p class="status-subtitle">{{ deck.title }}</p>
-
-    <!-- Progress Bar -->
-    {% if deck.status not in ["ready", "failed"] %}
-    <div class="progress-wrapper">
-      <div class="progress">
-        <div class="bar" style="width: {{ 0 if total_sources == 0 else (done_sources / total_sources) * 100 }}%"></div>
+    <div class="ring-wrap" data-progress="{{ pct }}">
+      <svg class="ring" viewBox="0 0 160 160" aria-hidden="true">
+        <defs>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff5c5c" />
+            <stop offset=".55" stop-color="#ff8a3d" />
+            <stop offset="1" stop-color="#ffc541" />
+          </linearGradient>
+        </defs>
+        <circle class="track" cx="80" cy="80" r="72" />
+        <circle class="fill" cx="80" cy="80" r="72" />
+      </svg>
+      <div class="ring-label">
+        <b><span data-progress-num>{{ pct }}</span><small>%</small></b>
+        <span>{{ done_sources }} / {{ total_sources }}</span>
       </div>
-      <p class="progress-text">
-        <span class="progress-count">{{ done_sources }}</span> / <span>{{ total_sources }}</span> {{ progress_label }}
-      </p>
     </div>
-    {% endif %}
 
-    <!-- Status Message -->
-    {% if deck.status == "ready" %}
-    <div class="status-message success-message">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        aria-hidden="true">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-        <polyline points="22 4 12 14.01 9 11.01" />
-      </svg>
-      Your flashcards are ready. Open the editor to review and export.
-    </div>
-    {% elif deck.status == "failed" %}
-    <div class="status-message error-message">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
-      {{ failure_message }}
-    </div>
-    {% else %}
-    <div class="status-message processing-message">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-      AI is creating an exam cheat sheet first, then generating cards from that sheet.
-    </div>
-    {% endif %}
+    <h2>{% if stage == 'cheat_sheet' %}Distilling the <span class="serif grad">cheat sheet</span>{% else %}Dealing out <span class="serif grad">cards</span>{% endif %}</h2>
+    <p class="sub">{{ deck.title }}</p>
 
-    <!-- Actions -->
+    <div class="deal-row" aria-hidden="true" style="--mid: {{ ((shown - 1) / 2) if shown > 0 else 0 }}">
+      {% for i in range(shown) %}<i class="mini" style="--i:{{ i }}"></i>{% endfor %}
+      {% if done_sources > shown %}<span class="more">+{{ done_sources - shown }}</span>{% endif %}
+    </div>
+
+    <div class="status-msg">
+      {{ icon('info', 16) }}
+      <span>{{ progress_label|capitalize }}.
+        {% if stage == 'cheat_sheet' %}The model is first condensing your source into an exam-focused cheat sheet.
+        {% else %}Cards are being written and validated from each cheat sheet section.{% endif %}
+        You can leave this page — the deck keeps building.</span>
+    </div>
+
     <div class="status-actions">
-      {% if deck.status == "ready" %}
-      <a class="btn primary" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          aria-hidden="true">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-          <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" />
-        </svg>
-        Open Editor
-      </a>
-      <a class="btn ghost" href="{{ url_for('main.decks') }}">All Decks</a>
-      {% elif deck.status == "failed" %}
-      <form action="{{ url_for('main.preview_deck', deck_id=deck.id) }}" method="post" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="focus" value="{{ (deck.settings_json or {}).get('focus', '') }}">
-        <input type="hidden" name="exclude" value="{{ (deck.settings_json or {}).get('exclude', '') }}">
-        <input type="hidden" name="glossary" value="{{ (deck.settings_json or {}).get('glossary', '') }}">
-        <input type="hidden" name="max_chars" value="{{ (deck.settings_json or {}).get('max_chars', 3500) }}">
-        <button class="btn primary" type="submit">Retry Generation</button>
-      </form>
-      <a class="btn ghost" href="{{ url_for('main.preview_deck', deck_id=deck.id) }}">Edit Settings</a>
-      <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to Decks</a>
-      {% else %}
-      <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to Decks</a>
-      {% endif %}
+      <a class="btn ghost" href="{{ url_for('main.decks') }}">{{ icon('arrow-left', 15) }} Back to decks</a>
     </div>
+
+    {% elif state == 'ready' %}
+    <div class="confetti" aria-hidden="true">
+      {% set colors = ['#ff6b57', '#ffc541', '#5ff0b0', '#6cb8ff', '#a98bff'] %}
+      {% for i in range(16) %}
+      <i style="--x:{{ (i * 6.3 + 2)|round(1) }}%; --dl:{{ ((i % 5) * 0.13)|round(2) }}s; --rot:{{ 540 if i % 2 else -540 }}deg; --c:{{ colors[i % 5] }}"></i>
+      {% endfor %}
+    </div>
+    <div class="status-icon ok">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 12.5l5 5L20 6.5" />
+      </svg>
+    </div>
+    <h2>Your deck is <span class="serif grad">ready</span></h2>
+    <p class="sub">{{ deck.title }} · {{ deck.cards|rejectattr('status', 'equalto', 'deleted')|list|length }} cards</p>
+    <div class="fan" aria-hidden="true">{% for i in range(5) %}<i style="--i:{{ i }}"></i>{% endfor %}</div>
+    <div class="status-msg">
+      {{ icon('check', 16) }}
+      <span>Every card passed validation. Open the editor to polish, tag and export as .apkg.</span>
+    </div>
+    <div class="status-actions">
+      <a class="btn primary lg" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('edit') }} Open editor</a>
+      <a class="btn lg ghost" href="{{ url_for('main.decks') }}">All decks</a>
+    </div>
+
+    {% else %}
+    <div class="status-icon err">{{ icon('x-circle', 52) }}</div>
+    <h2>Generation failed</h2>
+    <p class="sub">{{ deck.title }}</p>
+    <div class="status-msg">
+      {{ icon('alert', 16) }}
+      <span>{{ failure_message }}</span>
+    </div>
+    <div class="status-actions">
+      <form action="{{ url_for('main.preview_deck', deck_id=deck.id) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="focus" value="{{ settings.get('focus', '') }}">
+        <input type="hidden" name="exclude" value="{{ settings.get('exclude', '') }}">
+        <input type="hidden" name="glossary" value="{{ settings.get('glossary', '') }}">
+        <input type="hidden" name="max_chars" value="{{ settings.get('max_chars', 3500) }}">
+        <button class="btn primary" type="submit">{{ icon('refresh') }} Retry generation</button>
+      </form>
+      <a class="btn" href="{{ url_for('main.preview_deck', deck_id=deck.id) }}">{{ icon('settings') }} Edit settings</a>
+      <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to decks</a>
+    </div>
+    {% endif %}
   </div>
 </section>

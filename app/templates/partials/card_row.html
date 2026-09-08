@@ -1,75 +1,70 @@
-<div class="table-row card-row" id="card-{{ card.id }}">
-  <div class="card-select">
-    <input type="checkbox" name="card_ids" value="{{ card.id }}" form="bulk-actions-form"
+{# One editable card. Swapped in place by HTMX after Save / AI improve (outerHTML on #card-<id>). #}
+{% from "partials/ui.html" import icon %}
+<div class="card-row" id="card-{{ card.id }}">
+  <div class="sel">
+    <input type="checkbox" class="check" name="card_ids" value="{{ card.id }}" form="bulk-actions-form"
       aria-label="Select card {{ card.id }}">
   </div>
-  <div class="card-content">
-    <form hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
-      hx-swap="outerHTML" hx-disabled-elt="find button" class="card-form">
+
+  <form class="card-form" hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
+    hx-swap="outerHTML" hx-indicator="#card-{{ card.id }}" hx-disabled-elt="find button[type='submit']">
+    <div class="card-fields">
       {% if card.type == "basic" %}
-      <div class="card-field">
-        <label class="field-label">Front</label>
-        <input type="text" name="front" value="{{ card.front or '' }}" placeholder="Question / prompt">
+      <div class="cf">
+        <label for="front-{{ card.id }}">Front</label>
+        <input class="inp q" type="text" id="front-{{ card.id }}" name="front" value="{{ card.front or '' }}"
+          placeholder="Question / prompt">
       </div>
-      <div class="card-field">
-        <label class="field-label">Back</label>
-        <textarea name="back" rows="2" placeholder="Answer / response">{{ card.back or '' }}</textarea>
+      <div class="cf">
+        <label for="back-{{ card.id }}">Back</label>
+        <textarea class="inp" id="back-{{ card.id }}" name="back" rows="1" data-autogrow
+          placeholder="Answer">{{ card.back or '' }}</textarea>
       </div>
       {% else %}
-      <div class="card-field">
-        <label class="field-label">Cloze</label>
-        <textarea name="cloze_text" rows="2"
-          placeholder="Text with {{ '{{c1::cloze}}' }} deletions">{{ card.cloze_text or '' }}</textarea>
+      <div class="cf">
+        <label for="cloze-{{ card.id }}">Cloze</label>
+        <textarea class="inp q" id="cloze-{{ card.id }}" name="cloze_text" rows="1" data-autogrow
+          placeholder="Text with {{ '{{c1::deletions}}' }}">{{ card.cloze_text or '' }}</textarea>
       </div>
-      <div class="card-field">
-        <label class="field-label">Extra</label>
-        <textarea name="extra" rows="2" placeholder="Additional context">{{ card.extra or '' }}</textarea>
+      <div class="cf">
+        <label for="extra-{{ card.id }}">Extra</label>
+        <textarea class="inp" id="extra-{{ card.id }}" name="extra" rows="1" data-autogrow
+          placeholder="Additional context shown on the back">{{ card.extra or '' }}</textarea>
       </div>
       {% endif %}
-      <div class="card-field">
-        <label class="field-label">Tags</label>
-        <input type="text" name="tags" value="{{ (card.tags or [])|join(', ') }}" placeholder="Tags (comma separated)">
+      <div class="cf">
+        <label for="tags-{{ card.id }}">Tags</label>
+        <input class="inp" type="text" id="tags-{{ card.id }}" name="tags" value="{{ (card.tags or [])|join(', ') }}"
+          placeholder="Comma-separated tags">
       </div>
-      <div class="card-form-actions">
-        <button class="btn ghost sm" type="submit">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-            <polyline points="17 21 17 13 7 13 7 21" />
-            <polyline points="7 3 7 8 15 8" />
-          </svg>
-          Save
-        </button>
-        <button class="btn ghost sm improve-btn" type="button" hx-post="{{ url_for('main.improve', card_id=card.id) }}"
-          hx-target="#card-{{ card.id }}" hx-swap="outerHTML" hx-disabled-elt="this">
-          <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" aria-hidden="true">
-            <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
-            <path d="M18 12l.9 2.1L21 15l-2.1.9L18 18l-.9-2.1L15 15l2.1-.9L18 12z" />
-          </svg>
-          <span class="btn-spinner" aria-hidden="true"></span>
-          <span class="btn-label">AI Improve</span>
-        </button>
-      </div>
-    </form>
-  </div>
-  <div class="card-tags">
-    {% if card.tags and card.tags|length > 0 %}
-    {% for tag in card.tags[:3] %}
-    <span class="tag-chip">{{ tag }}</span>
-    {% endfor %}
-    {% if card.tags|length > 3 %}
-    <span class="tag-more">+{{ card.tags|length - 3 }}</span>
-    {% endif %}
-    {% else %}
-    <span class="no-tags">No tags</span>
-    {% endif %}
-  </div>
-  <div class="card-type">
-    <span class="pill {% if card.type == 'basic' %}basic-pill{% else %}cloze-pill{% endif %}">{{ card.type }}</span>
+    </div>
+    <div class="card-actions">
+      <button class="btn sm" type="submit">{{ icon('save', 14) }} Save</button>
+      <button class="btn sm cool" type="button" data-improve hx-post="{{ url_for('main.improve', card_id=card.id) }}"
+        hx-target="#card-{{ card.id }}" hx-swap="outerHTML" hx-indicator="#card-{{ card.id }}" hx-disabled-elt="this"
+        title="Ask the AI to tighten this card">
+        <span class="btn-icon">{{ icon('sparkles', 14) }}</span><span class="btn-spinner" aria-hidden="true"></span>
+        <span>AI improve</span>
+      </button>
+      <span class="dirty">Unsaved changes</span>
+      <span class="saved">{{ icon('check', 13) }} Saved</span>
+    </div>
+  </form>
+
+  <div class="card-side">
+    <span class="pill {{ 'ok' if card.type == 'basic' else 'info' }}">{{ card.type }}</span>
     {% if card.status == "needs_review" %}
-    <span class="pill warn">Review</span>
+    <span class="pill warn"><span class="dot"></span> Needs review</span>
     {% elif card.status == "deleted" %}
-    <span class="pill danger">Deleted</span>
+    <span class="pill danger"><span class="dot"></span> Deleted</span>
+    {% endif %}
+    {% if card.tags %}
+    <div class="tags">
+      {% for tag in card.tags[:4] %}<span class="chip">{{ tag }}</span>{% endfor %}
+      {% if card.tags|length > 4 %}<span class="chip">+{{ card.tags|length - 4 }}</span>{% endif %}
+    </div>
+    {% else %}
+    <span class="none">No tags</span>
     {% endif %}
   </div>
 </div>
