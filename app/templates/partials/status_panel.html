@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <h2>{% if stage == 'cheat_sheet' %}Distilling the <span class="serif grad">cheat sheet</span>{% else %}Dealing out <span class="serif grad">cards</span>{% endif %}</h2>
+    <h2>{% if stage == 'cheat_sheet' %}Distilling the <span class="grad">cheat sheet</span>{% else %}Dealing out <span class="grad">cards</span>{% endif %}</h2>
     <p class="sub">{{ deck.title }}</p>
 
     <div class="deal-row" aria-hidden="true" style="--mid: {{ ((shown - 1) / 2) if shown > 0 else 0 }}">
@@ -77,7 +77,7 @@
         <path d="M4 12.5l5 5L20 6.5" />
       </svg>
     </div>
-    <h2>Your deck is <span class="serif grad">ready</span></h2>
+    <h2>Your deck is <span class="grad">ready</span></h2>
     <p class="sub">{{ deck.title }} · {{ deck.cards|rejectattr('status', 'equalto', 'deleted')|list|length }} cards</p>
     <div class="fan" aria-hidden="true">{% for i in range(5) %}<i style="--i:{{ i }}"></i>{% endfor %}</div>
     <div class="status-msg">
