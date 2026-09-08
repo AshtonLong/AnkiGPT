@@ -1,133 +1,83 @@
 <!doctype html>
 <html lang="en">
+{% from "partials/ui.html" import icon %}
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>{{ title or "AnkiGPT" }}</title>
+  <meta name="theme-color" content="#0a0a0d">
+  <title>{% block title %}{{ title or "AnkiGPT" }}{% endblock %}</title>
   <meta name="description"
-    content="Transform any document into perfectly crafted Anki flashcards using AI. Upload, generate, export - done.">
+    content="Turn any PDF or set of notes into validated, editable Anki flashcards. Upload, generate, export.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff5c5c'/%3E%3Cstop offset='1' stop-color='%23ffc541'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Crect x='8' y='11' width='14' height='10' rx='2' fill='%231a0b06' opacity='.5' transform='rotate(-10 15 16)'/%3E%3Crect x='11' y='11' width='14' height='10' rx='2' fill='%23fff' transform='rotate(6 18 16)'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@1&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 
-<body>
-  <!-- Animated Mesh Background -->
-  <div class="mesh-bg">
-    <svg viewBox="0 0 1000 900" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:.08" />
-          <stop offset="50%" style="stop-color:#ffd93d;stop-opacity:.05" />
-          <stop offset="100%" style="stop-color:#6bff9e;stop-opacity:.08" />
-        </linearGradient>
-        <linearGradient id="g2" x1="100%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:#6bb5ff;stop-opacity:.06" />
-          <stop offset="100%" style="stop-color:#c06bff;stop-opacity:.06" />
-        </linearGradient>
-      </defs>
-      <path class="mesh-blob" fill="url(#g1)"
-        d="M800,200Q750,400,600,350Q450,300,350,500Q250,700,500,750Q750,800,800,600Q850,400,800,200Z" />
-      <path class="mesh-blob2" fill="url(#g2)"
-        d="M200,600Q300,400,450,500Q600,600,550,400Q500,200,350,250Q200,300,200,600Z" />
-    </svg>
-  </div>
-  <div class="grain"></div>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="pbar" aria-hidden="true"></div>
 
-  <!-- Top Navigation -->
+  <!-- Ambient backdrop: drifting aurora orbs, a masked dot grid, film grain. -->
+  <div class="backdrop" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="dots"></div>
+  </div>
+  <div class="grain" aria-hidden="true"></div>
+
   <header class="topbar">
-    <div class="container">
-      <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT Home">
-        <span class="logo-main">Anki</span><span class="logo-accent">GPT</span><span class="logo-dot"
-          aria-hidden="true"></span>
+    <div class="wrap">
+      <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span class="logo-word"><b>Anki</b><i>GPT</i></span>
       </a>
-      <nav class="nav">
-        <a href="{{ url_for('main.decks') }}">Decks</a>
-        <a href="{{ url_for('main.new_deck') }}">New Deck</a>
+      <nav class="nav-links" aria-label="Primary">
+        {% block nav %}
+        <a href="{{ url_for('main.decks') }}" {% if request.endpoint == 'main.decks' %}aria-current="page"{% endif %}>Decks</a>
+        <a href="{{ url_for('main.new_deck') }}" {% if request.endpoint == 'main.new_deck' %}aria-current="page"{% endif %}>New deck</a>
         {% if current_user.is_authenticated %}
         <form action="{{ url_for('auth.logout') }}" method="post">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="link">Logout</button>
+          <button type="submit">{{ icon('logout', 15) }} Log out</button>
         </form>
-        {% else %}
-        <a href="{{ url_for('auth.login') }}">Login</a>
+        {% elif config.AUTH_REQUIRED %}
+        <a href="{{ url_for('auth.login') }}">Sign in</a>
         {% endif %}
+        {% endblock %}
       </nav>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="container">
+  <!-- Flash messages render as toasts; app.js handles dismissal and auto-expiry. -->
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false">
     {% with messages = get_flashed_messages(with_categories=True) %}
-    {% if messages %}
-    <div class="flash">
-      {% for category, message in messages %}
-      <div class="flash-item {{ category }}">{{ message }}</div>
-      {% endfor %}
+    {% for category, message in messages %}
+    {% set kind = 'error' if category == 'error' else ('success' if category == 'success' else 'info') %}
+    <div class="toast {{ kind }}" role="status">
+      <span class="t-ic">{{ icon('alert' if kind == 'error' else ('check' if kind == 'success' else 'info'), 20) }}</span>
+      <div>{{ message }}</div>
+      <button class="t-x" type="button" aria-label="Dismiss" data-dismiss>{{ icon('x', 14) }}</button>
+      <span class="t-bar" aria-hidden="true"></span>
     </div>
-    {% endif %}
+    {% endfor %}
     {% endwith %}
-    {% block content %}{% endblock %}
+  </div>
+
+  <main class="page">
+    {% block main %}
+    <div class="wrap">
+      {% block content %}{% endblock %}
+    </div>
+    {% endblock %}
   </main>
-
-  <!-- Live region for client-side toasts (e.g. HTMX errors) -->
-  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
-
-  <script>
-    // Send the CSRF token with every HTMX request so hx-post actions pass CSRFProtect.
-    (function () {
-      var token = document.querySelector('meta[name="csrf-token"]');
-      token = token ? token.getAttribute('content') : '';
-      document.body.addEventListener('htmx:configRequest', function (evt) {
-        evt.detail.headers['X-CSRFToken'] = token;
-      });
-      function toast(message, kind) {
-        var region = document.getElementById('toast-region');
-        if (!region) return;
-        var el = document.createElement('div');
-        el.className = 'toast ' + (kind || 'error');
-        el.setAttribute('role', 'status');
-        el.textContent = message;
-        region.appendChild(el);
-        setTimeout(function () { el.remove(); }, 5000);
-      }
-      // Surface failed inline actions (e.g. AI Improve) instead of failing silently.
-      document.body.addEventListener('improveError', function () {
-        toast('AI Improve failed. Please try again.', 'error');
-      });
-      document.body.addEventListener('htmx:responseError', function () {
-        toast('Something went wrong. Please retry.', 'error');
-      });
-      document.body.addEventListener('htmx:sendError', function () {
-        toast('Network error. Check your connection and retry.', 'error');
-      });
-
-      // Loading state for classic (non-HTMX) form submits, e.g. Generate / Export.
-      document.body.addEventListener('submit', function (evt) {
-        var form = evt.target;
-        if (form.hasAttribute('hx-post') || form.hasAttribute('hx-get')) return;
-        var btn = form.querySelector('button[type="submit"], button:not([type])');
-        if (!btn) return;
-        // Defer disabling so the submit value is still included in the request.
-        setTimeout(function () {
-          btn.classList.add('is-loading');
-          btn.disabled = true;
-        }, 0);
-      });
-      // Re-enable buttons if the user navigates back to a cached page.
-      window.addEventListener('pageshow', function () {
-        document.querySelectorAll('button.is-loading').forEach(function (b) {
-          b.classList.remove('is-loading');
-          b.disabled = false;
-        });
-      });
-    })();
-  </script>
 </body>
 
 </html>

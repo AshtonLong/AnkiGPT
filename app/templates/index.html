@@ -1,228 +1,210 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AnkiGPT - AI Flashcard Generator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon, card_stack %}
+{% block title %}AnkiGPT — Turn anything into Anki flashcards{% endblock %}
 
-<div class="mesh-bg">
-  <svg viewBox="0 0 1000 900" preserveAspectRatio="xMidYMid slice">
-    <defs>
-      <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:.08"/>
-        <stop offset="50%" style="stop-color:#ffd93d;stop-opacity:.05"/>
-        <stop offset="100%" style="stop-color:#6bff9e;stop-opacity:.08"/>
-      </linearGradient>
-      <linearGradient id="g2" x1="100%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" style="stop-color:#6bb5ff;stop-opacity:.06"/>
-        <stop offset="100%" style="stop-color:#c06bff;stop-opacity:.06"/>
-      </linearGradient>
-    </defs>
-    <path class="mesh-blob" fill="url(#g1)" d="M800,200Q750,400,600,350Q450,300,350,500Q250,700,500,750Q750,800,800,600Q850,400,800,200Z"/>
-    <path class="mesh-blob2" fill="url(#g2)" d="M200,600Q300,400,450,500Q600,600,550,400Q500,200,350,250Q200,300,200,600Z"/>
-  </svg>
+{% block nav %}
+<a href="#how">How it works</a>
+<a href="#features">Features</a>
+{% if current_user.is_authenticated or not config.AUTH_REQUIRED %}
+<a class="btn sm" href="{{ url_for('main.decks') }}">My decks {{ icon('arrow-right', 14) }}</a>
+{% else %}
+<a href="{{ url_for('auth.login') }}">Sign in</a>
+<a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started</a>
+{% endif %}
+{% endblock %}
+
+{% block main %}
+<section class="hero wrap" data-tilt>
+  <div class="hero-copy">
+    <div class="hero-chip">
+      <span class="spark">{{ icon('sparkles', 12) }}</span>
+      AI flashcards from PDFs and notes
+    </div>
+    <h1>
+      <span class="w" style="--i:0"><span>Study</span></span>
+      <span class="w" style="--i:1"><span>less.</span></span><br>
+      <span class="w" style="--i:2"><span>Remember</span></span><br>
+      <span class="w" style="--i:3"><span><em>more.</em></span></span>
+    </h1>
+    <p>Drop in a lecture PDF or paste your notes. AnkiGPT distills it into an exam cheat sheet, then deals out
+      validated Basic and Cloze cards you can edit in place and export straight into Anki.</p>
+    <div class="hero-actions">
+      <a class="btn primary lg" href="{{ url_for('main.new_deck') }}">{{ icon('plus') }} Create a deck</a>
+      <a class="btn lg ghost" href="#how">See how it works <span class="arrow">{{ icon('arrow-right', 16) }}</span></a>
+    </div>
+    <div class="hero-ticks">
+      <span>PDF + text input</span>
+      <span>Basic &amp; cloze</span>
+      <span>Validated output</span>
+      <span>.apkg export</span>
+    </div>
+  </div>
+  {{ card_stack() }}
+</section>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    {% for _ in range(2) %}
+    <span>Anatomy</span><span>Organic chemistry</span><span>Constitutional law</span><span>Pharmacology</span>
+    <span>Microeconomics</span><span>Cell biology</span><span>Spanish vocabulary</span><span>Data structures</span>
+    <span>Art history</span><span>Neuroscience</span><span>Thermodynamics</span><span>Immunology</span>
+    {% endfor %}
+  </div>
 </div>
-<div class="grain"></div>
 
-<div class="content">
-
-<nav class="nav">
-  <div class="nav-inner">
-    <a href="/" class="logo" aria-label="AnkiGPT Home">
-      <span class="logo-main">Anki</span><span class="logo-accent">GPT</span><span class="logo-dot"
-        aria-hidden="true"></span>
-    </a>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#process">Process</a>
-      <a href="{{ url_for('main.new_deck') }}" class="pill-btn">Get Started</a>
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">How it works</span>
+      <h2>Source in. <span class="serif grad">Deck</span> out.</h2>
+      <p>Most generators throw raw text at a model and hope. AnkiGPT builds an exam cheat sheet first, then writes
+        cards from that — so every card is anchored to what actually matters.</p>
     </div>
-  </div>
-</nav>
-
-<section class="hero">
-  <div class="hero-chip">
-    <span class="spark" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z"/>
-        <path d="M18 12l.9 2.1L21 15l-2.1.9L18 18l-.9-2.1L15 15l2.1-.9L18 12z"/>
-      </svg>
-    </span>
-    AI-powered flashcard generation
-  </div>
-  <h1>
-    <span class="line1">Study less.</span>
-    <span class="line2">Remember more.</span>
-  </h1>
-  <p>Transform any document into perfectly crafted Anki flashcards. Upload, generate, export - done.</p>
-  <div class="hero-actions">
-    <a href="{{ url_for('main.new_deck') }}" class="btn-gradient">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      Create Deck
-    </a>
-    <a href="#features" class="btn-ghost">
-      Explore
-      <span class="btn-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14"/>
-          <path d="m13 5 7 7-7 7"/>
-        </svg>
-      </span>
-    </a>
-  </div>
-</section>
-
-<section class="features" id="features">
-  <div class="section-label">Capabilities</div>
-  <div class="section-title">Built to make you <span class="grad">dangerously efficient</span></div>
-  <div class="section-sub">Every feature exists to reduce the time between "I should study this" and sitting down with Anki.</div>
-  <div class="feat-grid">
-    <div class="feat-card">
-      <span class="feat-emoji" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <path d="M14 2v6h6"/>
-          <path d="M8 13h8"/>
-          <path d="M8 17h5"/>
-        </svg>
-      </span>
-      <h3>PDF & Text Input</h3>
-      <p>Upload any PDF with optional page-range selection, or paste raw text from any source.</p>
-    </div>
-    <div class="feat-card">
-      <span class="feat-emoji" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="7" y="7" width="10" height="10" rx="2"/>
-          <path d="M12 1v3"/>
-          <path d="M12 20v3"/>
-          <path d="M4.2 4.2l2.1 2.1"/>
-          <path d="M17.7 17.7l2.1 2.1"/>
-          <path d="M1 12h3"/>
-          <path d="M20 12h3"/>
-          <path d="M4.2 19.8l2.1-2.1"/>
-          <path d="M17.7 6.3l2.1-2.1"/>
-        </svg>
-      </span>
-      <h3>AI Generation</h3>
-      <p>LLM creates both basic Q&A and cloze deletion cards with validated formatting.</p>
-    </div>
-    <div class="feat-card">
-      <span class="feat-emoji" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="6" cy="6" r="3"/>
-          <circle cx="6" cy="18" r="3"/>
-          <path d="M20 4 8.1 15.9"/>
-          <path d="m14.5 14.5 5.5 5.5"/>
-          <path d="m8.1 8.1 3.9 3.9"/>
-        </svg>
-      </span>
-      <h3>Smart Chunking</h3>
-      <p>Content is intelligently segmented so the AI never loses context across sections.</p>
-    </div>
-    <div class="feat-card">
-      <span class="feat-emoji" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 20h9"/>
-          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-        </svg>
-      </span>
-      <h3>Inline Editor</h3>
-      <p>Edit any card directly. Bulk tag, delete, regenerate, or AI-improve - all in the browser.</p>
-    </div>
-    <div class="feat-card">
-      <span class="feat-emoji" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"/>
-          <path d="m9 12 2 2 4-4"/>
-        </svg>
-      </span>
-      <h3>Quality Checks</h3>
-      <p>Every card passes syntax validation and quality scoring before you ever see it.</p>
-    </div>
-    <div class="feat-card">
-      <span class="feat-emoji" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m16.5 9.4-9-5.2"/>
-          <path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-          <path d="M3.3 7 12 12l8.7-5"/>
-          <path d="M12 22V12"/>
-        </svg>
-      </span>
-      <h3>.apkg Export</h3>
-      <p>Native Anki export with tags and formatting. Import and start studying immediately.</p>
+    <div class="pipeline">
+      <div class="pnode" data-reveal>
+        <div class="pviz doc" aria-hidden="true">
+          <i style="--i:0;--w:52%"></i><i style="--i:1;--w:88%"></i><i style="--i:2;--w:74%"></i>
+          <i style="--i:3;--w:92%"></i><i style="--i:4;--w:60%"></i><i style="--i:5;--w:80%"></i>
+        </div>
+        <div class="step-tag">01 / UPLOAD</div>
+        <h3>Bring the material</h3>
+        <p>A PDF (with an optional page range) or pasted notes. Text is extracted to clean Markdown so headings and
+          structure survive.</p>
+      </div>
+      <div class="plink l1" aria-hidden="true"></div>
+      <div class="pnode" data-reveal style="--d:120">
+        <div class="pviz sheet" aria-hidden="true">
+          <b style="--i:0">Key concepts</b><i style="--i:1;--w:85%"></i><i style="--i:2;--w:64%"></i>
+          <b style="--i:3">Formulas</b><i style="--i:4;--w:72%"></i><i style="--i:5;--w:50%"></i>
+        </div>
+        <div class="step-tag">02 / DISTILL</div>
+        <h3>Build the cheat sheet</h3>
+        <p>Each chunk is condensed into an exam-focused sheet using your focus, exclusions and must-include terms.</p>
+      </div>
+      <div class="plink l2" aria-hidden="true"></div>
+      <div class="pnode" data-reveal style="--d:240">
+        <div class="pviz deck" aria-hidden="true">
+          <em style="--i:0;--x:-72px;--y:-14px;--r:-16deg"></em>
+          <em style="--i:1;--x:-26px;--y:-28px;--r:-6deg"></em>
+          <em style="--i:2;--x:26px;--y:-28px;--r:6deg"></em>
+          <em style="--i:3;--x:72px;--y:-14px;--r:16deg"></em>
+        </div>
+        <div class="step-tag">03 / DEAL</div>
+        <h3>Generate &amp; validate</h3>
+        <p>Cards are written per section, checked for cloze syntax, math and scope, de-duplicated, then handed to you
+          to edit and export.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="showcase">
-  <div class="section-label">Sample Output</div>
-  <div class="section-title">Cards that actually <span class="grad">work</span></div>
-  <div class="section-sub" style="margin-bottom:3rem">Real examples from AI-generated decks.</div>
-  <div class="showcase-grid">
-    <div class="show-card warm">
-      <div class="show-label">Basic Card</div>
-      <div class="show-q">What is the primary function of the cerebellum?</div>
-      <div class="show-a">Coordination of voluntary movements, balance, posture, and motor learning. It receives input from sensory systems and other parts of the brain to fine-tune motor activity.</div>
+<section class="section tight" id="features">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Capabilities</span>
+      <h2>Built to make you <span class="serif grad">dangerously</span> efficient</h2>
+      <p>Everything exists to shrink the gap between “I should study this” and sitting down with Anki.</p>
     </div>
-    <div class="show-card cool">
-      <div class="show-label">Cloze Deletion</div>
-      <div class="show-q">Wernicke's area, located in the <span class="show-cloze">{% raw %}{{c1::posterior superior temporal gyrus}}{% endraw %}</span>, is critical for language comprehension.</div>
+    <div class="feat-grid" data-stagger="70">
+      <div class="feat" data-reveal>
+        <div class="feat-ic">{{ icon('file-text', 20) }}</div>
+        <h3>PDF &amp; text input</h3>
+        <p>Upload a PDF with an optional page range, or paste raw text from anywhere. Layout-aware extraction keeps
+          headings intact.</p>
+      </div>
+      <div class="feat" data-reveal>
+        <div class="feat-ic">{{ icon('sheet', 20) }}</div>
+        <h3>Cheat-sheet-first</h3>
+        <p>The source is distilled into a Markdown cheat sheet before any card is written, so cards test what matters.
+        </p>
+      </div>
+      <div class="feat" data-reveal>
+        <div class="feat-ic">{{ icon('scissors', 20) }}</div>
+        <h3>Basic &amp; cloze</h3>
+        <p>Question/answer cards for facts, cloze deletions for sequences and formulas. Pick a style per deck.</p>
+      </div>
+      <div class="feat" data-reveal>
+        <div class="feat-ic">{{ icon('shield', 20) }}</div>
+        <h3>Validation pipeline</h3>
+        <p>Cloze syntax, math normalisation, source-scope checks and de-duplication run on every card before you see
+          it.</p>
+      </div>
+      <div class="feat" data-reveal>
+        <div class="feat-ic">{{ icon('wand', 20) }}</div>
+        <h3>Inline editor</h3>
+        <p>Edit any card in place, tag or restore in bulk, regenerate a section, or let the AI polish a single card.
+        </p>
+      </div>
+      <div class="feat" data-reveal>
+        <div class="feat-ic">{{ icon('package', 20) }}</div>
+        <h3>Native .apkg export</h3>
+        <p>One click produces an Anki package with tags and formatting. Import and start reviewing immediately.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="process" id="process">
-  <div class="section-label">Workflow</div>
-  <div class="section-title">Three steps. <span class="grad">That's it.</span></div>
-  <div class="section-sub" style="margin-bottom:3rem">From raw material to Anki-ready deck in under a minute.</div>
-  <div class="proc-grid">
-    <div class="proc-card">
-      <div class="proc-num">01</div>
-      <h3>Upload</h3>
-      <p>Drop in a PDF or paste your study notes. Pick specific pages or use everything.</p>
+<section class="section tight">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Sample output</span>
+      <h2>Cards that actually <span class="serif grad">work</span></h2>
+      <p>Tap a card to flip it. These are real examples from generated decks.</p>
     </div>
-    <div class="proc-card">
-      <div class="proc-num">02</div>
-      <h3>Generate</h3>
-      <p>Set focus areas and exclusions. AI processes every chunk and generates validated cards.</p>
-    </div>
-    <div class="proc-card">
-      <div class="proc-num">03</div>
-      <h3>Export</h3>
-      <p>Review and edit inline, then export as .apkg. Open in Anki and start studying.</p>
+    <div class="show-grid" data-stagger="120">
+      <div class="flip" data-reveal="scale">
+        <div class="flip-inner">
+          <div class="face front">
+            <div class="face-top"><span><b>Basic</b> · Anatomy</span><span>Front</span></div>
+            <div class="face-q">What is the primary function of the cerebellum?</div>
+            <span class="flip-hint">Flip</span>
+          </div>
+          <div class="face back">
+            <div class="face-top"><span><b>Answer</b> · Anatomy</span><span>Back</span></div>
+            <div class="face-a">Coordination of voluntary movement, balance, posture and motor learning. It receives
+              sensory input and fine-tunes motor activity from other brain regions.</div>
+            <span class="flip-hint">Flip</span>
+          </div>
+        </div>
+      </div>
+      <div class="flip" data-reveal="scale">
+        <div class="flip-inner">
+          <div class="face front">
+            <div class="face-top"><span><b>Cloze</b> · Neuroscience</span><span>Front</span></div>
+            <div class="face-q">Wernicke's area, located in the <span class="cloze"><span>[…]</span></span>, is critical
+              for language comprehension.</div>
+            <span class="flip-hint">Flip</span>
+          </div>
+          <div class="face back">
+            <div class="face-top"><span><b>Revealed</b> · Neuroscience</span><span>Back</span></div>
+            <div class="face-q">Wernicke's area, located in the <span class="cloze"><span>posterior superior temporal
+                  gyrus</span></span>, is critical for language comprehension.</div>
+            <span class="flip-hint">Flip</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="cta">
-  <div class="cta-box">
-    <h2>Ready to build something <span class="grad">brilliant</span>?</h2>
-    <p>Sign up free and have a full Anki deck from your material in under a minute.</p>
-    <a href="{{ url_for('main.new_deck') }}" class="btn-gradient">
-      Create Your Deck
-      <span class="btn-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14"/>
-          <path d="m13 5 7 7-7 7"/>
-        </svg>
-      </span>
-    </a>
+<section class="section tight">
+  <div class="wrap">
+    <div class="cta-box" data-reveal="scale">
+      <h2>Ready to build something <span class="serif grad">brilliant</span>?</h2>
+      <p>Go from raw material to an Anki-ready deck in a few minutes. No setup, nothing to install.</p>
+      <a class="btn primary lg" href="{{ url_for('main.new_deck') }}">Create your deck <span class="arrow">{{ icon('arrow-right', 16) }}</span></a>
+    </div>
   </div>
 </section>
 
-<footer>
-  <div class="footer-l">(c) 2026 AnkiGPT</div>
-  <div class="footer-r">
-    <a href="{{ url_for('main.decks') }}">Decks</a>
-    <a href="{{ url_for('main.new_deck') }}">New Deck</a>
+<footer class="site">
+  <div class="wrap">
+    <span>© 2026 AnkiGPT</span>
+    <nav aria-label="Footer">
+      <a href="{{ url_for('main.decks') }}">Decks</a>
+      <a href="{{ url_for('main.new_deck') }}">New deck</a>
+      <a href="#how">How it works</a>
+    </nav>
   </div>
 </footer>
-
-</div>
-</body>
-</html>
+{% endblock %}
