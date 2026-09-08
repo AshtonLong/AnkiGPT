@@ -1,6 +1,7 @@
 import os
 import secrets
 import uuid
+from functools import wraps
 
 from flask import (
     Blueprint,
@@ -26,10 +27,20 @@ from ..tasks import generate_deck_task
 bp = Blueprint("main", __name__)
 
 
-def guard_auth():
-    if current_app.config["AUTH_REQUIRED"] and not current_user.is_authenticated:
-        return redirect(url_for("auth.login"))
-    return None
+def auth_required(view):
+    """Send anonymous users to the login page when AUTH_REQUIRED is on.
+
+    Not `flask_login.login_required`: with AUTH_REQUIRED=false the app runs in demo
+    mode against a local `demo@local` user and every view stays reachable.
+    """
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if current_app.config["AUTH_REQUIRED"] and not current_user.is_authenticated:
+            return redirect(url_for("auth.login"))
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 def get_actor():
@@ -71,20 +82,16 @@ def index():
 
 
 @bp.route("/decks")
+@auth_required
 def decks():
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     user = get_actor()
     decks = Deck.query.filter_by(user_id=user.id).order_by(Deck.created_at.desc()).all()
     return render_template("decks.html", decks=decks)
 
 
 @bp.route("/decks/<int:deck_id>/delete", methods=["POST"])
+@auth_required
 def delete_deck(deck_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     deck = get_owned_deck(deck_id)
     db.session.delete(deck)
     db.session.commit()
@@ -104,10 +111,8 @@ def _parse_page(value):
 
 
 @bp.route("/decks/new", methods=["GET", "POST"])
+@auth_required
 def new_deck():
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     if request.method == "POST":
         title = request.form.get("title", "").strip() or "Untitled Deck"
         source_type = request.form.get("source_type")
@@ -179,10 +184,8 @@ def new_deck():
 
 
 @bp.route("/decks/<int:deck_id>/preview", methods=["GET", "POST"])
+@auth_required
 def preview_deck(deck_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     deck = get_owned_deck(deck_id)
     if request.method == "POST":
         try:
@@ -213,10 +216,8 @@ def preview_deck(deck_id):
 
 
 @bp.route("/decks/<int:deck_id>/status")
+@auth_required
 def status(deck_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     deck = get_owned_deck(deck_id)
     settings = deck.settings_json or {}
     total_sources = Source.query.filter_by(deck_id=deck_id).count()
@@ -243,10 +244,8 @@ def status(deck_id):
 
 
 @bp.route("/decks/<int:deck_id>")
+@auth_required
 def deck_editor(deck_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     deck = get_owned_deck(deck_id)
     settings = deck.settings_json or {}
     auto_deleted = settings.get("auto_deleted_cards")
@@ -265,24 +264,32 @@ def deck_editor(deck_id):
         db.session.commit()
     q = request.args.get("q", "").strip()
     card_type = request.args.get("type", "")
-    status = request.args.get("status", "")
+    # Named *_filter so it doesn't shadow the `status` view function in this module.
+    status_filter = request.args.get("status", "")
     query = Card.query.filter_by(deck_id=deck_id)
     if q:
         like = f"%{q}%"
-        query = query.filter((Card.front.ilike(like)) | (Card.back.ilike(like)) | (Card.cloze_text.ilike(like)))
+        query = query.filter(
+            Card.front.ilike(like) | Card.back.ilike(like) | Card.cloze_text.ilike(like)
+        )
     if card_type:
         query = query.filter_by(type=card_type)
-    if status:
-        query = query.filter_by(status=status)
+    if status_filter:
+        query = query.filter_by(status=status_filter)
     cards = query.order_by(Card.created_at.desc()).all()
-    return render_template("deck_editor.html", deck=deck, cards=cards, q=q, card_type=card_type, status=status)
+    return render_template(
+        "deck_editor.html",
+        deck=deck,
+        cards=cards,
+        q=q,
+        card_type=card_type,
+        status=status_filter,
+    )
 
 
 @bp.route("/cards/<int:card_id>", methods=["POST"])
+@auth_required
 def update_card(card_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     card = get_owned_card(card_id)
     if card.type == "basic":
         card.front = request.form.get("front", "").strip()
@@ -301,10 +308,8 @@ def update_card(card_id):
 
 
 @bp.route("/cards/bulk", methods=["POST"])
+@auth_required
 def bulk_cards():
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     actor = get_actor()
     action = request.form.get("action")
     ids = request.form.getlist("card_ids")
@@ -353,10 +358,8 @@ def bulk_cards():
 
 
 @bp.route("/cards/<int:card_id>/improve", methods=["POST"])
+@auth_required
 def improve(card_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     card = get_owned_card(card_id)
     try:
         improve_card(card_id)
@@ -371,10 +374,8 @@ def improve(card_id):
 
 
 @bp.route("/decks/<int:deck_id>/export", methods=["POST"])
+@auth_required
 def export_deck(deck_id):
-    redirect_resp = guard_auth()
-    if redirect_resp:
-        return redirect_resp
     deck = get_owned_deck(deck_id)
     result = export_deck_file(deck.id)
     if not result:

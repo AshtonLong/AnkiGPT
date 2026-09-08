@@ -6,7 +6,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
-# Local instance data (DB, uploads, exports) — persisted via a Docker volume instead
+# Local instance data (DB, uploads) — persisted via a Docker volume instead
 instance/
 
 # VCS / editor / OS

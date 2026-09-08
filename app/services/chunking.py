@@ -3,11 +3,15 @@ import re
 
 
 def clean_text(text):
+    """Normalize newlines, strip trailing spaces, and cap blank-line runs at two.
+
+    Shared by the PDF extractor and the deck pipeline so both clean text the same way.
+    """
     text = (text or "").replace("\r\n", "\n").replace("\r", "\n").replace("\x0c", "\n")
-    lines = [line.rstrip() for line in text.split("\n")]
     cleaned = []
     blank_run = 0
-    for line in lines:
+    for line in text.split("\n"):
+        line = line.rstrip()
         if not line.strip():
             blank_run += 1
             if blank_run <= 2 and cleaned:
@@ -30,6 +34,10 @@ def guess_title(paragraph):
 
 
 def chunk_text(text, max_chars=3500):
+    """Split text into (title, body) chunks of at most `max_chars`, breaking on paragraphs.
+
+    A heading paragraph becomes the title of the chunk that follows it.
+    """
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n+", text) if p.strip()]
     chunks = []
     current = []
@@ -41,8 +49,7 @@ def chunk_text(text, max_chars=3500):
             current_title = title
             continue
         if current_len + len(para) + 1 > max_chars and current:
-            chunk_text = "\n".join(current)
-            chunks.append((current_title, chunk_text))
+            chunks.append((current_title, "\n".join(current)))
             current = []
             current_len = 0
             current_title = title
@@ -51,8 +58,7 @@ def chunk_text(text, max_chars=3500):
         current.append(para)
         current_len += len(para) + 1
     if current:
-        chunk_text = "\n".join(current)
-        chunks.append((current_title, chunk_text))
+        chunks.append((current_title, "\n".join(current)))
     return chunks
 
 

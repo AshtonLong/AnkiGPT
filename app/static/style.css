@@ -534,22 +534,6 @@ select:focus {
 }
 
 /* ============================================
-   Form Inline
-   ============================================ */
-.form.inline {
-    display: flex;
-    gap: var(--space-md);
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.form.inline input,
-.form.inline select {
-    width: auto;
-    min-width: 180px;
-}
-
-/* ============================================
    Flash Messages
    ============================================ */
 .flash {
@@ -579,30 +563,6 @@ select:focus {
     color: var(--accent);
 }
 
-.flash-item.warning {
-    background: rgba(255, 217, 61, 0.08);
-    border-color: rgba(255, 217, 61, 0.2);
-    color: var(--accent-secondary);
-}
-
-/* ============================================
-   Empty States
-   ============================================ */
-.empty {
-    text-align: center;
-    padding: var(--space-2xl) var(--space-xl);
-    color: var(--text-tertiary);
-    font-size: 0.95rem;
-}
-
-/* ============================================
-   Row Utility
-   ============================================ */
-.row {
-    display: flex;
-    gap: var(--space-md);
-    align-items: center;
-}
 
 /* ============================================
    Progress Bar
@@ -673,16 +633,6 @@ select:focus {
 
     .table-row.table-head div:nth-child(n+3) {
         display: none;
-    }
-
-    .form.inline {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .form.inline input,
-    .form.inline select {
-        width: 100%;
     }
 }
 
@@ -975,54 +925,11 @@ select:focus {
     padding: var(--space-2xl);
 }
 
-.status-page h2 {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: var(--space-lg);
-    background: linear-gradient(180deg, var(--text-primary) 0%, rgba(255, 255, 255, 0.8) 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
 
 .status-page .progress {
     margin: var(--space-lg) 0;
 }
 
-.status-page .row {
-    justify-content: center;
-    margin-top: var(--space-lg);
-}
-
-/* ============================================
-   Loading States & Animations
-   ============================================ */
-@keyframes pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.loading {
-    animation: pulse 1.5s ease-in-out infinite;
-}
 
 /* ============================================
    Scrollbar Styling
@@ -1152,10 +1059,6 @@ button[disabled],
     animation: toast-in 0.2s ease-out;
 }
 
-.toast.info {
-    background: #0f1f2a;
-    border-color: rgba(107, 181, 255, 0.4);
-}
 
 @keyframes toast-in {
     from {

@@ -71,7 +71,7 @@ You can paste text or upload a PDF, generate cards, review/edit them, and export
 |-- Dockerfile
 |-- docker-compose.yml
 |-- tests/
-`-- instance/          # sqlite db, uploads, exports (created automatically)
+`-- instance/          # sqlite db + PDF uploads (created automatically)
 ```
 
 ## Requirements
@@ -142,7 +142,6 @@ AUTH_REQUIRED=true
 SESSION_COOKIE_SECURE=false
 UPLOAD_MAX_MB=50
 UPLOAD_FOLDER=instance/uploads
-EXPORT_FOLDER=instance/exports
 MAX_SOURCE_CHARS=200000
 
 OPENROUTER_API_KEY=your_openrouter_api_key
@@ -196,7 +195,6 @@ celery -A celery_app.celery worker --loglevel=info
 | `MAX_SOURCE_CHARS` | `200000` | Hard cap on source length to bound LLM cost (`0` disables). |
 | `OPENROUTER_MAX_TOKENS` | `4000` | Max output tokens per generation call. |
 | `UPLOAD_FOLDER` | `instance/uploads` | PDF upload storage directory. |
-| `EXPORT_FOLDER` | `instance/exports` | Export directory (app currently streams files directly). |
 | `OPENROUTER_API_KEY` | `` | Required for generation/improve calls. |
 | `OPENROUTER_MODEL` | `google/gemini-3.5-flash` | Model sent to OpenRouter (a current, stable slug). |
 | `OPENROUTER_SITE_URL` | `` | Optional `HTTP-Referer` header for OpenRouter. |
@@ -247,6 +245,7 @@ celery -A celery_app.celery worker --loglevel=info
 ## Export Details
 
 - Exports only cards with `status="ok"`.
+- The `.apkg` is built in memory and streamed to the browser; nothing is written to disk.
 - Supports:
   - Basic model (`Front`, `Back`)
   - Cloze model (`Text`, `Extra`)

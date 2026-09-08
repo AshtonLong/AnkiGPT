@@ -20,6 +20,15 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.close()
 
 
+def _under_instance(instance_path, path):
+    """Resolve a config path relative to the instance dir, tolerating an 'instance/' prefix."""
+    if os.path.isabs(path):
+        return path
+    if path.startswith("instance/"):
+        path = path.replace("instance/", "", 1)
+    return os.path.join(instance_path, path)
+
+
 def create_app(config_object=Config):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
@@ -38,19 +47,13 @@ def create_app(config_object=Config):
     db_url = app.config["SQLALCHEMY_DATABASE_URI"]
     if db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////"):
         rel_path = db_url.replace("sqlite:///", "", 1)
-        if rel_path.startswith("instance/"):
-            rel_path = rel_path.replace("instance/", "", 1)
-        abs_path = os.path.join(app.instance_path, rel_path)
+        abs_path = _under_instance(app.instance_path, rel_path)
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{abs_path}"
-    for key in ("UPLOAD_FOLDER", "EXPORT_FOLDER"):
-        path = app.config.get(key, "")
-        if path and not os.path.isabs(path):
-            if path.startswith("instance/"):
-                path = path.replace("instance/", "", 1)
-            path = os.path.join(app.instance_path, path)
-        app.config[key] = path
-        if path:
-            os.makedirs(path, exist_ok=True)
+    upload_folder = app.config.get("UPLOAD_FOLDER", "")
+    if upload_folder:
+        upload_folder = _under_instance(app.instance_path, upload_folder)
+        os.makedirs(upload_folder, exist_ok=True)
+    app.config["UPLOAD_FOLDER"] = upload_folder
 
     db.init_app(app)
     migrate.init_app(app, db)
