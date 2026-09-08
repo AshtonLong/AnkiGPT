@@ -4,6 +4,7 @@ from flask import current_app
 from .chunking import clean_text, chunk_text, hash_text
 from .llm import (
     CARD_RESPONSE_FORMAT,
+    TERMINAL_ERROR_MARKERS,
     OpenRouterError,
     extract_json,
     message_content,
@@ -20,8 +21,6 @@ logger = logging.getLogger(__name__)
 PROMPT_VERSION = "v5-cheat-sheet-pipeline"
 CHEAT_SHEET_PROMPT_VERSION = f"{PROMPT_VERSION}:cheat_sheet"
 CARD_PROMPT_VERSION = f"{PROMPT_VERSION}:cards"
-
-TERMINAL_MARKERS = ("insufficient", "credit", "quota", "billing", "payment")
 
 # Static instruction blocks live in the SYSTEM message so they form an identical,
 # cacheable prefix across every chunk of a deck run. Only the variable chunk text
@@ -304,7 +303,7 @@ def format_generation_error(exc):
         status = exc.status_code
         detail = (exc.response_body or "").lower()
         if status == 429:
-            if any(marker in detail for marker in TERMINAL_MARKERS):
+            if any(marker in detail for marker in TERMINAL_ERROR_MARKERS):
                 return "OpenRouter credits/quota were exhausted while processing this deck."
             return "OpenRouter rate limit was hit while processing this deck. Wait a minute and try again."
         if status in (401, 403):
@@ -327,7 +326,7 @@ def _is_terminal_llm_error(exc):
         if exc.status_code in (401, 403):
             return True
         detail = (exc.response_body or "").lower()
-        if exc.status_code == 429 and any(m in detail for m in TERMINAL_MARKERS):
+        if exc.status_code == 429 and any(m in detail for m in TERMINAL_ERROR_MARKERS):
             return True
     if isinstance(exc, RuntimeError) and "OPENROUTER_API_KEY" in str(exc):
         return True
@@ -523,18 +522,17 @@ def _run_generation(deck):
     if ok_cards == 0:
         raise OpenRouterError("No valid cards could be generated from this source.")
 
+    # Clear per-run progress bookkeeping; carry forward only the counts we actually
+    # have, so a stale count from a previous run can't linger in settings_json.
+    stale_keys = ["generation_stage", "source_chunks", "cheat_sheet_chunks_done", "dropped_cards"]
     updates = {}
     if auto_deleted_cards:
         updates["auto_deleted_cards"] = auto_deleted_cards
+    else:
+        stale_keys.append("auto_deleted_cards")
     if card_failures:
         updates["partial_failures"] = card_failures
-    _pop_progress(
-        deck,
-        "generation_stage", "source_chunks", "cheat_sheet_chunks_done", "dropped_cards",
-        **updates,
-    )
-    if not auto_deleted_cards:
-        _pop_progress(deck, "auto_deleted_cards")
+    _pop_progress(deck, *stale_keys, **updates)
     deck.status = "ready"
     db.session.commit()
     logger.info(

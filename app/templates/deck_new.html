@@ -94,7 +94,8 @@
 
         <!-- Text Input Section -->
         <div id="source-text" class="source-section active">
-          <textarea name="text_input" rows="10" maxlength="200000"
+          <textarea name="text_input" rows="10"
+            {% if config.MAX_SOURCE_CHARS %}maxlength="{{ config.MAX_SOURCE_CHARS }}"{% endif %}
             placeholder="Paste your notes, article, or study guide here..."></textarea>
         </div>
 
@@ -110,7 +111,7 @@
               </svg>
             </div>
             <p class="upload-text">Click to select PDF</p>
-            <span class="upload-hint">or drag and drop - PDF, up to 50MB</span>
+            <span class="upload-hint">or drag and drop - PDF, up to {{ config.UPLOAD_MAX_MB }}MB</span>
             <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" onchange="updateFileName(this)">
             <p id="file-name" class="file-name"></p>
           </div>

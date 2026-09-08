@@ -27,10 +27,3 @@ def generate_deck_task(deck_id):
     from .services.deckgen import generate_deck
 
     return generate_deck(deck_id)
-
-
-@celery.task
-def export_deck_task(deck_id):
-    from .services.export import export_deck
-
-    return export_deck(deck_id)

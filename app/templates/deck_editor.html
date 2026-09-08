@@ -160,6 +160,126 @@
 </section>
 
 <style>
+  /* Card rows — markup lives in partials/card_row.html, which HTMX swaps in place. */
+  .card-row {
+    transition: background var(--duration-fast);
+  }
+
+  .card-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .card-select input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  /* Card Form */
+  .card-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .card-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin: 0;
+  }
+
+  .card-form input,
+  .card-form textarea {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+  }
+
+  .card-form input:focus,
+  .card-form textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-muted);
+  }
+
+  .card-form-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+  }
+
+  .improve-btn {
+    color: var(--accent-cool) !important;
+    border-color: rgba(107, 181, 255, 0.3) !important;
+  }
+
+  .improve-btn:hover {
+    background: rgba(107, 181, 255, 0.1) !important;
+  }
+
+  /* Tags */
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .tag-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .tag-more {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .no-tags {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  /* Card Type Pills */
+  .card-type {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+  }
+
+  .basic-pill {
+    background: rgba(107, 255, 158, 0.08) !important;
+    color: var(--accent-tertiary) !important;
+    border-color: rgba(107, 255, 158, 0.15) !important;
+  }
+
+  .cloze-pill {
+    background: rgba(107, 181, 255, 0.08) !important;
+    color: var(--accent-cool) !important;
+    border-color: rgba(107, 181, 255, 0.15) !important;
+  }
+
   /* Deck Editor Badge */
   .deck-editor-badge {
     display: inline-flex;

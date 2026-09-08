@@ -2,6 +2,8 @@ import inspect
 import re
 from pypdf import PdfReader
 
+from .chunking import clean_text
+
 
 LIGATURE_MAP = str.maketrans(
     {
@@ -15,20 +17,7 @@ LIGATURE_MAP = str.maketrans(
 
 
 def _normalize_pdf_text(text):
-    text = (text or "").translate(LIGATURE_MAP)
-    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\x0c", "\n")
-    lines = [line.rstrip() for line in text.split("\n")]
-    compacted = []
-    blank_run = 0
-    for line in lines:
-        if not line.strip():
-            blank_run += 1
-            if blank_run <= 2 and compacted:
-                compacted.append("")
-            continue
-        blank_run = 0
-        compacted.append(line)
-    return "\n".join(compacted).strip()
+    return clean_text((text or "").translate(LIGATURE_MAP))
 
 
 def _looks_like_list_item(line):
@@ -131,10 +120,8 @@ def _result_to_markdown(raw):
 
 def _extract_markdown_with_pymupdf4llm(file_path, start, end, total_pages):
     try:
-        # Enables advanced page layout analysis used by pymupdf4llm.
+        # Optional: enables the advanced page layout analysis used by pymupdf4llm.
         import pymupdf.layout  # noqa: F401
-    except ImportError:
-        pass
     except Exception:
         pass
 

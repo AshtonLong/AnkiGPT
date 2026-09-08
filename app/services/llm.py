@@ -6,6 +6,19 @@ import requests
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _HEX_CHARS = set("0123456789abcdefABCDEF")
 
+# A 429 mentioning one of these is a spend/quota wall, not throttling: retrying it
+# only burns time. Shared with deckgen, which uses it to abort a run early.
+TERMINAL_ERROR_MARKERS = ("insufficient", "credit", "quota", "billing", "payment")
+
+
+class OpenRouterError(RuntimeError):
+    def __init__(self, message, status_code=None, error_code=None, response_body=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.error_code = error_code
+        self.response_body = response_body
+
+
 # Strict JSON-schema response format for the card-generation pass. Supported models
 # (incl. Gemini) constrain decoding to this shape, which removes nearly all of the
 # fragile free-text JSON parsing/repair below. Strict mode requires every property to
@@ -65,14 +78,6 @@ def message_content(response):
     return content
 
 
-class OpenRouterError(RuntimeError):
-    def __init__(self, message, status_code=None, error_code=None, response_body=None):
-        super().__init__(message)
-        self.status_code = status_code
-        self.error_code = error_code
-        self.response_body = response_body
-
-
 def build_headers(api_key, site_url, app_name):
     headers = {"Authorization": f"Bearer {api_key}"}
     if site_url:
@@ -117,8 +122,7 @@ def _should_retry(status_code, detail):
         return True
     if status_code == 429:
         lowered = (detail or "").lower()
-        terminal_markers = ("insufficient", "credit", "quota", "billing", "payment")
-        return not any(marker in lowered for marker in terminal_markers)
+        return not any(marker in lowered for marker in TERMINAL_ERROR_MARKERS)
     return False
 
 
@@ -297,5 +301,4 @@ def repair_json(
         backoff_seconds=backoff_seconds,
         timeout_seconds=timeout_seconds,
     )
-    content = response["choices"][0]["message"]["content"]
-    return extract_json(content)
+    return extract_json(message_content(response))
