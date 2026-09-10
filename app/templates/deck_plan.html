@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon, stepper %}
+{% block title %}Review plan · {{ deck.title }} · AnkiGPT{% endblock %}
+{% block content %}
+{% set doc = run.get('doc_meta') or {} %}
+{% set live_units = units|rejectattr('skipped')|list %}
+{% set total_target = plan.tasks|sum(attribute='target_cards') %}
+
+{{ stepper(3) }}
+
+<div class="page-head" data-reveal>
+  <div>
+    <span class="eyebrow ember">Plan review</span>
+    <h1>{{ deck.title }}</h1>
+    <p>The planner mapped {{ units|length }} units{% if doc.subject %} of <b>{{ doc.subject }}</b>{% endif %} and proposes {{ plan.tasks|length }} tasks for about {{ total_target }} cards. Adjust anything below, then run it.</p>
+  </div>
+  <div class="actions">
+    <span class="pill violet">{{ icon('brain', 12) }} {{ plan.mode }} · {{ plan.turns }} turns</span>
+    <span class="pill">budget {{ plan.budget }}</span>
+    {% if figure_count %}<span class="pill warn">{{ icon('image', 12) }} {{ figure_count }} figures</span>{% endif %}
+  </div>
+</div>
+
+{% if plan.summary %}
+<div class="planner-note" data-reveal style="margin-bottom:1.5rem">{{ icon('brain', 15) }}<span>{{ plan.summary }}</span></div>
+{% endif %}
+
+<div class="plan-layout">
+  <form method="post" class="plan-tasks" data-reveal style="--d:80">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="run">
+    {% for task in plan.tasks %}
+    {% set names = [] %}
+    {% for i in task.unit_idxs %}{% if unit_by_idx.get(i) %}{% set _ = names.append(unit_by_idx[i].title) %}{% endif %}{% endfor %}
+    <div class="panel plan-task {{ task.origin }}" data-plan-task>
+      <div class="pt-head">
+        <label class="pt-skip" title="Skip this task">
+          <input type="checkbox" class="check" name="skip_{{ task.id }}" data-skip>
+          <span>skip</span>
+        </label>
+        <div class="pt-title">
+          <b>{{ names|join(' · ') or ('units ' ~ task.unit_idxs|join(', ')) }}</b>
+          <small>units {{ task.unit_idxs|map('string')|join(', ') }}{% if task.origin != 'planner' %} · {{ task.origin }}{% endif %}</small>
+        </div>
+        <div class="pt-controls">
+          <div class="select-wrap">
+            <select name="strategy_{{ task.id }}" aria-label="Strategy">
+              {% for key, s in strategies.items() %}
+              <option value="{{ key }}" {% if key == task.strategy %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="pt-target">
+            <input type="number" name="target_{{ task.id }}" value="{{ task.target_cards }}" min="1" max="60" inputmode="numeric" aria-label="Target cards" data-target>
+            <span>cards</span>
+          </div>
+        </div>
+      </div>
+      <textarea name="notes_{{ task.id }}" rows="2" data-autogrow placeholder="Notes for the worker">{{ task.notes }}</textarea>
+    </div>
+    {% endfor %}
+
+    <div class="plan-foot panel">
+      <div class="plan-total">{{ icon('target', 16) }} <span>About <b data-plan-total>{{ total_target }}</b> cards from <b data-plan-count>{{ plan.tasks|length }}</b> tasks</span></div>
+      <div class="actions">
+        <button class="btn" type="submit" name="action" value="replan" formnovalidate>{{ icon('refresh', 15) }} Re-plan</button>
+        <button class="btn primary lg" type="submit">{{ icon('play', 16) }} Run this plan</button>
+      </div>
+    </div>
+  </form>
+
+  <aside class="plan-side" data-reveal style="--d:140">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">{{ icon('map') }} Document map</span><span class="counter"><b>{{ live_units|length }}</b> live</span></div>
+      <ol class="unit-list">
+        {% for u in units %}
+        <li class="unit {{ 'skipped' if u.skipped else '' }}">
+          <span class="u-idx">{{ u.idx }}</span>
+          <div>
+            <b>{{ u.title }}</b>
+            <small>{{ u.kind }} · density {{ u.density }} · {{ '{:,}'.format(u.text|length) }} chars{% if u.page_start %} · p.{{ u.page_start }}{% if u.page_end and u.page_end != u.page_start %}–{{ u.page_end }}{% endif %}{% endif %}</small>
+            {% if u.skipped %}<small class="skip-reason">{{ icon('skip', 11) }} {{ u.skip_reason or 'skipped' }}</small>
+            {% elif u.summary %}<small class="summary">{{ u.summary }}</small>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -10,13 +10,14 @@
 
 <div class="page-head" data-reveal>
   <div>
-    <span class="eyebrow ember">Review &amp; configure</span>
+    <span class="eyebrow ember">Review &amp; brief the agent</span>
     <h1>{{ deck.title }}</h1>
-    <p>Check the extracted text on the left, then tell the model what to focus on before it builds your deck.</p>
+    <p>Check the extracted text, then brief the planning agent. It maps the document, decides how to carve it up, and delegates card writing to specialist workers.</p>
   </div>
   <div class="actions">
-    <span class="pill {{ 'info' if deck.card_style == 'cloze' else 'ok' }}">{{ deck.card_style }}</span>
+    <span class="pill {{ 'info' if deck.card_style == 'cloze' else ('violet' if deck.card_style == 'mixed' else 'ok') }}">{{ deck.card_style }}</span>
     <span class="pill">{{ 'PDF' if deck.source_type == 'pdf' else 'Text' }} source</span>
+    {% if figure_count %}<span class="pill warn">{{ icon('image', 12) }} {{ figure_count }} figures</span>{% endif %}
   </div>
 </div>
 
@@ -35,40 +36,62 @@
 
   <form method="post" class="panel form-card sticky" data-reveal style="--d:110" data-source-chars="{{ n }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="panel-title" style="margin-bottom:1.4rem">{{ icon('settings') }} Generation settings</div>
+    <div class="panel-title" style="margin-bottom:1.4rem">{{ icon('brain') }} Brief the planner</div>
+
+    <div class="field">
+      <div class="label-row"><label for="exam_context">Exam / context</label><span class="hint">optional</span></div>
+      <input type="text" id="exam_context" name="exam_context" value="{{ s.get('exam_context', '') }}"
+        placeholder="e.g. 2nd-year pharmacology final, MCQ + short answer">
+    </div>
 
     <div class="field">
       <div class="label-row"><label for="focus">Focus on</label><span class="hint">optional</span></div>
       <input type="text" id="focus" name="focus" value="{{ s.get('focus', '') }}"
-        placeholder="e.g. definitions, mechanisms, key equations">
+        placeholder="e.g. mechanisms, key equations, contrasts">
     </div>
 
     <div class="field">
       <div class="label-row"><label for="exclude">Exclude</label><span class="hint">optional</span></div>
       <input type="text" id="exclude" name="exclude" value="{{ s.get('exclude', '') }}"
-        placeholder="e.g. trivia, dates, worked examples">
+        placeholder="e.g. history, trivia, worked examples">
     </div>
 
     <div class="field">
       <div class="label-row"><label for="glossary">Must-include terms</label><span class="hint">one per line</span></div>
-      <textarea id="glossary" name="glossary" rows="3" style="min-height:96px"
+      <textarea id="glossary" name="glossary" rows="3" style="min-height:80px"
         placeholder="Terms that must show up in the cards">{{ s.get('glossary', '') }}</textarea>
     </div>
 
     <div class="field">
-      <div class="label-row"><label for="max_chars">Chunk size</label><span class="hint">characters per chunk</span></div>
+      <div class="label-row"><label for="target_cards">Deck size</label><span class="hint">cards, roughly</span></div>
       <div class="range-row">
-        <input type="range" id="max_chars" name="max_chars" min="1000" max="8000" step="250"
-          value="{{ s.get('max_chars', 3500) }}" data-range="max-chars-out">
-        <output id="max-chars-out" for="max_chars">3,500</output>
+        <input type="range" id="target_cards" name="target_cards_range" min="0" max="400" step="10"
+          value="{{ s.get('target_cards') or 0 }}" data-range="target-out" data-auto-label="Auto">
+        <output id="target-out" for="target_cards">Auto</output>
       </div>
-      <div class="estimate">{{ icon('scissors', 15) }}
-        <span>Your source splits into about <b data-estimate>—</b> chunks. Smaller chunks give finer-grained cards but take longer.</span>
+      <input type="hidden" name="target_cards" id="target_cards_value" value="{{ s.get('target_cards') or 'auto' }}">
+      <div class="estimate">{{ icon('target', 15) }}
+        <span><b data-estimate>—</b> cards is what the planner would size this source at on its own. Leave on Auto to let it decide.</span>
       </div>
     </div>
 
-    <button type="submit" class="btn primary lg block">{{ icon('zap') }} Generate deck</button>
-    <p class="note">{{ icon('clock', 14) }} Usually one to three minutes, depending on length.</p>
+    <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" name="review_plan" {% if s.get('review_plan') %}checked{% endif %}>
+        <span class="tg"></span>
+        <span class="tg-text"><b>Review the plan before writing</b><small>Pause after planning so you can skip units, resize tasks, or change strategies.</small></span>
+      </label>
+      {% if figure_count %}
+      <label class="toggle">
+        <input type="checkbox" name="use_figures" {% if s.get('use_figures', True) %}checked{% endif %}>
+        <span class="tg"></span>
+        <span class="tg-text"><b>Read figures with vision</b><small>{{ figure_count }} figures were found. Useful ones become image-backed cards.</small></span>
+      </label>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn primary lg block">{{ icon('zap') }} Plan &amp; generate</button>
+    <p class="note">{{ icon('clock', 14) }} Workers run in parallel; most decks finish in two to four minutes.</p>
   </form>
 </div>
 {% endblock %}

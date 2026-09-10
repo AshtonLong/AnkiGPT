@@ -1,281 +1,217 @@
 # AnkiGPT
 
-AnkiGPT is a Flask web app that turns study material into editable Anki flashcards using an LLM via OpenRouter.  
-You can paste text or upload a PDF, generate cards, review/edit them, and export a ready-to-import `.apkg` deck.
+AnkiGPT turns study material into editable Anki decks with an **agentic pipeline**: a
+planning agent maps your document, decides how to carve it up, and delegates card
+writing to specialist workers that run in parallel. A critic reviews every card against
+the source, near-duplicates are merged by meaning, a coverage audit fills gaps, and you
+can feed your real Anki review history back in to have failing cards rewritten.
 
-## Features
+Paste text or upload a PDF, watch the run trace live, edit the cards, export `.apkg`.
 
-- Text and PDF input
-- PDF-to-Markdown extraction pipeline for cleaner LLM context (with `pypdf` fallback)
-- Exam cheat sheet generation before card creation
-- Basic and cloze card generation
-- Per-deck generation settings (`focus`, `exclude`, `glossary`, `chunk size`)
-- Card validation pipeline:
-  - cloze syntax checks
-  - math normalization checks
-  - source-scope checks
-  - deduplication
-- In-browser card editor with HTMX inline save/improve actions
-- Bulk actions (delete, restore, tag, regenerate by cheat sheet section)
-- `.apkg` export compatible with Anki
-- Optional authentication-free demo mode
-- Sync mode by default, optional async Celery worker mode
+## How a deck is generated
 
-## Tech Stack
-
-- Backend: Flask, Flask-Login, Flask-SQLAlchemy, Flask-Migrate
-- Queue: Celery (optional async mode), Redis (optional broker/backend)
-- AI: OpenRouter Chat Completions API
-- Validation: Pydantic
-- Export: `genanki`
-- PDF parsing: `pymupdf4llm` + `pymupdf-layout` (preferred Markdown/layout extraction) + `pypdf` (fallback)
-- Database: SQLite by default (configurable via `DATABASE_URL`)
-
-## How It Works
-
-1. Create a deck from text or PDF.
-2. PDFs are converted to Markdown (fallback: cleaned plain text) for higher-quality chunking.
-3. Review extracted source text and choose generation settings.
-4. App converts the source chunks into a comprehensive, exam-focused Markdown cheat sheet.
-5. App chunks only that cheat sheet and generates cards from those sections.
-6. Responses are parsed/validated, invalid cards are dropped, duplicates are marked deleted.
-7. You review/edit cards and export an `.apkg` file.
-
-## Project Structure
-
-```text
-.
-|-- app/
-|   |-- routes/
-|   |   |-- auth.py
-|   |   `-- main.py
-|   |-- services/
-|   |   |-- chunking.py
-|   |   |-- deckgen.py
-|   |   |-- export.py
-|   |   |-- llm.py
-|   |   |-- pdf.py
-|   |   |-- schemas.py
-|   |   `-- validators.py
-|   |-- templates/
-|   |-- static/
-|   |-- config.py
-|   |-- extensions.py
-|   |-- models.py
-|   |-- tasks.py
-|   `-- __init__.py
-|-- celery_app.py
-|-- run.py
-|-- wsgi.py
-|-- requirements.txt
-|-- Dockerfile
-|-- docker-compose.yml
-|-- tests/
-`-- instance/          # sqlite db + PDF uploads (created automatically)
+```
+source ──▶ MAP ──▶ PLAN ──▶ FIGURES ──▶ WRITE ──▶ CRITIQUE ──▶ RECONCILE ──▶ COVERAGE ──▶ FINISH
+           │        │         │           │          │            │             │
+     document map   │    vision reads  N workers   cold-answer  embeddings    audit each
+     units, kinds,  │    figures from  in parallel + judge on   cluster +     unit; spawn
+     density,       │    the PDF       one strategy every card  model merges  gap-fillers
+     prerequisites  │                  each
+                    ▼
+        an agent with tools: read_unit · search_source · spawn_task · skip_unit · finish_plan
 ```
 
-## Requirements
+1. **Map** — the source is split on headings into candidates; one cheap model call groups
+   them into semantic *units* with a kind (definitions, formulas, procedure, comparison,
+   worked example…), a density score, prerequisites, and skip verdicts for front matter,
+   references, and recaps. Short sources skip the model and become one unit.
+2. **Plan** — the planner is a real tool-using loop. It reads units it is unsure about,
+   searches the source, and *spawns tasks*: which units, which **card strategy**, how many
+   cards, and specific notes for the worker. Every live unit must end up covered
+   (uncovered units get a default task); task and card counts are capped. If the model
+   never calls a tool, a single structured-output plan is used instead.
+   Tick **Review the plan before writing** and the run pauses so you can skip tasks,
+   change strategies, resize budgets, or edit worker notes before anything is written.
+3. **Figures** (PDFs) — figure regions are rendered from the page (so vector labels
+   survive), a vision call decides whether each is examinable and lists its labelled
+   parts, and useful ones become image-backed `figure_recall` tasks. Images ship inside
+   the `.apkg`.
+4. **Write** — each task is one worker call: the strategy's grammar + the planner's notes
+   + the unit text **verbatim** (never a lossy summary) + a hint of what sibling tasks
+   cover. Tasks run concurrently (`PIPELINE_MAX_WORKERS`). Truncated outputs are retried
+   with a smaller ask. Every card carries a verbatim `source_quote`.
+5. **Critique** — two cheap calls per batch of 20 cards. A *cold pass* answers each card
+   front with no source (exposes prompts that leak their answer, gives a difficulty
+   signal); a *judge pass* rules keep / rewrite / drop on support, atomicity, ambiguity
+   and leakage. Dropped cards are kept as `deleted` with `critic:*` tags so you can
+   restore them.
+6. **Reconcile** — surviving cards are embedded, clustered by cosine similarity, and a
+   model decides per cluster what to keep. Exact duplicates are removed first.
+7. **Coverage** — per unit, the model lists testable facts no card covers; important gaps
+   spawn one bounded round of gap-filler tasks (which also go through the critic).
+8. **Finish** — cards are ordered by unit prerequisites so foundations are introduced
+   first, and tagged with unit, strategy, and difficulty.
 
-- **Docker + Docker Compose** (recommended), or
-- Python 3.10+ (3.12 recommended) for a local install
-- An OpenRouter API key
-- Redis only if you want true async background workers (bundled in the Docker setup)
+### Card strategies
 
-## Quick Start (Docker — recommended)
+| Strategy | Use for |
+|---|---|
+| `general` | Mixed prose; the safe default |
+| `definition_sweep` | Term-heavy material; one card per term plus reverse cards for key terms |
+| `formula_derivation` | Equations: what it computes, each symbol, validity conditions, limiting cases |
+| `mechanism_chain` | Processes and pathways; one card per link |
+| `compare_contrast` | Confusable siblings; discriminator cards per (item, dimension) |
+| `worked_example` | Problem solving; method selection and next-step reasoning |
+| `key_claims` | Narrative / argumentative prose; claims, causes, evidence |
+| `pitfall_edge_case` | Exceptions, caveats, common mistakes |
+| `figure_recall` | Diagrams and charts, with the image on the card |
 
-The Docker setup runs the full stack: the Flask web app (gunicorn), a Celery
-worker, and Redis, with async generation enabled.
+All strategies share one base rule set (grounding, minimum-information, cloze hygiene,
+math format) placed first in the prompt so provider prompt caches hit across tasks.
 
-```bash
-# 1. Configure secrets
-cp example.env .env        # then set SECRET_KEY and OPENROUTER_API_KEY in .env
+### Everything is traced
 
-# 2. Build and start
-docker compose up --build
-```
+Every phase and task is a `PipelineTask` row; every model call is an `LLMRun` under its
+task. The status page polls `/decks/<id>/progress.json` and renders the tree live —
+what the planner decided, which workers are in flight, what the critic dropped, tokens
+and cost per phase. The editor's **Run insights** panel shows the same after the fact.
 
-Open `http://localhost:5000`.
+### Content-addressed cache
 
-- The web app listens on container port 8000 and is published to host port `5000`.
-- The SQLite database, uploads, and exports persist in the `ankigpt-data` volume.
-- Celery/Redis wiring (`CELERY_BROKER_URL`, etc.) is set in `docker-compose.yml`
-  and overrides `.env`, so async mode works out of the box.
+Worker, critic, vision and coverage results are cached on a hash of
+(role, model, prompt version, inputs). Re-running a deck, or generating another deck
+from the same chapter, costs nothing for any task whose inputs are unchanged.
 
-Common commands:
+### Close the loop with Anki
 
-```bash
-docker compose up -d --build      # start in the background
-docker compose logs -f web        # tail web logs (or: worker / redis)
-docker compose down               # stop (add -v to also delete the data volume)
+The export stamps every note with a stable guid. Study the deck, then export it back
+from Anki (*File → Export*, include scheduling) and upload it on the editor page. Review
+stats (reps, lapses, "again" rate) are attached to each card; cards with ≥2 lapses or a
+≥40% again-rate are flagged **struggling**. **Coach** sends them to the model with their
+stats and the source unit, which rewrites or splits them (marked *Needs review*).
 
-# Run the test suite in the container (pytest is a dev-only dependency):
-docker compose exec web sh -c "pip install -q -r requirements-dev.txt && python -m pytest tests/ -q"
-```
+## Tech stack
 
-To run the web service synchronously without the worker (eager mode), set
-`CELERY_ALWAYS_EAGER: "true"` on the `web` service and skip the `worker`/`redis`
-services.
+- Flask, Flask-Login, Flask-SQLAlchemy, Flask-Migrate, Flask-WTF (CSRF)
+- OpenRouter chat completions (structured outputs, tools, vision) + embeddings
+- Default model: **`openai/gpt-5.6-luna`** for every role (1M context, tools, vision,
+  ~$0.20/M input); any role can be overridden per env var
+- Pydantic validation, NumPy for clustering, genanki export
+- PDF: pymupdf4llm + pymupdf-layout (Markdown with page offsets), pymupdf figure
+  rendering, pypdf fallback
+- No queue or broker: generation runs on a background thread inside the web process,
+  and the status page polls run state from the database
+- SQLite by default (WAL mode; missing columns are added automatically on startup)
 
-## Quick Start (local Python install)
-
-### 1. Create and activate a virtual environment
+## Quick start (local)
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-### 2. Install dependencies
-
-```powershell
 pip install -r requirements.txt
-```
-
-### 3. Configure environment
-
-Create/update `.env` in the project root:
-
-```env
-SECRET_KEY=change-me
-DATABASE_URL=sqlite:///instance/ankigpt.db
-AUTH_REQUIRED=true
-SESSION_COOKIE_SECURE=false
-UPLOAD_MAX_MB=50
-UPLOAD_FOLDER=instance/uploads
-MAX_SOURCE_CHARS=200000
-
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=google/gemini-3.5-flash
-OPENROUTER_SITE_URL=
-OPENROUTER_APP_NAME=AnkiGPT
-OPENROUTER_TIMEOUT_SECONDS=120
-OPENROUTER_MAX_RETRIES=2
-OPENROUTER_RETRY_BACKOFF_SECONDS=1.5
-OPENROUTER_MAX_TOKENS=4000
-
-CELERY_BROKER_URL=
-CELERY_RESULT_BACKEND=
-CELERY_ALWAYS_EAGER=true
-```
-
-### 4. Run the app
-
-```powershell
+copy example.env .env      # set SECRET_KEY and OPENROUTER_API_KEY
 python run.py
 ```
 
-Open `http://127.0.0.1:5000`.
+Open `http://127.0.0.1:5000`. Set `AUTH_REQUIRED=false` for a no-login demo mode.
 
-## Async Worker Mode (Optional)
+## Quick start (Docker)
 
-By default, tasks run eagerly in-process (`CELERY_ALWAYS_EAGER=true`).  
-To run true background jobs:
-
-1. Set:
-   - `CELERY_ALWAYS_EAGER=false`
-   - `CELERY_BROKER_URL=redis://localhost:6379/0`
-   - `CELERY_RESULT_BACKEND=redis://localhost:6379/0`
-2. Start Redis.
-3. Run Flask app (`python run.py`).
-4. Start Celery worker:
-
-```powershell
-celery -A celery_app.celery worker --loglevel=info
+```bash
+cp example.env .env        # then set SECRET_KEY and OPENROUTER_API_KEY in .env
+docker compose up --build
 ```
 
-## Configuration Reference
+Open `http://localhost:5000`. Compose runs a single `web` container; the SQLite
+database and uploads live in the `ankigpt-data` volume. Run the tests in the
+container with:
+
+```bash
+docker compose exec web sh -c "pip install -q -r requirements-dev.txt && python -m pytest tests/ -q"
+```
+
+## Configuration
 
 | Variable | Default | Description |
 |---|---|---|
-| `SECRET_KEY` | `dev-secret` | Flask session/CSRF secret. Change in real environments. |
-| `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy connection URL. |
-| `AUTH_REQUIRED` | `true` | Require login if true; if false uses a local demo user. |
-| `SESSION_COOKIE_SECURE` | `false` | Mark the session cookie `Secure` (enable behind HTTPS). |
-| `UPLOAD_MAX_MB` | `50` | Max upload size in MB (`MAX_CONTENT_LENGTH`). |
-| `MAX_SOURCE_CHARS` | `200000` | Hard cap on source length to bound LLM cost (`0` disables). |
-| `OPENROUTER_MAX_TOKENS` | `4000` | Max output tokens per generation call. |
-| `UPLOAD_FOLDER` | `instance/uploads` | PDF upload storage directory. |
-| `OPENROUTER_API_KEY` | `` | Required for generation/improve calls. |
-| `OPENROUTER_MODEL` | `google/gemini-3.5-flash` | Model sent to OpenRouter (a current, stable slug). |
-| `OPENROUTER_SITE_URL` | `` | Optional `HTTP-Referer` header for OpenRouter. |
-| `OPENROUTER_APP_NAME` | `AnkiGPT` | Optional `X-Title` header for OpenRouter. |
-| `OPENROUTER_TIMEOUT_SECONDS` | `120` | Request timeout per OpenRouter call. |
-| `OPENROUTER_MAX_RETRIES` | `2` | Retries for transient OpenRouter failures (`429`, `5xx`, network). |
-| `OPENROUTER_RETRY_BACKOFF_SECONDS` | `1.5` | Base exponential backoff between retries. |
-| `CELERY_BROKER_URL` | `` | Broker URL (Redis/Rabbit/etc). |
-| `CELERY_RESULT_BACKEND` | `` | Celery result backend URL. |
-| `CELERY_ALWAYS_EAGER` | `true` | Run tasks synchronously in request process. |
+| `SECRET_KEY` | `dev-secret` | Flask session/CSRF secret. Change it. |
+| `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy URL. |
+| `AUTH_REQUIRED` | `true` | `false` runs against a local `demo@local` user. |
+| `OPENROUTER_API_KEY` | | Required. |
+| `OPENROUTER_MODEL` | `openai/gpt-5.6-luna` | Default model for every role. |
+| `OPENROUTER_MODEL_{MAPPER,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). |
+| `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
+| `OPENROUTER_REASONING_{PLANNER,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role; empty omits the parameter. |
+| `OPENROUTER_TEMPERATURE` | | Unset by default — reasoning models reject it. |
+| `OPENROUTER_MAX_TOKENS` | `16000` | Output cap per call (billing is per token used). |
+| `OPENROUTER_TIMEOUT_SECONDS` / `_MAX_RETRIES` / `_RETRY_BACKOFF_SECONDS` | `180` / `2` / `1.5` | HTTP behaviour. |
+| `PIPELINE_MAX_WORKERS` | `6` | Concurrent model calls. |
+| `PIPELINE_PLANNER_MAX_TURNS` | `14` | Planner agent loop cap. |
+| `PIPELINE_UNIT_MAX_CHARS` | `14000` | Larger units are split deterministically. |
+| `PIPELINE_CRITIC_ENABLED` | `true` | Critic phase. |
+| `PIPELINE_COVERAGE_ENABLED` | `true` | Coverage audit + gap fill. |
+| `PIPELINE_EMBED_DEDUPE_ENABLED` | `true` | Embedding-based duplicate clustering. |
+| `PIPELINE_DEDUPE_THRESHOLD` | `0.90` | Cosine threshold for a duplicate cluster. |
+| `PIPELINE_CACHE_ENABLED` | `true` | Content-addressed result cache. |
+| `PIPELINE_FIGURES_ENABLED` / `PIPELINE_MAX_FIGURES` | `true` / `24` | Figure extraction from PDFs. |
+| `MAX_SOURCE_CHARS` | `400000` | Cap on source length (`0` disables). |
+| `UPLOAD_MAX_MB` / `UPLOAD_FOLDER` | `50` / `instance/uploads` | Uploads. |
+| `GENERATION_IN_THREAD` | `true` | Run generation on a background thread (tests set `false` to run inline). |
 
-## Auth Behavior
-
-- If `AUTH_REQUIRED=true`:
-  - Signup/login required for deck actions.
-  - Standard user records in database.
-- If `AUTH_REQUIRED=false`:
-  - App auto-creates/uses local user `demo@local`.
-  - Useful for local demos and rapid testing.
-
-## Main Routes
+## Routes
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | Landing page |
-| `GET` | `/decks` | List decks |
-| `GET,POST` | `/decks/new` | Create deck from text/PDF |
-| `GET,POST` | `/decks/<deck_id>/preview` | Review source + generation settings |
-| `GET` | `/decks/<deck_id>/status` | Generation progress/status |
-| `GET` | `/decks/<deck_id>` | Card editor |
-| `POST` | `/decks/<deck_id>/export` | Export `.apkg` |
-| `POST` | `/decks/<deck_id>/delete` | Delete deck |
-| `POST` | `/cards/<card_id>` | Save a single card edit |
-| `POST` | `/cards/<card_id>/improve` | LLM card rewrite |
-| `POST` | `/cards/bulk` | Bulk delete/restore/tag/regenerate |
-| `GET,POST` | `/auth/signup` | Signup |
-| `GET,POST` | `/auth/login` | Login |
-| `POST` | `/auth/logout` | Logout |
+| `GET` | `/decks` | Library |
+| `GET,POST` | `/decks/new` | Create a deck from text/PDF (figures extracted here) |
+| `GET,POST` | `/decks/<id>/preview` | Review source, brief the planner, start the run |
+| `GET` | `/decks/<id>/status` | Live run trace |
+| `GET` | `/decks/<id>/progress.json` | Trace as JSON (polled by the status page) |
+| `GET,POST` | `/decks/<id>/plan` | Review / edit / run the work order; re-plan |
+| `GET` | `/decks/<id>` | Card editor with run insights |
+| `POST` | `/decks/<id>/reviews` | Import an Anki package with review history |
+| `POST` | `/decks/<id>/coach` | Rewrite struggling cards |
+| `POST` | `/decks/<id>/export` | Export `.apkg` (with figure media) |
+| `POST` | `/cards/<id>` · `/cards/<id>/improve` · `/cards/bulk` | Edit, AI-improve, bulk (delete/restore/tag/regenerate unit/coach) |
+| `GET` | `/figures/<id>.png` | Figure image (owner-scoped) |
 
-## Data Model Summary
+## Project layout
 
-- `User`: account credentials and timestamps
-- `Deck`: deck metadata, source content, settings, status
-- `Source`: generated cheat sheet section records used for card creation
-- `Card`: generated/editable cards with status and tags
-- `LLMRun`: generation/improvement request logs, parsed payloads, errors, usage
+```text
+app/
+  services/
+    pipeline/
+      orchestrator.py   the run: phases, persistence, status transitions
+      document_map.py   phase 0 — skeleton + mapper
+      planner.py        phase 1 — tool-using planning agent + invariants
+      strategies.py     card grammars
+      workers.py        phase 2 — worker prompt + call
+      critic.py         phase 3 — cold pass + judge, coach diagnosis
+      reconcile.py      phase 4 — embedding clusters, coverage audit
+      figures.py        PDF figure extraction + vision analysis
+      feedback.py       Anki review import + coach
+      routing.py        role -> model client
+      cache.py          content-addressed cache
+      parallel.py       thread-pool fan-out
+      trace.py          PipelineTask / LLMRun tracing
+    llm.py              OpenRouter HTTP: chat, tools loop, embeddings, JSON repair
+    deckgen.py          regenerate a unit, improve a card
+    pdf.py, export.py, validators.py, chunking.py, schemas.py
+  routes/, templates/, static/, models.py, config.py, tasks.py
+tests/                  72 tests incl. an end-to-end run against a scripted model
+```
 
-## Export Details
+## Data model
 
-- Exports only cards with `status="ok"`.
-- The `.apkg` is built in memory and streamed to the browser; nothing is written to disk.
-- Supports:
-  - Basic model (`Front`, `Back`)
-  - Cloze model (`Text`, `Extra`)
-- Tags are sanitized before writing to Anki.
-- Output filename format: `<safe_deck_title>_<deck_id>.apkg`
-
-## Troubleshooting
-
-- "Generation failed":
-  - Check the exact status-page error message (it now shows the OpenRouter failure reason).
-  - For rate limits, wait briefly and retry.
-  - Check `OPENROUTER_API_KEY`.
-  - Verify model name in `OPENROUTER_MODEL`.
-  - Confirm internet access and OpenRouter account limits.
-- Stuck in processing with async mode:
-  - Confirm Redis is up and URLs are correct.
-  - Confirm Celery worker is running with `-A celery_app.celery`.
-- "No cards to export":
-  - Deck has zero cards in `ok` state; review filters/validation outcomes.
-- PDF has little/no extracted text:
-  - PDF may be scanned/image-only; OCR is not included.
-
-## Development Notes
-
-- Tables are auto-created on app startup via `db.create_all()` in `app/__init__.py`.
-  `create_all()` only creates *missing* tables — it does not alter existing ones. After
-  pulling schema changes (new indexes / cascades), delete an old dev `instance/ankigpt.db`
-  so it is rebuilt, or wire up `Flask-Migrate` (`flask db init/migrate/upgrade`).
-- SQLite foreign-key enforcement is enabled via a `PRAGMA foreign_keys=ON` connect hook,
-  so `ON DELETE CASCADE` works (deleting a user/deck removes its decks/cards/sources).
+- `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
+  totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
+- `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).
+- `Card` — with `strategy`, `difficulty`, `source_quote`, `critic_json`, `order_key`,
+  `guid`, `review_stats_json`, and links to its task, unit, and figure.
+- `PipelineTask` — the trace tree (phase → task), with status, model, tokens, cost.
+- `LLMRun` — every model call, attached to its task.
+- `Figure` — images pulled from a PDF plus the vision analysis.
+- `GenerationCache` — content-addressed results.
 
 ## Testing
 
@@ -284,19 +220,27 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-Covers JSON parsing/repair, validators, chunking, the generation pipeline (happy path +
-non-destructive failure), and route authorization/CSRF.
+The suite includes a scripted model (`tests/conftest.py::FakeLLM`) that drives the whole
+pipeline — planner tool calls, workers, critic verdicts, duplicate resolution, coverage
+audit, and the coach — without network access.
 
-## Security Notes
+## Troubleshooting
 
-- **Rotate any API key that ever touched git history.** Removing a committed `.env` does
-  not remove it from history — purge it (`git filter-repo`/BFG) and rotate the key.
-- Set a strong random `SECRET_KEY`; the app warns when the insecure default is used.
-- Auth: every deck/card route is scoped to the current user (ownership checks); cross-user
-  access returns 404.
-- CSRF protection (Flask-WTF) is enabled on all state-changing requests, including HTMX
-  actions (token sent via the `X-CSRFToken` header).
-- PDF uploads are validated by extension, stored under server-generated names
-  (`secure_filename` + UUID), and deleted after extraction.
-- Uploaded files and generated content may contain sensitive study material; handle
-  storage accordingly.
+- **Generation failed** — the status page shows the exact reason and what ran before the
+  failure. Auth/quota errors abort immediately and never wipe an existing deck.
+- **Planner produced a poor plan** — tick *Review the plan before writing* and adjust, or
+  set `OPENROUTER_MODEL_PLANNER` to a stronger model.
+- **Cards dropped by the critic** — filter the editor by *Deleted*; each carries the
+  critic's reason. Restore anything you disagree with.
+- **Review import finds no cards** — export this deck from AnkiGPT first, study it, then
+  export it back from Anki *with scheduling*. Cards are matched by note guid.
+- **Compressed Anki packages** — newer Anki exports use zstd; `zstandard` is in
+  `requirements.txt`, or tick *Support older Anki versions* when exporting.
+- **Scanned PDFs** — no OCR; only text-based PDFs extract.
+
+## Security notes
+
+- Rotate any API key that ever touched git history.
+- Every deck/card/figure route is scoped to the current user; cross-user access 404s.
+- CSRF protection on all state-changing requests (HTMX sends the token as a header).
+- Uploaded PDFs are extracted and deleted immediately; figure images live in the DB.

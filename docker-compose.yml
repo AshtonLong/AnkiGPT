@@ -1,21 +1,11 @@
-# AnkiGPT stack: Flask web app + Celery worker + Redis broker.
+# AnkiGPT: one Flask container. Generation runs on a background thread inside the web
+# process, so there is no queue, broker, or worker service to run.
 # Quick start:
 #   cp example.env .env   # then set SECRET_KEY and OPENROUTER_API_KEY
 #   docker compose up --build
 # App is served at http://localhost:5000
 
 services:
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   web:
     build: .
     restart: unless-stopped
@@ -24,17 +14,9 @@ services:
     env_file:
       - path: .env
         required: false
-    # These override .env so container-to-container networking is always correct.
-    environment:
-      CELERY_ALWAYS_EAGER: "false"
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
     volumes:
-      # Shared SQLite DB + uploads, persisted across restarts.
+      # SQLite DB + uploads, persisted across restarts.
       - ankigpt-data:/app/instance
-    depends_on:
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/"]
       interval: 15s
@@ -42,23 +24,5 @@ services:
       retries: 5
       start_period: 20s
 
-  worker:
-    build: .
-    restart: unless-stopped
-    command: celery -A celery_app.celery worker --loglevel=info
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      CELERY_ALWAYS_EAGER: "false"
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-    volumes:
-      - ankigpt-data:/app/instance
-    depends_on:
-      redis:
-        condition: service_healthy
-
 volumes:
   ankigpt-data:
-  redis-data:

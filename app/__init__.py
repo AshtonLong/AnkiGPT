@@ -3,7 +3,7 @@ import os
 import sqlite3
 
 from flask import Flask
-from sqlalchemy import event
+from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 
 from .config import Config, DEV_SECRET_KEY
@@ -13,10 +13,17 @@ from .models import User
 
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, connection_record):
-    """Enforce ON DELETE CASCADE for SQLite, which ignores foreign keys by default."""
+    """SQLite tuning: enforce ON DELETE CASCADE (off by default), and use WAL with a busy
+    timeout so the generation thread and web requests can share the file."""
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=8000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.DatabaseError:
+            pass
         cursor.close()
 
 
@@ -27,6 +34,32 @@ def _under_instance(instance_path, path):
     if path.startswith("instance/"):
         path = path.replace("instance/", "", 1)
     return os.path.join(instance_path, path)
+
+
+def _ensure_columns(app):
+    """Add columns that exist on the models but not in an older database.
+
+    `create_all()` only creates missing *tables*. Rather than force a migration step
+    on every schema change in a single-user app, add missing columns in place
+    (nullable, so the statement is valid on SQLite and Postgres alike).
+    """
+    engine = db.engine
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    added = []
+    with engine.begin() as conn:
+        for table in db.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+            present = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in present:
+                    continue
+                col_type = column.type.compile(dialect=engine.dialect)
+                conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))
+                added.append(f"{table.name}.{column.name}")
+    if added:
+        app.logger.info("Added missing columns: %s", ", ".join(added))
 
 
 def create_app(config_object=Config):
@@ -63,15 +96,13 @@ def create_app(config_object=Config):
 
     from .routes.main import bp as main_bp
     from .routes.auth import bp as auth_bp
-    from .tasks import init_celery
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
 
-    init_celery(app)
-
     with app.app_context():
         db.create_all()
+        _ensure_columns(app)
 
     return app
 

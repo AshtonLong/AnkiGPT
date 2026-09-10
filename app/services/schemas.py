@@ -9,6 +9,7 @@ class CardSchema(BaseModel):
     cloze_text: Optional[str] = None
     extra: Optional[str] = ""
     tags: List[str] = []
+    source_quote: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -20,7 +21,7 @@ class CardSchema(BaseModel):
                 raise ValueError("cloze cards require cloze_text")
         return self
 
-    @field_validator("front", "back", "cloze_text", "extra")
+    @field_validator("front", "back", "cloze_text", "extra", "source_quote")
     @classmethod
     def strip_fields(cls, value):
         if value is None:
