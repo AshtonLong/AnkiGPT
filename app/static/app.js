@@ -1,6 +1,7 @@
 /* AnkiGPT — client behaviours
    Progressive enhancement only: every page works without this file; it adds motion,
-   toasts, HTMX wiring, and the small interactions (selection tray, counters, tilt).  */
+   toasts, HTMX wiring, the live run trace, and the small interactions (selection tray,
+   counters, tilt).  */
 (function () {
   'use strict';
 
@@ -32,6 +33,8 @@
     return (n / 1048576).toFixed(1) + ' MB';
   }
   function fmtInt(n) { return Math.round(n).toLocaleString(); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fmtMoney(n) { return (Math.round((n || 0) * 1000) / 1000).toFixed(3); }
 
   /* ---------------------------------------------------------------- top bar */
   var topbar = $('.topbar');
@@ -254,9 +257,6 @@
       var cb = $('input[name="card_ids"]', t);
       swapMemo[t.id] = { checked: !!(cb && cb.checked) };
     }
-    if (t.id === 'status-root') {
-      swapMemo.status = { p: parseFloat(t.getAttribute('data-pct')) || 0, done: parseInt(t.getAttribute('data-done'), 10) || 0, state: t.getAttribute('data-state') };
-    }
   });
   // afterSettle, not afterSwap: htmx re-applies server attributes (class, style) to
   // id-matched elements after the settle delay, which would wipe anything set earlier.
@@ -275,7 +275,6 @@
       }
       improveFailed = false;
     }
-    if (el.id === 'status-root') hydrateStatus(swapMemo.status);
   });
 
   /* --------------------------------------------------- editor: selection */
@@ -329,31 +328,165 @@
     }
   }
 
-  /* --------------------------------------------------------- status page */
-  function hydrateStatus(prev) {
+  /* --------------------------------------------------- status page: trace */
+  var PHASE_VERBS = {
+    map: ['Mapping the', 'document'], plan: ['Planning the', 'work order'], figures: ['Reading', 'figures'],
+    write: ['Writing', 'cards'], critique: ['Critiquing', 'every card'], reconcile: ['Resolving', 'duplicates'],
+    coverage: ['Auditing', 'coverage'], finish: ['Finishing', 'up'], planned: ['Plan ready for', 'review']
+  };
+  var LOADER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>';
+
+  function renderTrace(root, data) {
+    // Phase strip
+    var strip = $('[data-phase-strip]', root);
+    if (strip) {
+      data.phases.forEach(function (p) {
+        var el = strip.querySelector('[data-phase="' + p.key + '"]');
+        if (!el) return;
+        el.className = 'phase ' + p.status;
+        var small = el.querySelector('small');
+        if (p.total) {
+          if (!small) { small = doc.createElement('small'); el.appendChild(small); }
+          small.textContent = p.done + '/' + p.total;
+        } else if (small) { small.remove(); }
+      });
+    }
+    // Headline
+    var head = $('[data-headline]', root);
+    var running = data.tasks.filter(function (t) { return t.status === 'running'; }).length;
+    if (head) {
+      var verb = PHASE_VERBS[data.phase] || ['Starting the', 'agent'];
+      var extra = (running && (data.phase === 'write' || data.phase === 'coverage')) ? ' <small>' + running + ' workers in flight</small>' : '';
+      head.innerHTML = LOADER + ' ' + esc(verb[0]) + ' <span class="grad">' + esc(verb[1]) + '</span>' + extra;
+    }
+    // Live stats
+    var t = data.totals || {};
+    var set = function (sel, v) { var el = $(sel, root); if (el) el.textContent = v; };
+    set('[data-live-calls]', t.calls || 0);
+    set('[data-live-cost]', fmtMoney(t.cost));
+    set('[data-live-cached]', t.cached || 0);
+    set('[data-live-running]', running);
+    var ok = $('[data-cards-ok]', root);
+    if (ok) { var prevOk = parseInt(ok.textContent, 10) || 0; if (prevOk !== data.cards_ok) tween(ok, prevOk, data.cards_ok, 700); }
+    var note = $('[data-planner-note]', root);
+    if (note && data.summary) { note.hidden = false; $('[data-planner-summary]', note).textContent = data.summary; }
+
+    // Task tree: keyed rows grouped by phase; the running phase stays open.
+    var tbody = $('[data-trace-body]', root);
+    if (!tbody) return;
+    var byPhase = {};
+    data.tasks.forEach(function (task) { (byPhase[task.phase] = byPhase[task.phase] || []).push(task); });
+    data.phases.forEach(function (p) {
+      if (p.status === 'pending') return;
+      var group = tbody.querySelector('[data-phase-group="' + p.key + '"]');
+      if (!group) {
+        group = doc.createElement('details');
+        group.setAttribute('data-phase-group', p.key);
+        group.innerHTML = '<summary><i class="ph-dot"></i><b>' + esc(p.label) + '</b><span class="count"></span></summary><div class="trace-rows"></div>';
+        group.addEventListener('toggle', function () { group.setAttribute('data-user-toggled', '1'); });
+        tbody.appendChild(group);
+      }
+      group.className = 'trace-phase ' + p.status;
+      if (!group.hasAttribute('data-user-toggled')) {
+        group.open = p.status === 'running' || (byPhase[p.key] || []).length <= 3;
+        group.removeAttribute('data-user-toggled');
+      }
+      group.querySelector('.count').textContent = p.done + '/' + p.total;
+      var rows = group.querySelector('.trace-rows');
+      (byPhase[p.key] || []).forEach(function (task) {
+        var row = rows.querySelector('[data-task="' + task.id + '"]');
+        var meta = task.cards_made ? (task.cards_kept + '/' + task.cards_made + ' kept') : (task.status === 'running' ? 'working…' : (task.status === 'cached' ? 'from cache' : ''));
+        if (task.error) meta = task.error.slice(0, 110);
+        var sig = task.status + '|' + meta;
+        var html = '<i class="ph-dot"></i><span class="tr-label">' + esc(task.label) + '</span>'
+          + (task.strategy ? '<span class="chip">' + esc(task.strategy) + '</span>' : '')
+          + '<span class="tr-meta' + (task.error ? ' err' : '') + '">' + esc(meta) + '</span>';
+        if (!row) {
+          row = doc.createElement('div');
+          row.setAttribute('data-task', task.id);
+          row.innerHTML = html;
+          row.className = 'trace-row ' + task.status + ' new';
+          rows.appendChild(row);
+          setTimeout(function () { row.classList.remove('new'); }, 900);
+        } else if (row.getAttribute('data-sig') !== sig) {
+          row.innerHTML = html;
+          row.className = 'trace-row ' + task.status + ((task.status === 'done' || task.status === 'cached') ? ' flash' : '');
+          setTimeout(function () { row.classList.remove('flash'); }, 1200);
+        }
+        row.setAttribute('data-sig', sig);
+      });
+    });
+  }
+
+  function hydrateStatus() {
     var root = doc.getElementById('status-root');
     if (!root) return;
     var state = root.getAttribute('data-state');
     var ring = $('[data-progress]', root);
     var target = parseFloat(root.getAttribute('data-pct')) || 0;
-    var from = prev && typeof prev.p === 'number' ? prev.p : 0;
     if (ring) {
-      ring.style.setProperty('--p', from);
+      ring.style.setProperty('--p', 0);
       // A timer, not rAF: rAF is paused in background tabs, and the ring should still
       // land on the right value even if the page finishes loading while hidden.
       setTimeout(function () { ring.style.setProperty('--p', target); }, 40);
       var num = $('[data-progress-num]', root);
-      if (num) tween(num, from, target, 900);
+      if (num) tween(num, 0, target, 900);
     }
-    var prevDone = prev ? prev.done : 0, k = 0;
-    $$('.deal-row .mini', root).forEach(function (m, i) {
-      if (i >= prevDone) { m.style.setProperty('--k', k++); m.classList.add('new'); }
-    });
-    if (state === 'processing') doc.title = Math.round(target) + '% · Generating · AnkiGPT';
-    else if (state === 'ready') { doc.title = 'Deck ready · AnkiGPT'; if (prev && prev.state === 'processing') toast('Your deck is ready to review.', 'success'); }
-    else if (state === 'failed') { doc.title = 'Generation failed · AnkiGPT'; }
-    observeReveals(root);
+    if (state === 'ready') doc.title = 'Deck ready · AnkiGPT';
+    else if (state === 'failed') doc.title = 'Generation failed · AnkiGPT';
+    if (state !== 'processing') return;
+
+    var url = root.getAttribute('data-progress-url');
+    var lastPct = target, failures = 0;
+    function poll() {
+      fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      }).then(function (data) {
+        failures = 0;
+        if (data.status === 'ready' || data.status === 'failed' || data.status === 'planned') {
+          var msg = data.status === 'ready' ? 'Your deck is ready to review.' : (data.status === 'planned' ? 'The plan is ready for review.' : 'Generation failed.');
+          toast(msg, data.status === 'failed' ? 'error' : 'success');
+          setTimeout(function () { window.location.reload(); }, 500);
+          return;
+        }
+        if (ring) {
+          ring.style.setProperty('--p', data.pct);
+          var num = $('[data-progress-num]', root);
+          if (num) tween(num, lastPct, data.pct, 700);
+          lastPct = data.pct;
+        }
+        doc.title = Math.round(data.pct) + '% · Generating · AnkiGPT';
+        renderTrace(root, data);
+        setTimeout(poll, 1500);
+      }).catch(function () {
+        failures++;
+        setTimeout(poll, Math.min(8000, 1500 * failures));
+      });
+    }
+    setTimeout(poll, 500);
   }
+
+  /* ------------------------------------------------------------ plan page */
+  (function () {
+    var tasks = $$('[data-plan-task]');
+    if (!tasks.length) return;
+    var totalEl = $('[data-plan-total]'), countEl = $('[data-plan-count]');
+    function recount() {
+      var total = 0, count = 0;
+      tasks.forEach(function (t) {
+        var skip = $('[data-skip]', t), target = $('[data-target]', t);
+        var off = skip && skip.checked;
+        t.classList.toggle('is-skipped', !!off);
+        if (!off) { total += parseInt(target.value, 10) || 0; count++; }
+      });
+      if (totalEl) totalEl.textContent = total;
+      if (countEl) countEl.textContent = count;
+    }
+    body.addEventListener('change', function (e) { if (e.target.closest('[data-plan-task]')) recount(); });
+    body.addEventListener('input', function (e) { if (e.target.hasAttribute('data-target')) recount(); });
+    recount();
+  })();
 
   /* ---------------------------------------------------------- new deck page */
   (function () {
@@ -409,13 +542,18 @@
     var range = $('input[type="range"][data-range]');
     if (!range) return;
     var out = doc.getElementById(range.getAttribute('data-range'));
+    var hidden = doc.getElementById('target_cards_value');
     var est = $('[data-estimate]');
-    var chars = parseInt((range.closest('form') || {}).getAttribute && range.closest('form').getAttribute('data-source-chars'), 10) || 0;
+    var form = range.closest('form');
+    var chars = parseInt(form ? form.getAttribute('data-source-chars') : 0, 10) || 0;
+    var autoLabel = range.getAttribute('data-auto-label') || 'Auto';
+    // Mirrors planner.heuristic_target for an average-density document (~3 cards / 1k chars).
+    if (est && chars) est.textContent = fmtInt(Math.max(5, Math.round(chars / 1000 * 3)));
     function update() {
       var v = parseInt(range.value, 10), min = parseInt(range.min, 10), max = parseInt(range.max, 10);
       range.style.setProperty('--fill', ((v - min) / (max - min) * 100) + '%');
-      if (out) out.textContent = fmtInt(v);
-      if (est && chars) est.textContent = Math.max(1, Math.ceil(chars / v));
+      if (out) out.textContent = v === 0 ? autoLabel : fmtInt(v);
+      if (hidden) hidden.value = v === 0 ? 'auto' : String(v);
     }
     range.addEventListener('input', update); update();
   })();
@@ -425,5 +563,5 @@
   initCounters();
   initAutogrow();
   syncSelection();
-  hydrateStatus(null);
+  hydrateStatus();
 })();

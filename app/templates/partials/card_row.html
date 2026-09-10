@@ -1,6 +1,8 @@
 {# One editable card. Swapped in place by HTMX after Save / AI improve (outerHTML on #card-<id>). #}
 {% from "partials/ui.html" import icon %}
-<div class="card-row" id="card-{{ card.id }}">
+{% set critic = card.critic_json or {} %}
+{% set rs = card.review_stats_json or {} %}
+<div class="card-row {{ 'has-figure' if card.figure_id else '' }}" id="card-{{ card.id }}">
   <div class="sel">
     <input type="checkbox" class="check" name="card_ids" value="{{ card.id }}" form="bulk-actions-form"
       aria-label="Select card {{ card.id }}">
@@ -8,6 +10,11 @@
 
   <form class="card-form" hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
     hx-swap="outerHTML" hx-indicator="#card-{{ card.id }}" hx-disabled-elt="find button[type='submit']">
+    {% if card.figure_id %}
+    <a class="card-figure" href="{{ url_for('main.figure_image', figure_id=card.figure_id) }}" target="_blank" rel="noopener">
+      <img src="{{ url_for('main.figure_image', figure_id=card.figure_id) }}" alt="Figure used by this card" loading="lazy">
+    </a>
+    {% endif %}
     <div class="card-fields">
       {% if card.type == "basic" %}
       <div class="cf">
@@ -38,6 +45,14 @@
           placeholder="Comma-separated tags">
       </div>
     </div>
+    {% if card.source_quote or critic.reason or critic.coach or rs %}
+    <div class="card-notes">
+      {% if card.source_quote %}<span class="cn quote" title="Verbatim span the card was written from">{{ icon('file-text', 12) }} “{{ card.source_quote }}”</span>{% endif %}
+      {% if critic.reason %}<span class="cn critic {{ critic.verdict }}" title="Critic verdict">{{ icon('shield-check', 12) }} {{ critic.verdict }}: {{ critic.reason }}</span>{% endif %}
+      {% if critic.coach %}<span class="cn coach" title="Coach diagnosis">{{ icon('brain', 12) }} {{ critic.coach.action }}: {{ critic.coach.diagnosis }}</span>{% endif %}
+      {% if rs %}<span class="cn stats {{ 'bad' if rs.struggling else '' }}" title="Imported Anki review history">{{ icon('activity', 12) }} {{ rs.reps }} reps · {{ rs.lapses }} lapses · {{ (rs.again_rate * 100)|round|int }}% again</span>{% endif %}
+    </div>
+    {% endif %}
     <div class="card-actions">
       <button class="btn sm" type="submit">{{ icon('save', 14) }} Save</button>
       <button class="btn sm cool" type="button" data-improve hx-post="{{ url_for('main.improve', card_id=card.id) }}"
@@ -53,11 +68,14 @@
 
   <div class="card-side">
     <span class="pill {{ 'ok' if card.type == 'basic' else 'info' }}">{{ card.type }}</span>
+    {% if card.strategy %}<span class="pill violet">{{ card.strategy|replace('_', ' ') }}</span>{% endif %}
+    {% if card.difficulty %}<span class="pill diff-{{ card.difficulty }}" title="Critic difficulty estimate">{{ 'easy' if card.difficulty == 1 else ('core' if card.difficulty == 2 else 'hard') }}</span>{% endif %}
     {% if card.status == "needs_review" %}
     <span class="pill warn"><span class="dot"></span> Needs review</span>
     {% elif card.status == "deleted" %}
     <span class="pill danger"><span class="dot"></span> Deleted</span>
     {% endif %}
+    {% if rs.struggling %}<span class="pill danger">{{ icon('flag', 11) }} struggling</span>{% endif %}
     {% if card.tags %}
     <div class="tags">
       {% for tag in card.tags[:4] %}<span class="chip">{{ tag }}</span>{% endfor %}

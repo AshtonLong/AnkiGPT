@@ -2,31 +2,105 @@
 {% from "partials/ui.html" import icon %}
 {% block title %}{{ deck.title }} · Editor · AnkiGPT{% endblock %}
 {% block content %}
-{% set filtered = q or card_type or status %}
+{% set filtered = q or card_type or status or strategy %}
 {% set total = deck.cards|length %}
+{% set run = insights.run or {} %}
+{% set stats = run.get('stats') or {} %}
+{% set totals = run.get('totals') or {} %}
 
 <div class="page-head editor-head" data-reveal>
   <div>
     <span class="eyebrow">Deck editor</span>
     <h1>{{ deck.title }}</h1>
     <div class="meta">
-      <span class="pill {{ 'info' if deck.card_style == 'cloze' else 'ok' }}">{{ deck.card_style }}</span>
+      <span class="pill {{ 'info' if deck.card_style == 'cloze' else ('violet' if deck.card_style == 'mixed' else 'ok') }}">{{ deck.card_style }}</span>
       {% if deck.status == 'ready' %}<span class="pill ok"><span class="dot"></span> Ready</span>
       {% elif deck.status == 'processing' %}<span class="pill violet live"><span class="dot"></span> Generating</span>
+      {% elif deck.status == 'planned' %}<span class="pill warn"><span class="dot"></span> Plan awaiting review</span>
       {% elif deck.status == 'failed' %}<span class="pill danger"><span class="dot"></span> Failed</span>
       {% else %}<span class="pill">{{ deck.status }}</span>{% endif %}
       <span class="pill">{{ cards|length }} shown · {{ total }} total</span>
+      {% if struggling %}<a class="pill danger" href="{{ url_for('main.deck_editor', deck_id=deck.id, strategy='struggling') }}">{{ icon('flag', 12) }} {{ struggling }} struggling</a>{% endif %}
       {% if filtered %}<span class="pill warn">Filtered</span>{% endif %}
     </div>
   </div>
   <div class="actions">
     <a class="btn ghost" href="{{ url_for('main.decks') }}">{{ icon('arrow-left', 15) }} Decks</a>
+    {% if deck.status == 'planned' %}
+    <a class="btn cool" href="{{ url_for('main.plan_deck', deck_id=deck.id) }}">{{ icon('brain', 15) }} Review plan</a>
+    {% endif %}
+    <a class="btn" href="{{ url_for('main.status', deck_id=deck.id) }}">{{ icon('git', 15) }} Run trace</a>
     <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn primary" type="submit">{{ icon('download') }} Export .apkg</button>
     </form>
   </div>
 </div>
+
+{% if stats or units %}
+<details class="panel insights" data-reveal style="--d:40">
+  <summary>
+    <span class="panel-title">{{ icon('gauge') }} Run insights</span>
+    <span class="ins-summary">
+      {% if stats %}<span>{{ stats.cards_ok }} kept</span><span>{{ stats.cards_deleted or 0 }} dropped</span>{% endif %}
+      {% if totals.cost is defined %}<span>${{ '%.3f'|format(totals.cost or 0) }}</span>{% endif %}
+      {% if totals.cached %}<span>{{ totals.cached }} cached</span>{% endif %}
+      <span class="hint">{{ run.get('model') or config.OPENROUTER_MODEL }}</span>
+    </span>
+  </summary>
+  <div class="ins-body">
+    <div class="ins-grid">
+      <div class="ins-col">
+        <h4>{{ icon('coins', 14) }} Cost by phase</h4>
+        <table class="ins-table">
+          {% for key, label in phases %}
+          {% set row = insights.by_phase.get(key) %}
+          {% if row %}
+          <tr><td>{{ label }}</td><td>{{ row.calls }} calls{% if row.cached %} · {{ row.cached }} cached{% endif %}</td><td class="num">{{ '{:,}'.format(row.input) }} in</td><td class="num">{{ '{:,}'.format(row.output) }} out</td><td class="num">${{ '%.4f'|format(row.cost) }}</td></tr>
+          {% endif %}
+          {% endfor %}
+          {% set coach = insights.by_phase.get('coach') %}
+          {% if coach %}<tr><td>Coach</td><td>{{ coach.calls }} calls</td><td class="num">{{ '{:,}'.format(coach.input) }} in</td><td class="num">{{ '{:,}'.format(coach.output) }} out</td><td class="num">${{ '%.4f'|format(coach.cost) }}</td></tr>{% endif %}
+        </table>
+        {% if stats.by_strategy %}
+        <h4 style="margin-top:1.2rem">{{ icon('layers', 14) }} Cards by strategy</h4>
+        <div class="strategy-bar">
+          {% for key, n in stats.by_strategy.items()|sort(attribute=1, reverse=True) %}
+          <a class="sb" style="--w:{{ n }}" href="{{ url_for('main.deck_editor', deck_id=deck.id, strategy=key) }}"><i></i>{{ key }} · {{ n }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="ins-col">
+        <h4>{{ icon('map', 14) }} Document map</h4>
+        <ol class="unit-list compact">
+          {% for u in units %}
+          <li class="unit {{ 'skipped' if u.skipped else '' }}">
+            <span class="u-idx">{{ u.idx }}</span>
+            <div><b>{{ u.title }}</b><small>{{ u.kind }} · density {{ u.density }}{% if u.skipped %} · skipped: {{ u.skip_reason }}{% endif %}</small></div>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+      <div class="ins-col">
+        <h4>{{ icon('activity', 14) }} Close the loop with Anki</h4>
+        <p class="hint" style="margin-bottom:.8rem">Study the exported deck, then export it back from Anki (<i>File → Export → include scheduling</i>) and drop it here. Cards you keep failing get flagged, and the coach rewrites them.</p>
+        <form action="{{ url_for('main.import_reviews', deck_id=deck.id) }}" method="post" enctype="multipart/form-data" class="review-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="file" name="anki_package" accept=".apkg,.colpkg" required aria-label="Anki package">
+          <button class="btn sm" type="submit">{{ icon('upload', 14) }} Import reviews</button>
+        </form>
+        {% if struggling %}
+        <form action="{{ url_for('main.coach', deck_id=deck.id) }}" method="post" style="margin-top:.6rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn sm cool" type="submit">{{ icon('sparkles', 14) }} Coach {{ struggling }} struggling cards</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</details>
+{% endif %}
 
 <form method="get" class="panel toolbar" data-reveal style="--d:70" role="search">
   <div class="with-icon search">
@@ -44,6 +118,15 @@
     <input type="radio" name="status" value="needs_review" id="s-rev" {% if status == 'needs_review' %}checked{% endif %} data-autosubmit><label for="s-rev">Needs review</label>
     <input type="radio" name="status" value="deleted" id="s-del" {% if status == 'deleted' %}checked{% endif %} data-autosubmit><label for="s-del">Deleted</label>
   </div>
+  {% if strategies_used or struggling %}
+  <div class="select-wrap sm">
+    <select name="strategy" aria-label="Strategy" data-autosubmit>
+      <option value="">All strategies</option>
+      {% for s in strategies_used %}<option value="{{ s }}" {% if strategy == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      {% if struggling %}<option value="struggling" {% if strategy == 'struggling' %}selected{% endif %}>Struggling ({{ struggling }})</option>{% endif %}
+    </select>
+  </div>
+  {% endif %}
   {% if filtered %}
   <a class="btn sm ghost" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('x', 14) }} Clear</a>
   {% endif %}
@@ -65,7 +148,9 @@
   <button class="btn sm" type="submit" name="action" value="tag" data-needs-tag>{{ icon('tag', 14) }} Add tag</button>
   <span class="sep" aria-hidden="true"></span>
   <button class="btn sm cool" type="submit" name="action" value="regenerate"
-    title="Regenerate cards from the source section behind each selected card">{{ icon('sparkles', 14) }} Regenerate</button>
+    title="Rewrite the cards of the unit behind each selected card (worker + critic)">{{ icon('sparkles', 14) }} Regenerate unit</button>
+  <button class="btn sm cool" type="submit" name="action" value="coach"
+    title="Diagnose why these cards are hard and rewrite or split them">{{ icon('brain', 14) }} Coach</button>
   <button class="btn sm ghost icon" type="button" data-clear-sel aria-label="Clear selection">{{ icon('x', 14) }}</button>
 </form>
 
@@ -80,11 +165,13 @@
   <div class="empty">
     <div class="empty-deck" aria-hidden="true"><i></i><i></i><i></i></div>
     <h3>No cards {% if filtered %}match{% else %}yet{% endif %}</h3>
-    <p>{% if filtered %}Try a different search or clear the filters.{% elif deck.status == 'processing' %}This deck is still generating — check its progress.{% else %}This deck doesn't have any cards yet.{% endif %}</p>
+    <p>{% if filtered %}Try a different search or clear the filters.{% elif deck.status == 'processing' %}This deck is still generating — check its progress.{% elif deck.status == 'planned' %}The plan is waiting for your review.{% else %}This deck doesn't have any cards yet.{% endif %}</p>
     {% if filtered %}
     <a class="btn" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('x', 14) }} Clear filters</a>
     {% elif deck.status == 'processing' %}
     <a class="btn primary" href="{{ url_for('main.status', deck_id=deck.id) }}">View progress {{ icon('arrow-right', 14) }}</a>
+    {% elif deck.status == 'planned' %}
+    <a class="btn primary" href="{{ url_for('main.plan_deck', deck_id=deck.id) }}">Review plan {{ icon('arrow-right', 14) }}</a>
     {% endif %}
   </div>
 </section>

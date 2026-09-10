@@ -27,6 +27,6 @@ USER appuser
 
 EXPOSE 8000
 
-# Production WSGI server. The long timeout covers slow synchronous generation
-# when async (Celery) mode is disabled.
+# Production WSGI server. Deck generation runs on a background thread inside a
+# worker; the timeout only has to cover in-request work such as PDF extraction.
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "180", "wsgi:app"]

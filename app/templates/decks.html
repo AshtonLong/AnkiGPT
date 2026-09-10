@@ -38,16 +38,20 @@
     {% set href = url_for('main.deck_editor', deck_id=deck.id) %}
   {% elif deck.status == 'draft' %}
     {% set href = url_for('main.preview_deck', deck_id=deck.id) %}
+  {% elif deck.status == 'planned' %}
+    {% set href = url_for('main.plan_deck', deck_id=deck.id) %}
   {% else %}
     {% set href = url_for('main.status', deck_id=deck.id) %}
   {% endif %}
   <article class="deck" data-reveal>
     <div class="deck-top">
-      <span class="pill {{ 'info' if deck.card_style == 'cloze' else 'ok' }}">{{ deck.card_style }}</span>
+      <span class="pill {{ 'info' if deck.card_style == 'cloze' else ('violet' if deck.card_style == 'mixed' else 'ok') }}">{{ deck.card_style }}</span>
       {% if deck.status == 'ready' %}
       <span class="pill ok"><span class="dot"></span> Ready</span>
       {% elif deck.status == 'processing' %}
       <span class="pill violet live"><span class="dot"></span> Generating</span>
+      {% elif deck.status == 'planned' %}
+      <span class="pill warn"><span class="dot"></span> Plan ready</span>
       {% elif deck.status == 'failed' %}
       <span class="pill danger"><span class="dot"></span> Failed</span>
       {% else %}
@@ -63,7 +67,7 @@
     </div>
     <div class="deck-foot">
       <span class="open">
-        {% if deck.status == 'ready' %}Open editor{% elif deck.status == 'draft' %}Configure{% elif deck.status == 'processing' %}View progress{% else %}View details{% endif %}
+        {% if deck.status == 'ready' %}Open editor{% elif deck.status == 'draft' %}Configure{% elif deck.status == 'processing' %}View progress{% elif deck.status == 'planned' %}Review plan{% else %}View details{% endif %}
         {{ icon('arrow-right', 15) }}
       </span>
       <form action="{{ url_for('main.delete_deck', deck_id=deck.id) }}" method="post"

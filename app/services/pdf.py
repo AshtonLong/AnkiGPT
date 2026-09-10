@@ -1,5 +1,13 @@
+"""PDF text extraction that keeps page boundaries.
+
+Returns Markdown (via pymupdf4llm when available, cleaned plain text otherwise) plus a
+list of [page_number, char_offset] pairs so the document map can tell which pages a
+unit spans and figures can be attached to the unit they sit in.
+"""
+
 import inspect
 import re
+
 from pypdf import PdfReader
 
 from .chunking import clean_text
@@ -7,11 +15,11 @@ from .chunking import clean_text
 
 LIGATURE_MAP = str.maketrans(
     {
-        "\ufb00": "ff",
-        "\ufb01": "fi",
-        "\ufb02": "fl",
-        "\ufb03": "ffi",
-        "\ufb04": "ffl",
+        "ﬀ": "ff",
+        "ﬁ": "fi",
+        "ﬂ": "fl",
+        "ﬃ": "ffi",
+        "ﬄ": "ffl",
     }
 )
 
@@ -94,7 +102,7 @@ def _format_plain_text_as_markdown(text):
     return "\n".join(md_lines).strip()
 
 
-def _result_to_markdown(raw):
+def _chunk_text(raw):
     if isinstance(raw, str):
         return raw
     if isinstance(raw, dict):
@@ -102,76 +110,70 @@ def _result_to_markdown(raw):
             value = raw.get(key)
             if isinstance(value, str):
                 return value
-        return ""
-    if isinstance(raw, list):
-        lines = []
-        for item in raw:
-            if isinstance(item, str):
-                lines.append(item)
-            elif isinstance(item, dict):
-                for key in ("text", "markdown", "md"):
-                    value = item.get(key)
-                    if isinstance(value, str) and value.strip():
-                        lines.append(value)
-                        break
-        return "\n\n".join(lines)
     return ""
 
 
-def _extract_markdown_with_pymupdf4llm(file_path, start, end, total_pages):
+def _pages_with_pymupdf4llm(file_path, start, end):
+    """Per-page Markdown strings for pages [start, end), or None if unavailable."""
     try:
-        # Optional: enables the advanced page layout analysis used by pymupdf4llm.
-        import pymupdf.layout  # noqa: F401
+        import pymupdf.layout  # noqa: F401  (optional layout analysis)
     except Exception:
         pass
-
     try:
         import pymupdf4llm
-    except ImportError:
-        return ""
-    try:
         import pymupdf
     except ImportError:
-        pymupdf = None
-
+        return None
     to_markdown = getattr(pymupdf4llm, "to_markdown", None)
     if to_markdown is None:
-        return ""
-
-    page_indexes = list(range(start, end))
-    if not page_indexes:
-        return ""
-
+        return None
     try:
         params = set(inspect.signature(to_markdown).parameters)
     except (TypeError, ValueError):
         params = set()
-
-    def run_to_markdown(**kwargs):
-        if pymupdf is None:
-            return to_markdown(file_path, **kwargs)
-        with pymupdf.open(file_path) as doc:
-            return to_markdown(doc, **kwargs)
-
+    page_indexes = list(range(start, end))
+    if not page_indexes:
+        return []
     try:
-        if "pages" in params:
-            return _normalize_pdf_text(_result_to_markdown(run_to_markdown(pages=page_indexes)))
-
-        if "page_chunks" in params:
-            raw = run_to_markdown(page_chunks=True)
-            if isinstance(raw, list):
-                selected = raw[start:end]
-                return _normalize_pdf_text(_result_to_markdown(selected))
-
-        if start == 0 and end == total_pages:
-            return _normalize_pdf_text(_result_to_markdown(run_to_markdown()))
+        with pymupdf.open(file_path) as doc:
+            kwargs = {}
+            if "page_chunks" in params:
+                kwargs["page_chunks"] = True
+            if "pages" in params:
+                kwargs["pages"] = page_indexes
+            raw = to_markdown(doc, **kwargs)
     except Exception:
-        return ""
+        return None
+    if isinstance(raw, list):
+        pages = [_chunk_text(item) for item in raw]
+        if "pages" not in params:
+            pages = pages[start:end]
+        return [_normalize_pdf_text(p) for p in pages]
+    if isinstance(raw, str):
+        # No page chunking available: one blob, page offsets unknown beyond the first.
+        return [_normalize_pdf_text(raw)]
+    return None
 
-    return ""
+
+def _join_pages(pages, first_page_number):
+    """Join per-page texts, recording [page_number, char_offset] for each page."""
+    parts = []
+    offsets = []
+    pos = 0
+    for i, page_text in enumerate(pages):
+        page_text = (page_text or "").strip()
+        if not page_text:
+            continue
+        if parts:
+            pos += 2  # the "\n\n" separator
+        offsets.append([first_page_number + i, pos])
+        parts.append(page_text)
+        pos += len(page_text)
+    return "\n\n".join(parts), offsets
 
 
 def extract_pdf_text(file_path, page_start=None, page_end=None):
+    """Returns (markdown_text, total_pages, page_offsets)."""
     with open(file_path, "rb") as fh:
         reader = PdfReader(fh)
         pages = reader.pages
@@ -179,14 +181,17 @@ def extract_pdf_text(file_path, page_start=None, page_end=None):
         start = max(0, (page_start or 1) - 1)
         end = min(total, page_end or total)
 
-        markdown = _extract_markdown_with_pymupdf4llm(file_path, start, end, total)
-        if markdown:
-            return markdown, total
+        md_pages = _pages_with_pymupdf4llm(file_path, start, end)
+        if md_pages:
+            text, offsets = _join_pages(md_pages, start + 1)
+            if text.strip():
+                # clean_text may trim leading whitespace; offsets stay valid because
+                # each page string was already stripped before joining.
+                return clean_text(text), total, offsets
 
-        chunks = []
+        plain_pages = []
         for page in pages[start:end]:
-            text = page.extract_text() or ""
-            chunks.append(text)
+            plain_pages.append(_format_plain_text_as_markdown(page.extract_text() or ""))
 
-    fallback_text = "\n\n".join(chunks)
-    return _format_plain_text_as_markdown(fallback_text), total
+    text, offsets = _join_pages(plain_pages, start + 1)
+    return clean_text(text), total, offsets

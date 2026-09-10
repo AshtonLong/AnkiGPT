@@ -1,64 +1,82 @@
-{# Polled fragment. While processing it re-fetches itself every 3s and swaps in place; app.js
-   carries the progress ring / counters across swaps so they animate instead of jumping.
-   Polling stops once the status is terminal (hx-trigger is omitted from ready/failed markup). #}
+{# Live generation trace. Server-renders the current state; app.js polls progress.json every
+   1.5s while processing and re-renders the phase strip + task tree in place (keyed by task id,
+   so rows animate in instead of jumping). It reloads the page once the run reaches a terminal
+   state so the ready/failed markup below takes over. #}
 {% from "partials/ui.html" import icon, stepper %}
-{% set settings = deck.settings_json or {} %}
 {% set state = 'ready' if deck.status == 'ready' else ('failed' if deck.status == 'failed' else 'processing') %}
-{% set stage = settings.get('generation_stage') or 'cheat_sheet' %}
-{% set pct = (0 if total_sources == 0 else (done_sources / total_sources * 100))|round|int %}
-{% set shown = [done_sources, 12]|min %}
-<section class="status" id="status-root" data-state="{{ state }}" data-done="{{ done_sources }}" data-pct="{{ pct }}"
-  {% if state == 'processing' %}
-  hx-get="{{ url_for('main.status', deck_id=deck.id, partial=1) }}" hx-trigger="every 3s" hx-swap="outerHTML"
-  {% endif %}>
+{% set stats = payload.stats or {} %}
+{% set totals = payload.totals or {} %}
+<section class="status wide" id="status-root" data-state="{{ state }}" data-pct="{{ payload.pct }}"
+  data-progress-url="{{ url_for('main.progress_json', deck_id=deck.id) }}"
+  data-editor-url="{{ url_for('main.deck_editor', deck_id=deck.id) }}">
   {{ stepper(3, done=(state == 'ready')) }}
 
   <div class="panel status-card" role="status" aria-live="polite">
     {% if state == 'processing' %}
-    <div class="stages" aria-label="Pipeline stages">
-      <span class="stage done">{{ icon('check', 14) }} Source</span>
-      <span class="stage-arrow" aria-hidden="true"></span>
-      <span class="stage {{ 'active' if stage == 'cheat_sheet' else 'done' }}">
-        {{ icon('loader' if stage == 'cheat_sheet' else 'check', 14) }} Cheat sheet
+    <div class="phase-strip" data-phase-strip aria-label="Pipeline phases">
+      {% for p in payload.phases %}
+      <span class="phase {{ p.status }}" data-phase="{{ p.key }}">
+        <i class="ph-dot"></i>{{ p.label }}
+        {% if p.total %}<small>{{ p.done }}/{{ p.total }}</small>{% endif %}
       </span>
-      <span class="stage-arrow" aria-hidden="true"></span>
-      <span class="stage {{ 'active' if stage == 'cards' else '' }}">
-        {{ icon('loader' if stage == 'cards' else 'cards', 14) }} Cards
-      </span>
+      {% endfor %}
     </div>
 
-    <div class="ring-wrap" data-progress="{{ pct }}">
-      <svg class="ring" viewBox="0 0 160 160" aria-hidden="true">
-        <defs>
-          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ff5c5c" />
-            <stop offset=".55" stop-color="#ff8a3d" />
-            <stop offset="1" stop-color="#ffc541" />
-          </linearGradient>
-        </defs>
-        <circle class="track" cx="80" cy="80" r="72" />
-        <circle class="fill" cx="80" cy="80" r="72" />
-      </svg>
-      <div class="ring-label">
-        <b><span data-progress-num>{{ pct }}</span><small>%</small></b>
-        <span>{{ done_sources }} / {{ total_sources }}</span>
+    <div class="status-hero">
+      <div class="ring-wrap" data-progress="{{ payload.pct }}">
+        <svg class="ring" viewBox="0 0 160 160" aria-hidden="true">
+          <defs>
+            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ff5c5c" />
+              <stop offset=".55" stop-color="#ff8a3d" />
+              <stop offset="1" stop-color="#ffc541" />
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="80" cy="80" r="72" />
+          <circle class="fill" cx="80" cy="80" r="72" />
+        </svg>
+        <div class="ring-label">
+          <b><span data-progress-num>{{ payload.pct }}</span><small>%</small></b>
+          <span><span data-cards-ok>{{ payload.cards_ok }}</span> cards</span>
+        </div>
+      </div>
+      <div class="status-copy">
+        <h2 data-headline>{{ icon('loader', 18) }} Starting the <span class="grad">agent</span></h2>
+        <p class="sub">{{ deck.title }}</p>
+        <div class="live-stats">
+          <span>{{ icon('cpu', 14) }} <b data-live-calls>{{ totals.calls or 0 }}</b> calls</span>
+          <span>{{ icon('activity', 14) }} <b data-live-running>0</b> in flight</span>
+          <span>{{ icon('coins', 14) }} $<b data-live-cost>{{ '%.3f'|format(totals.cost or 0) }}</b></span>
+          <span>{{ icon('refresh', 14) }} <b data-live-cached>{{ totals.cached or 0 }}</b> cached</span>
+        </div>
+        <div class="planner-note" data-planner-note {% if not payload.summary %}hidden{% endif %}>
+          {{ icon('brain', 15) }}<span data-planner-summary>{{ payload.summary or '' }}</span>
+        </div>
       </div>
     </div>
 
-    <h2>{% if stage == 'cheat_sheet' %}Distilling the <span class="grad">cheat sheet</span>{% else %}Dealing out <span class="grad">cards</span>{% endif %}</h2>
-    <p class="sub">{{ deck.title }}</p>
-
-    <div class="deal-row" aria-hidden="true" style="--mid: {{ ((shown - 1) / 2) if shown > 0 else 0 }}">
-      {% for i in range(shown) %}<i class="mini" style="--i:{{ i }}"></i>{% endfor %}
-      {% if done_sources > shown %}<span class="more">+{{ done_sources - shown }}</span>{% endif %}
-    </div>
-
-    <div class="status-msg">
-      {{ icon('info', 16) }}
-      <span>{{ progress_label|capitalize }}.
-        {% if stage == 'cheat_sheet' %}The model is first condensing your source into an exam-focused cheat sheet.
-        {% else %}Cards are being written and validated from each cheat sheet section.{% endif %}
-        You can leave this page — the deck keeps building.</span>
+    <div class="trace" data-trace>
+      <div class="trace-head">
+        <span class="panel-title">{{ icon('git') }} Run trace</span>
+        <span class="hint">Every decision and worker, live. You can leave this page — the deck keeps building.</span>
+      </div>
+      <div class="trace-body" data-trace-body>
+        {% for p in payload.phases if p.status != 'pending' %}
+        <details class="trace-phase {{ p.status }}" {% if p.status == 'running' %}open{% endif %} data-phase-group="{{ p.key }}">
+          <summary><i class="ph-dot"></i><b>{{ p.label }}</b><span class="count">{{ p.done }}/{{ p.total }}</span></summary>
+          <div class="trace-rows">
+            {% for t in payload.tasks if t.phase == p.key %}
+            <div class="trace-row {{ t.status }}" data-task="{{ t.id }}">
+              <i class="ph-dot"></i>
+              <span class="tr-label">{{ t.label }}</span>
+              {% if t.strategy %}<span class="chip">{{ t.strategy }}</span>{% endif %}
+              <span class="tr-meta">{% if t.cards_made %}{{ t.cards_kept }}/{{ t.cards_made }} kept{% endif %}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
     </div>
 
     <div class="status-actions">
@@ -78,12 +96,28 @@
       </svg>
     </div>
     <h2>Your deck is <span class="grad">ready</span></h2>
-    <p class="sub">{{ deck.title }} · {{ deck.cards|rejectattr('status', 'equalto', 'deleted')|list|length }} cards</p>
+    <p class="sub">{{ deck.title }} · {{ stats.cards_ok or payload.cards_ok }} cards</p>
     <div class="fan" aria-hidden="true">{% for i in range(5) %}<i style="--i:{{ i }}"></i>{% endfor %}</div>
-    <div class="status-msg">
-      {{ icon('check', 16) }}
-      <span>Every card passed validation. Open the editor to polish, tag and export as .apkg.</span>
+
+    <div class="ready-stats" data-stagger="60">
+      <div class="rs" data-reveal><b data-count="{{ stats.cards_ok or payload.cards_ok }}">0</b><span>cards kept</span></div>
+      <div class="rs" data-reveal><b data-count="{{ stats.cards_deleted or 0 }}">0</b><span>dropped by review</span></div>
+      <div class="rs" data-reveal><b data-count="{{ stats.units or 0 }}">0</b><span>units mapped</span></div>
+      <div class="rs" data-reveal><b>${{ '%.3f'|format(totals.cost or 0) }}</b><span>spent{% if totals.cached %} · {{ totals.cached }} cached{% endif %}</span></div>
     </div>
+
+    {% if payload.summary %}
+    <div class="planner-note center">{{ icon('brain', 15) }}<span>{{ payload.summary }}</span></div>
+    {% endif %}
+
+    {% if stats.by_strategy %}
+    <div class="strategy-bar" aria-label="Cards by strategy">
+      {% for key, n in stats.by_strategy.items()|sort(attribute=1, reverse=True) %}
+      <span class="sb" style="--w:{{ n }}"><i></i>{{ key }} · {{ n }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="status-actions">
       <a class="btn primary lg" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('edit') }} Open editor</a>
       <a class="btn lg ghost" href="{{ url_for('main.decks') }}">All decks</a>
@@ -97,16 +131,29 @@
       {{ icon('alert', 16) }}
       <span>{{ failure_message }}</span>
     </div>
+    {% if payload.tasks %}
+    <details class="trace-phase failed compact">
+      <summary><i class="ph-dot"></i><b>What ran before it failed</b><span class="count">{{ payload.tasks|length }} tasks</span></summary>
+      <div class="trace-rows">
+        {% for t in payload.tasks %}
+        <div class="trace-row {{ t.status }}"><i class="ph-dot"></i><span class="tr-label">{{ t.label }}</span>{% if t.error %}<span class="tr-meta err">{{ t.error[:120] }}</span>{% endif %}</div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
     <div class="status-actions">
       <form action="{{ url_for('main.preview_deck', deck_id=deck.id) }}" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="focus" value="{{ settings.get('focus', '') }}">
-        <input type="hidden" name="exclude" value="{{ settings.get('exclude', '') }}">
-        <input type="hidden" name="glossary" value="{{ settings.get('glossary', '') }}">
-        <input type="hidden" name="max_chars" value="{{ settings.get('max_chars', 3500) }}">
+        {% set s = deck.settings_json or {} %}
+        <input type="hidden" name="focus" value="{{ s.get('focus', '') }}">
+        <input type="hidden" name="exclude" value="{{ s.get('exclude', '') }}">
+        <input type="hidden" name="glossary" value="{{ s.get('glossary', '') }}">
+        <input type="hidden" name="exam_context" value="{{ s.get('exam_context', '') }}">
+        <input type="hidden" name="target_cards" value="{{ s.get('target_cards') or 'auto' }}">
+        {% if s.get('use_figures', True) %}<input type="hidden" name="use_figures" value="on">{% endif %}
         <button class="btn primary" type="submit">{{ icon('refresh') }} Retry generation</button>
       </form>
-      <a class="btn" href="{{ url_for('main.preview_deck', deck_id=deck.id) }}">{{ icon('settings') }} Edit settings</a>
+      <a class="btn" href="{{ url_for('main.preview_deck', deck_id=deck.id) }}">{{ icon('settings') }} Edit brief</a>
       <a class="btn ghost" href="{{ url_for('main.decks') }}">Back to decks</a>
     </div>
     {% endif %}
