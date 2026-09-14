@@ -190,6 +190,19 @@ p {
   display:none
 }
 
+.topbar-actions {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-left:auto
+}
+
+.auth-control {
+  margin:0;
+  flex-shrink:0;
+  white-space:nowrap
+}
+
 .logo {
   display:inline-flex;
   align-items:center;
@@ -4333,6 +4346,16 @@ dialog p {
     gap:24px
   }
 
+}
+
+@media(max-width:400px) {
+  .public-shell .topbar .logo-word {
+    display:none
+  }
+
+  .topbar .wrap {
+    gap:12px
+  }
 }
 
 @media(prefers-reduced-motion:reduce) {

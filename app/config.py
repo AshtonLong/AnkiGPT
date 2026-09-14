@@ -68,8 +68,6 @@ class Config:
     PIPELINE_MAX_FIGURES = _env_int("PIPELINE_MAX_FIGURES", 24)
     PIPELINE_DEDUPE_THRESHOLD = float(os.getenv("PIPELINE_DEDUPE_THRESHOLD", "0.90"))
 
-    AUTH_REQUIRED = _env_bool("AUTH_REQUIRED", True)
-
     # Uploads. 50 MB is plenty for study PDFs; a multi-hundred-MB cap is a trivial
     # disk-exhaustion DoS vector since files are written before validation.
     UPLOAD_MAX_MB = _env_int("UPLOAD_MAX_MB", 50)

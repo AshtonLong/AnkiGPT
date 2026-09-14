@@ -172,7 +172,7 @@ def export_deck(deck_id):
     cloze_model = build_cloze_model()
 
     figure_ids = {c.figure_id for c in cards if c.figure_id}
-    figures = {f.id: f for f in Figure.query.filter(Figure.id.in_(figure_ids)).all()} if figure_ids else {}
+    figures = {f.id: f for f in Figure.query.filter(Figure.id.in_(figure_ids), Figure.deck_id == deck_id).all()} if figure_ids else {}
 
     for card in cards:
         img = ""

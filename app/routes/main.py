@@ -1,9 +1,7 @@
 import io
 import os
-import secrets
 import uuid
 from collections import defaultdict
-from functools import wraps
 
 from flask import (
     Blueprint,
@@ -21,8 +19,8 @@ from flask_login import current_user
 from sqlalchemy import func
 from werkzeug.utils import secure_filename
 
-from ..extensions import db
-from ..models import Card, Deck, Figure, LLMRun, PipelineTask, Source, User
+from ..extensions import db, login_manager
+from ..models import Card, Deck, Figure, LLMRun, PipelineTask, Source
 from ..services.deckgen import improve_card, regenerate_source
 from ..services.export import export_deck as export_deck_file
 from ..services.pdf import extract_pdf_text
@@ -40,34 +38,15 @@ bp = Blueprint("main", __name__)
 CARD_STYLES = ("basic", "cloze", "mixed")
 
 
-def auth_required(view):
-    """Send anonymous users to the login page when AUTH_REQUIRED is on.
-
-    Not `flask_login.login_required`: with AUTH_REQUIRED=false the app runs in demo
-    mode against a local `demo@local` user and every view stays reachable.
-    """
-
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if current_app.config["AUTH_REQUIRED"] and not current_user.is_authenticated:
-            return redirect(url_for("auth.login"))
-        return view(*args, **kwargs)
-
-    return wrapped
+@bp.before_request
+def require_workspace_sign_in():
+    """Every workspace route is private, including future routes and JSON endpoints."""
+    if request.endpoint != "main.index" and not current_user.is_authenticated:
+        return login_manager.unauthorized()
 
 
 def get_actor():
-    if current_app.config["AUTH_REQUIRED"]:
-        return current_user
-    user = User.query.filter_by(email="demo@local").first()
-    if not user:
-        user = User(email="demo@local")
-        # Demo mode bypasses auth entirely; this password is never used for login,
-        # so make it unguessable rather than a fixed "demo".
-        user.set_password(secrets.token_urlsafe(32))
-        db.session.add(user)
-        db.session.commit()
-    return user
+    return current_user
 
 
 def get_owned_deck(deck_id):
@@ -95,7 +74,6 @@ def index():
 
 
 @bp.route("/decks")
-@auth_required
 def decks():
     user = get_actor()
     decks = Deck.query.filter_by(user_id=user.id).order_by(Deck.created_at.desc()).all()
@@ -111,7 +89,6 @@ def decks():
 
 
 @bp.route("/decks/<int:deck_id>/delete", methods=["POST"])
-@auth_required
 def delete_deck(deck_id):
     deck = get_owned_deck(deck_id)
     db.session.delete(deck)
@@ -132,7 +109,6 @@ def _parse_page(value):
 
 
 @bp.route("/decks/new", methods=["GET", "POST"])
-@auth_required
 def new_deck():
     if request.method == "POST":
         def invalid(message):
@@ -249,7 +225,6 @@ def _read_settings_form(deck):
 
 
 @bp.route("/decks/<int:deck_id>/preview", methods=["GET", "POST"])
-@auth_required
 def preview_deck(deck_id):
     deck = get_owned_deck(deck_id)
     if request.method == "POST":
@@ -296,7 +271,6 @@ def _status_payload(deck):
 
 
 @bp.route("/decks/<int:deck_id>/status")
-@auth_required
 def status(deck_id):
     deck = get_owned_deck(deck_id)
     if deck.status == "planned":
@@ -307,14 +281,12 @@ def status(deck_id):
 
 
 @bp.route("/decks/<int:deck_id>/progress.json")
-@auth_required
 def progress_json(deck_id):
     deck = get_owned_deck(deck_id)
     return jsonify(_status_payload(deck))
 
 
 @bp.route("/decks/<int:deck_id>/plan", methods=["GET", "POST"])
-@auth_required
 def plan_deck(deck_id):
     deck = get_owned_deck(deck_id)
     run = dict(deck.run_json or {})
@@ -384,7 +356,6 @@ def _insights(deck):
 
 
 @bp.route("/decks/<int:deck_id>")
-@auth_required
 def deck_editor(deck_id):
     deck = get_owned_deck(deck_id)
     run = dict(deck.run_json or {})
@@ -443,7 +414,6 @@ def deck_editor(deck_id):
 
 
 @bp.route("/figures/<int:figure_id>.png")
-@auth_required
 def figure_image(figure_id):
     actor = get_actor()
     fig = (
@@ -451,11 +421,10 @@ def figure_image(figure_id):
         .filter(Figure.id == figure_id, Deck.user_id == actor.id)
         .first_or_404()
     )
-    return Response(fig.image, mimetype=fig.mime or "image/png", headers={"Cache-Control": "private, max-age=86400"})
+    return Response(fig.image, mimetype=fig.mime or "image/png")
 
 
 @bp.route("/cards/<int:card_id>", methods=["POST"])
-@auth_required
 def update_card(card_id):
     card = get_owned_card(card_id)
     if card.type == "basic":
@@ -479,7 +448,6 @@ def update_card(card_id):
 
 
 @bp.route("/cards/bulk", methods=["POST"])
-@auth_required
 def bulk_cards():
     actor = get_actor()
     action = request.form.get("action")
@@ -540,7 +508,6 @@ def bulk_cards():
 
 
 @bp.route("/cards/<int:card_id>/improve", methods=["POST"])
-@auth_required
 def improve(card_id):
     card = get_owned_card(card_id)
     try:
@@ -556,7 +523,6 @@ def improve(card_id):
 
 
 @bp.route("/decks/<int:deck_id>/reviews", methods=["POST"])
-@auth_required
 def import_reviews(deck_id):
     deck = get_owned_deck(deck_id)
     def result(message, ok=False, matched=0, struggling=0):
@@ -583,7 +549,6 @@ def import_reviews(deck_id):
 
 
 @bp.route("/decks/<int:deck_id>/coach", methods=["POST"])
-@auth_required
 def coach(deck_id):
     deck = get_owned_deck(deck_id)
     try:
@@ -600,7 +565,6 @@ def coach(deck_id):
 
 
 @bp.route("/decks/<int:deck_id>/export", methods=["POST"])
-@auth_required
 def export_deck(deck_id):
     deck = get_owned_deck(deck_id)
     result = export_deck_file(deck.id)

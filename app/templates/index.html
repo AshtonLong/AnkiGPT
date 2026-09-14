@@ -6,7 +6,7 @@
 <a href="#how">How it works</a>
 <a href="#coach">Coach</a>
 <a href="#faq">FAQs</a>
-{% if current_user.is_authenticated or not config.AUTH_REQUIRED %}<a class="btn sm" href="{{ url_for('main.decks') }}">Your decks {{ icon('arrow-right',14) }}</a>{% else %}<a href="{{ url_for('auth.login') }}">Sign in</a>
+{% if current_user.is_authenticated %}<a class="btn sm" href="{{ url_for('main.decks') }}">Your decks {{ icon('arrow-right',14) }}</a>{% else %}
 <a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started {{ icon('arrow-right',14) }}</a>{% endif %}
 {% endblock %}
 {% block main %}

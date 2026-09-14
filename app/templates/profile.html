@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% block title %}My profile · AnkiGPT{% endblock %}
+{% block body_class %}profile-page{% endblock %}
+{% macro field_error(name) %}{% if errors.get(name) %}<p class="profile-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
+{% macro error_attrs(name) %}{% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}
+{% macro password_field(name, label, autocomplete='current-password', hint='') %}
+<div class="field">
+  <label for="{{ name }}">{{ label }}</label>
+  <div class="with-icon has-trail">
+    {{ icon('lock', 17) }}
+    <input type="password" id="{{ name }}" name="{{ name }}" autocomplete="{{ autocomplete }}" required {% if autocomplete == 'new-password' %}minlength="8" maxlength="128"{% endif %} {{ error_attrs(name) }}>
+    <button type="button" class="eye trail" data-eye="{{ name }}" aria-label="Show {{ label|lower }}" aria-pressed="false">{{ icon('eye', 17) }}<span hidden>{{ icon('eye-off', 17) }}</span></button>
+  </div>
+  {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
+  {{ field_error(name) }}
+</div>
+{% endmacro %}
+{% block content %}
+<div class="profile-container">
+  <div class="profile-heading">
+    <div><span class="eyebrow">YOUR SPACE TO LEARN</span><h1>Make yourself at home.</h1><p>A little about you. Everything for your next chapter.</p></div>
+    <a class="btn" href="{{ url_for('main.decks') }}">{{ icon('arrow-left', 16) }} Back to decks</a>
+  </div>
+
+  {% if errors %}<div class="profile-alert" role="alert" tabindex="-1" data-profile-errors>{{ icon('alert', 19) }}<span>{{ errors.get('form', 'A few details need another look. Check the highlighted fields below.') }}</span></div>{% endif %}
+
+  <div class="profile-layout">
+    <aside class="profile-overview" aria-label="Your account at a glance">
+      <div class="profile-identity">
+        <div class="profile-cover" aria-hidden="true"><span></span><span></span><span></span><i>EVERY DAY, A LITTLE MORE.</i></div>
+        <div class="profile-identity-body">
+          <span class="profile-avatar profile-avatar-large avatar-{{ current_user.profile_color }}" data-profile-avatar aria-hidden="true">{{ current_user.initials }}</span>
+          <span class="profile-member">{{ icon('sparkles', 13) }} YOUR WORKSPACE</span>
+          <h2 data-profile-name data-profile-fallback="{{ current_user.email.split('@')[0] or 'Learner' }}">{{ current_user.profile_name }}</h2>
+          <p class="profile-email">{{ current_user.email }}</p>
+          <p class="profile-bio" data-profile-bio>{{ current_user.bio or 'A curious mind. A fresh stack of cards.' }}</p>
+          {% if current_user.created_at %}<p class="profile-joined">{{ icon('clock', 14) }} Here since {{ current_user.created_at.strftime('%B %Y') }}</p>{% endif %}
+          <div class="profile-stats"><div><strong>{{ deck_count }}</strong><span>{{ 'Deck' if deck_count == 1 else 'Decks' }} created</span></div><div><strong>{{ card_count }}</strong><span>{{ 'Card' if card_count == 1 else 'Cards' }} in your library</span></div></div>
+        </div>
+      </div>
+      <nav class="profile-section-nav" aria-label="Profile sections">
+        <a href="#profile">{{ icon('user', 17) }} Personal details <span>01</span></a>
+        <a href="#email">{{ icon('mail', 17) }} Email address <span>02</span></a>
+        <a href="#password">{{ icon('shield', 17) }} Password & security <span>03</span></a>
+      </nav>
+      <p class="profile-private">{{ icon('lock', 15) }} Your profile is just for you.<br>No public profile. No distractions.</p>
+    </aside>
+
+    <div class="profile-settings">
+      <section class="profile-panel" id="profile" aria-labelledby="profile-title">
+        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('user', 21) }}</span><div><h2 id="profile-title">Personal details</h2><p>Put your own stamp on your workspace.</p></div><span class="profile-section-number">01</span></div>
+        <form method="post" action="{{ url_for('auth.profile', _anchor='profile') }}" data-profile-form data-profile-editor {% if errors and active_section == 'profile' %}data-save-failed="true"{% endif %}>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="profile">
+          <div class="profile-fields">
+            <fieldset class="profile-avatar-picker"><legend>Avatar color</legend><div class="profile-swatches">{% for color in avatar_colors %}<label class="profile-swatch"><input type="radio" name="avatar_color" value="{{ color }}" {% if values.avatar_color == color %}checked{% endif %}><span class="avatar-{{ color }}">{{ icon('check', 17) }}</span><span class="sr-only">{{ color|capitalize }}</span></label>{% endfor %}<span class="hint">A color that feels like you.</span></div>{{ field_error('avatar_color') }}</fieldset>
+            <div class="field"><label for="display_name">Display name <span class="profile-optional">Optional</span></label><input id="display_name" name="display_name" value="{{ values.display_name }}" maxlength="80" autocomplete="nickname" placeholder="What should we call you?" {{ error_attrs('display_name') }}><p class="hint">This is how you’ll appear around your workspace.</p>{{ field_error('display_name') }}</div>
+            <div class="field"><label for="bio">A little about you <span class="profile-optional">Optional</span></label><textarea id="bio" name="bio" maxlength="280" rows="3" placeholder="What are you learning, working toward, or curious about?" {{ error_attrs('bio') }}>{{ values.bio }}</textarea><div class="profile-field-footer"><span class="hint">Your subjects, your goals, your next big idea.</span><span class="hint"><span data-bio-count>{{ values.bio|length }}</span> / 280</span></div>{{ field_error('bio') }}</div>
+          </div>
+          <div class="profile-form-footer"><span class="profile-save-state" data-save-state aria-live="polite">{% if errors and active_section == 'profile' %}Changes not saved{% else %}{{ icon('check', 14) }} Up to date{% endif %}</span><div><button class="btn ghost" type="reset">Reset</button><button class="btn primary" type="submit">Save profile {{ icon('arrow-right', 15) }}</button></div></div>
+        </form>
+      </section>
+
+      <section class="profile-panel" id="email" aria-labelledby="email-title">
+        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('mail', 21) }}</span><div><h2 id="email-title">Email address</h2><p>The address you use to sign in.</p></div><span class="profile-section-number">02</span></div>
+        <form method="post" action="{{ url_for('auth.profile', _anchor='email') }}" data-profile-form>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="email">
+          <div class="profile-fields">
+            <div class="field"><label for="email_address">Email address</label><div class="with-icon">{{ icon('mail', 17) }}<input type="email" id="email_address" name="email" value="{{ values.email }}" maxlength="255" required autocomplete="email" {{ error_attrs('email') }}></div>{{ field_error('email') }}</div>
+            {{ password_field('email_password', 'Confirm your current password') }}
+            <p class="profile-security-note">{{ icon('shield-check', 16) }} Your password is required to change your sign-in email.</p>
+          </div>
+          <div class="profile-form-footer"><span class="profile-save-state" data-save-state aria-live="polite"></span><button class="btn" type="submit">Update email {{ icon('arrow-right', 15) }}</button></div>
+        </form>
+      </section>
+
+      <section class="profile-panel" id="password" aria-labelledby="password-title">
+        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('shield', 21) }}</span><div><h2 id="password-title">Password & security</h2><p>Keep your account in your hands.</p></div><span class="profile-section-number">03</span></div>
+        <form method="post" action="{{ url_for('auth.profile', _anchor='password') }}" data-profile-form>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="password">
+          <div class="profile-fields">
+            {{ password_field('current_password', 'Current password') }}
+            <div class="profile-field-grid">{{ password_field('new_password', 'New password', 'new-password', 'Use at least 8 characters.') }}{{ password_field('confirm_password', 'Confirm new password', 'new-password') }}</div>
+          </div>
+          <div class="profile-form-footer"><span class="profile-save-state" data-save-state aria-live="polite"></span><button class="btn" type="submit">Update password {{ icon('arrow-right', 15) }}</button></div>
+        </form>
+      </section>
+      <div class="profile-signout"><div><h3>See you next session.</h3><p>Your decks will be here when you get back.</p></div><form action="{{ url_for('auth.logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" type="submit">{{ icon('logout', 16) }} Sign out</button></form></div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='profile.js') }}" defer></script>
+{% endblock %}

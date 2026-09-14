@@ -2,11 +2,12 @@ import logging
 import os
 import sqlite3
 
-from flask import Flask
+from flask import Flask, request
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 
 from .config import Config, DEV_SECRET_KEY
+from .database import database_url, engine_options
 from .extensions import csrf, db, login_manager, migrate
 from .models import User
 
@@ -88,6 +89,10 @@ def create_app(config_object=Config):
         os.makedirs(upload_folder, exist_ok=True)
     app.config["UPLOAD_FOLDER"] = upload_folder
 
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url(app.config["SQLALCHEMY_DATABASE_URI"])
+    options = engine_options(app.config["SQLALCHEMY_DATABASE_URI"])
+    options.update(app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {}))
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = options
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
@@ -99,6 +104,15 @@ def create_app(config_object=Config):
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
+
+    @app.after_request
+    def private_responses(response):
+        # Account-specific HTML, images, downloads, and errors must be reauthorized
+        # after logout or an account switch, never reused from an HTTP cache.
+        if request.endpoint != "static":
+            response.headers["Cache-Control"] = "private, no-store"
+            response.vary.add("Cookie")
+        return response
 
     with app.app_context():
         db.create_all()

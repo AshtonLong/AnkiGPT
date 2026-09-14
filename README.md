@@ -1,246 +1,120 @@
 # AnkiGPT
 
-AnkiGPT turns study material into editable Anki decks with an **agentic pipeline**: a
-planning agent maps your document, decides how to carve it up, and delegates card
-writing to specialist workers that run in parallel. A critic reviews every card against
-the source, near-duplicates are merged by meaning, a coverage audit fills gaps, and you
-can feed your real Anki review history back in to have failing cards rewritten.
+### Your material. Your edits. Your Anki routine.
 
-Paste text or upload a PDF, watch the run trace live, edit the cards, export `.apkg`.
+Turn PDFs and notes into editable flashcards. Brief the planner, review its work,
+refine the cards, and export a deck you can study in Anki.
 
-## How a deck is generated
+[Get started](#get-started) · [User guide](docs/user-guide.md) · [Configuration](docs/setup.md) · [How it works](docs/architecture.md)
 
-```
-source ──▶ MAP ──▶ PLAN ──▶ FIGURES ──▶ WRITE ──▶ CRITIQUE ──▶ RECONCILE ──▶ COVERAGE ──▶ FINISH
-           │        │         │           │          │            │             │
-     document map   │    vision reads  N workers   cold-answer  embeddings    audit each
-     units, kinds,  │    figures from  in parallel + judge on   cluster +     unit; spawn
-     density,       │    the PDF       one strategy every card  model merges  gap-fillers
-     prerequisites  │                  each
-                    ▼
-        an agent with tools: read_unit · search_source · spawn_task · skip_unit · finish_plan
-```
+![AnkiGPT card editor showing a source-grounded question, editable answer and tags, card filters, and export controls](docs/images/editor.png)
 
-1. **Map** — the source is split on headings into candidates; one cheap model call groups
-   them into semantic *units* with a kind (definitions, formulas, procedure, comparison,
-   worked example…), a density score, prerequisites, and skip verdicts for front matter,
-   references, and recaps. Short sources skip the model and become one unit.
-2. **Plan** — the planner is a real tool-using loop. It reads units it is unsure about,
-   searches the source, and *spawns tasks*: which units, which **card strategy**, how many
-   cards, and specific notes for the worker. Every live unit must end up covered
-   (uncovered units get a default task); task and card counts are capped. If the model
-   never calls a tool, a single structured-output plan is used instead.
-   Tick **Review the plan before writing** and the run pauses so you can skip tasks,
-   change strategies, resize budgets, or edit worker notes before anything is written.
-3. **Figures** (PDFs) — figure regions are rendered from the page (so vector labels
-   survive), a vision call decides whether each is examinable and lists its labelled
-   parts, and useful ones become image-backed `figure_recall` tasks. Images ship inside
-   the `.apkg`.
-4. **Write** — each task is one worker call: the strategy's grammar + the planner's notes
-   + the unit text **verbatim** (never a lossy summary) + a hint of what sibling tasks
-   cover. Tasks run concurrently (`PIPELINE_MAX_WORKERS`). Truncated outputs are retried
-   with a smaller ask. Every card carries a verbatim `source_quote`.
-5. **Critique** — two cheap calls per batch of 20 cards. A *cold pass* answers each card
-   front with no source (exposes prompts that leak their answer, gives a difficulty
-   signal); a *judge pass* rules keep / rewrite / drop on support, atomicity, ambiguity
-   and leakage. Dropped cards are kept as `deleted` with `critic:*` tags so you can
-   restore them.
-6. **Reconcile** — surviving cards are embedded, clustered by cosine similarity, and a
-   model decides per cluster what to keep. Exact duplicates are removed first.
-7. **Coverage** — per unit, the model lists testable facts no card covers; important gaps
-   spawn one bounded round of gap-filler tasks (which also go through the critic).
-8. **Finish** — cards are ordered by unit prerequisites so foundations are introduced
-   first, and tagged with unit, strategy, and difficulty.
+*The real card editor with synthetic study material. All screenshots show the current
+interface with sample data, not results from a live AI run.*
 
-### Card strategies
+## From source to study
 
-| Strategy | Use for |
-|---|---|
-| `general` | Mixed prose; the safe default |
-| `definition_sweep` | Term-heavy material; one card per term plus reverse cards for key terms |
-| `formula_derivation` | Equations: what it computes, each symbol, validity conditions, limiting cases |
-| `mechanism_chain` | Processes and pathways; one card per link |
-| `compare_contrast` | Confusable siblings; discriminator cards per (item, dimension) |
-| `worked_example` | Problem solving; method selection and next-step reasoning |
-| `key_claims` | Narrative / argumentative prose; claims, causes, evidence |
-| `pitfall_edge_case` | Exceptions, caveats, common mistakes |
-| `figure_recall` | Diagrams and charts, with the image on the card |
+1. **Add your material.** Paste notes or upload a text-based PDF, optionally choosing a
+   page range. Pick basic, cloze, or mixed cards.
+2. **Set the direction.** Review the extracted source and tell the planner your exam
+   context, focus areas, exclusions, must-include terms, and approximate deck size.
+3. **Review the plan.** Optionally pause before writing to change strategies, adjust
+   card budgets, edit worker notes, or skip tasks.
+4. **Make the cards yours.** Search, filter, edit, tag, restore, or AI-improve cards.
+   Use source quotes and critic notes to check them, then export `.apkg` to Anki.
+5. **Improve after studying.** Import Anki review history and use Coach to rewrite or
+   split struggling cards. Review its suggestions before exporting again.
 
-All strategies share one base rule set (grounding, minimum-information, cloze hygiene,
-math format) placed first in the prompt so provider prompt caches hit across tasks.
+### Start with your material
 
-### Everything is traced
+![New deck form with basic, cloze, and mixed card styles, paste-text and PDF input options, and an illustrative source-to-card example](docs/images/new-deck.png)
 
-Every phase and task is a `PipelineTask` row; every model call is an `LLMRun` under its
-task. The status page polls `/decks/<id>/progress.json` and renders the tree live —
-what the planner decided, which workers are in flight, what the critic dropped, tokens
-and cost per phase. The editor's **Run insights** panel shows the same after the fact.
+### Shape the plan before cards are written
 
-### Content-addressed cache
+![Plan review showing three editable tasks, strategy selectors, card budgets, worker notes, and the document map](docs/images/plan.png)
 
-Worker, critic, vision and coverage results are cached on a hash of
-(role, model, prompt version, inputs). Re-running a deck, or generating another deck
-from the same chapter, costs nothing for any task whose inputs are unchanged.
+## What happens behind the scenes
 
-### Close the loop with Anki
+The pipeline maps the source into units, plans specialist tasks, and writes cards in
+parallel. Optional vision analysis turns useful PDF figures into image-backed cards.
+A critic checks generated cards; duplicate reconciliation and a coverage pass refine
+the deck. The live run trace and **Run insights** expose task status, tokens, and
+recorded costs. [Read the pipeline reference →](docs/architecture.md)
 
-The export stamps every note with a stable guid. Study the deck, then export it back
-from Anki (*File → Export*, include scheduling) and upload it on the editor page. Review
-stats (reps, lapses, "again" rate) are attached to each card; cards with ≥2 lapses or a
-≥40% again-rate are flagged **struggling**. **Coach** sends them to the model with their
-stats and the source unit, which rewrites or splits them (marked *Needs review*).
+**You stay in control:** only cards with `ok` status (shown as **Reviewed** in the
+filter) export. Deleted and Needs review cards are excluded. The label is a workflow
+state, not a guarantee of human review or factual accuracy.
 
-## Tech stack
+## Get started
 
-- Flask, Flask-Login, Flask-SQLAlchemy, Flask-Migrate, Flask-WTF (CSRF)
-- OpenRouter chat completions (structured outputs, tools, vision) + embeddings
-- Default model: **`openai/gpt-5.6-luna`** for every role (1M context, tools, vision,
-  ~$0.20/M input); any role can be overridden per env var
-- Pydantic validation, NumPy for clustering, genanki export
-- PDF: pymupdf4llm + pymupdf-layout (Markdown with page offsets), pymupdf figure
-  rendering, pypdf fallback
-- No queue or broker: generation runs on a background thread inside the web process,
-  and the status page polls run state from the database
-- SQLite by default (WAL mode; missing columns are added automatically on startup)
+Use **Python 3.12** (the version used by the Docker image), an **OpenRouter API key**
+for AI operations, and **Anki** to study exported packages.
 
-## Quick start (local)
+### Local · PowerShell
+
+Run from the repository root:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy example.env .env      # set SECRET_KEY and OPENROUTER_API_KEY
+Copy-Item example.env .env
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Edit `.env`: set `SECRET_KEY` to the generated value and add your
+`OPENROUTER_API_KEY`. If `.env` already exists, update it instead of copying over it.
+Then start the app:
+
+```powershell
 python run.py
 ```
 
-Open `http://127.0.0.1:5000`. Set `AUTH_REQUIRED=false` for a no-login demo mode.
+Open [localhost:5000](http://127.0.0.1:5000), create an account, and choose **New deck**.
+The workspace requires sign-in; the landing page has a public illustrative sample.
+**My profile** manages your display name, bio, avatar color, email, and password.
 
-## Quick start (Docker)
+### Docker
+
+After configuring `.env` as above:
 
 ```bash
-cp example.env .env        # then set SECRET_KEY and OPENROUTER_API_KEY in .env
 docker compose up --build
 ```
 
-Open `http://localhost:5000`. Compose runs a single `web` container; the SQLite
-database and uploads live in the `ankigpt-data` volume. Run the tests in the
-container with:
+Open [localhost:5000](http://localhost:5000). Compose runs one web container and
+persists local SQLite data in the `ankigpt-data` volume. PostgreSQL, including Neon,
+is supported through `DATABASE_URL`.
 
-```bash
-docker compose exec web sh -c "pip install -q -r requirements-dev.txt && python -m pytest tests/ -q"
-```
+## Practical details
 
-## Configuration
+- **Input:** text and text-based PDFs; no OCR workflow. Defaults: 50 MB upload limit
+  and 400,000 source characters. Longer sources are truncated with a warning.
+- **Models:** the configured default is `openai/gpt-5.6-luna`, with per-role overrides.
+  Model access and billing depend on your OpenRouter account. Repeated tasks can use
+  cached results, but a rerun is not guaranteed to be free.
+- **Runtime:** generation runs in background threads inside the web process. You can
+  close the page while it works; restarting the server interrupts the run.
+- **Data:** workspace routes enforce account ownership. AI operations send source
+  content through OpenRouter. Extracted text, figures, cards, and traces are stored
+  in your database. The original uploaded PDF is removed after extraction.
+- **Anki:** export and review import are manual file transfers. Export includes all
+  `ok` cards in the deck, even when the editor is filtered.
 
-| Variable | Default | Description |
-|---|---|---|
-| `SECRET_KEY` | `dev-secret` | Flask session/CSRF secret. Change it. |
-| `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy URL. |
-| `AUTH_REQUIRED` | `true` | `false` runs against a local `demo@local` user. |
-| `OPENROUTER_API_KEY` | | Required. |
-| `OPENROUTER_MODEL` | `openai/gpt-5.6-luna` | Default model for every role. |
-| `OPENROUTER_MODEL_{MAPPER,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). |
-| `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
-| `OPENROUTER_REASONING_{PLANNER,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role; empty omits the parameter. |
-| `OPENROUTER_TEMPERATURE` | | Unset by default — reasoning models reject it. |
-| `OPENROUTER_MAX_TOKENS` | `16000` | Output cap per call (billing is per token used). |
-| `OPENROUTER_TIMEOUT_SECONDS` / `_MAX_RETRIES` / `_RETRY_BACKOFF_SECONDS` | `180` / `2` / `1.5` | HTTP behaviour. |
-| `PIPELINE_MAX_WORKERS` | `6` | Concurrent model calls. |
-| `PIPELINE_PLANNER_MAX_TURNS` | `14` | Planner agent loop cap. |
-| `PIPELINE_UNIT_MAX_CHARS` | `14000` | Larger units are split deterministically. |
-| `PIPELINE_CRITIC_ENABLED` | `true` | Critic phase. |
-| `PIPELINE_COVERAGE_ENABLED` | `true` | Coverage audit + gap fill. |
-| `PIPELINE_EMBED_DEDUPE_ENABLED` | `true` | Embedding-based duplicate clustering. |
-| `PIPELINE_DEDUPE_THRESHOLD` | `0.90` | Cosine threshold for a duplicate cluster. |
-| `PIPELINE_CACHE_ENABLED` | `true` | Content-addressed result cache. |
-| `PIPELINE_FIGURES_ENABLED` / `PIPELINE_MAX_FIGURES` | `true` / `24` | Figure extraction from PDFs. |
-| `MAX_SOURCE_CHARS` | `400000` | Cap on source length (`0` disables). |
-| `UPLOAD_MAX_MB` / `UPLOAD_FOLDER` | `50` / `instance/uploads` | Uploads. |
-| `GENERATION_IN_THREAD` | `true` | Run generation on a background thread (tests set `false` to run inline). |
+## Documentation
 
-## Routes
+| Guide | What's inside |
+|---|---|
+| [User guide](docs/user-guide.md) | Source → brief → plan → editor → export, Coach, profiles, troubleshooting |
+| [Setup and configuration](docs/setup.md) | Local/Docker setup, environment variables, Neon migration, deployment and storage |
+| [Architecture](docs/architecture.md) | Pipeline phases, strategies, caching, data model, failure handling |
+| [Development](docs/development.md) | Stack, tests, routes, and reproducible screenshot capture |
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/decks` | Library |
-| `GET,POST` | `/decks/new` | Create a deck from text/PDF (figures extracted here) |
-| `GET,POST` | `/decks/<id>/preview` | Review source, brief the planner, start the run |
-| `GET` | `/decks/<id>/status` | Live run trace |
-| `GET` | `/decks/<id>/progress.json` | Trace as JSON (polled by the status page) |
-| `GET,POST` | `/decks/<id>/plan` | Review / edit / run the work order; re-plan |
-| `GET` | `/decks/<id>` | Card editor with run insights |
-| `POST` | `/decks/<id>/reviews` | Import an Anki package with review history |
-| `POST` | `/decks/<id>/coach` | Rewrite struggling cards |
-| `POST` | `/decks/<id>/export` | Export `.apkg` (with figure media) |
-| `POST` | `/cards/<id>` · `/cards/<id>/improve` · `/cards/bulk` | Edit, AI-improve, bulk (delete/restore/tag/regenerate unit/coach) |
-| `GET` | `/figures/<id>.png` | Figure image (owner-scoped) |
-
-## Project layout
-
-```text
-app/
-  services/
-    pipeline/
-      orchestrator.py   the run: phases, persistence, status transitions
-      document_map.py   phase 0 — skeleton + mapper
-      planner.py        phase 1 — tool-using planning agent + invariants
-      strategies.py     card grammars
-      workers.py        phase 2 — worker prompt + call
-      critic.py         phase 3 — cold pass + judge, coach diagnosis
-      reconcile.py      phase 4 — embedding clusters, coverage audit
-      figures.py        PDF figure extraction + vision analysis
-      feedback.py       Anki review import + coach
-      routing.py        role -> model client
-      cache.py          content-addressed cache
-      parallel.py       thread-pool fan-out
-      trace.py          PipelineTask / LLMRun tracing
-    llm.py              OpenRouter HTTP: chat, tools loop, embeddings, JSON repair
-    deckgen.py          regenerate a unit, improve a card
-    pdf.py, export.py, validators.py, chunking.py, schemas.py
-  routes/, templates/, static/, models.py, config.py, tasks.py
-tests/                  72 tests incl. an end-to-end run against a scripted model
-```
-
-## Data model
-
-- `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
-  totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
-- `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).
-- `Card` — with `strategy`, `difficulty`, `source_quote`, `critic_json`, `order_key`,
-  `guid`, `review_stats_json`, and links to its task, unit, and figure.
-- `PipelineTask` — the trace tree (phase → task), with status, model, tokens, cost.
-- `LLMRun` — every model call, attached to its task.
-- `Figure` — images pulled from a PDF plus the vision analysis.
-- `GenerationCache` — content-addressed results.
-
-## Testing
+## Development checks
 
 ```powershell
 pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-The suite includes a scripted model (`tests/conftest.py::FakeLLM`) that drives the whole
-pipeline — planner tool calls, workers, critic verdicts, duplicate resolution, coverage
-audit, and the coach — without network access.
-
-## Troubleshooting
-
-- **Generation failed** — the status page shows the exact reason and what ran before the
-  failure. Auth/quota errors abort immediately and never wipe an existing deck.
-- **Planner produced a poor plan** — tick *Review the plan before writing* and adjust, or
-  set `OPENROUTER_MODEL_PLANNER` to a stronger model.
-- **Cards dropped by the critic** — filter the editor by *Deleted*; each carries the
-  critic's reason. Restore anything you disagree with.
-- **Review import finds no cards** — export this deck from AnkiGPT first, study it, then
-  export it back from Anki *with scheduling*. Cards are matched by note guid.
-- **Compressed Anki packages** — newer Anki exports use zstd; `zstandard` is in
-  `requirements.txt`, or tick *Support older Anki versions* when exporting.
-- **Scanned PDFs** — no OCR; only text-based PDFs extract.
-
-## Security notes
-
-- Rotate any API key that ever touched git history.
-- Every deck/card/figure route is scoped to the current user; cross-user access 404s.
-- CSRF protection on all state-changing requests (HTMX sends the token as a header).
-- Uploaded PDFs are extracted and deleted immediately; figure images live in the DB.
+The scripted model tests exercise the pipeline without calling a live AI provider.

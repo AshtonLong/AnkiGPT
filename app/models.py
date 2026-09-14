@@ -10,10 +10,28 @@ def utcnow():
 
 
 class User(UserMixin, db.Model):
+    AVATAR_COLORS = ("terracotta", "sage", "blue", "lavender", "slate")
+
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=utcnow)
+    display_name = db.Column(db.String(80))
+    bio = db.Column(db.String(280))
+    avatar_color = db.Column(db.String(20))
+
+    @property
+    def profile_name(self):
+        return self.display_name or self.email.split("@")[0] or "Learner"
+
+    @property
+    def initials(self):
+        parts = self.profile_name.split()
+        return (parts[0][0] + parts[-1][0] if len(parts) > 1 else parts[0][:2]).upper()
+
+    @property
+    def profile_color(self):
+        return self.avatar_color if self.avatar_color in self.AVATAR_COLORS else "terracotta"
 
     decks = db.relationship(
         "Deck", backref="user", cascade="all, delete-orphan", passive_deletes=True
