@@ -1,7 +1,4 @@
-/* AnkiGPT — client behaviours
-   Progressive enhancement only: every page works without this file; it adds motion,
-   toasts, HTMX wiring, the live run trace, and the small interactions (selection tray,
-   counters, tilt).  */
+/* AnkiGPT: form feedback, HTMX card editing, live progress, and source controls. */
 (function () {
   'use strict';
 
@@ -9,7 +6,6 @@
   var body = doc.body;
   doc.documentElement.classList.add('js');
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var canHover = window.matchMedia('(hover: hover)').matches;
 
   /* ------------------------------------------------------------------ utils */
   function $(sel, root) { return (root || doc).querySelector(sel); }
@@ -152,46 +148,6 @@
     if (r) { t.setAttribute('title', t.textContent); t.textContent = r; }
   });
 
-  /* ------------------------------------------------------- cursor spotlight */
-  if (canHover) {
-    $$('.feat').forEach(function (card) {
-      card.addEventListener('pointermove', function (e) {
-        var r = card.getBoundingClientRect();
-        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
-        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
-      });
-    });
-  }
-
-  /* ----------------------------------------------------------------- tilt */
-  if (canHover && !reduced) {
-    $$('[data-tilt]').forEach(function (zone) {
-      var inner = $('.stack-inner', zone);
-      if (!inner) return;
-      zone.addEventListener('pointermove', function (e) {
-        var r = zone.getBoundingClientRect();
-        var x = (e.clientX - r.left) / r.width - 0.5;
-        var y = (e.clientY - r.top) / r.height - 0.5;
-        inner.style.setProperty('--ry', (x * 16).toFixed(2) + 'deg');
-        inner.style.setProperty('--rx', (-y * 12).toFixed(2) + 'deg');
-      });
-      zone.addEventListener('pointerleave', function () {
-        inner.style.setProperty('--rx', '0deg');
-        inner.style.setProperty('--ry', '0deg');
-      });
-    });
-  }
-
-  /* ------------------------------------------------------------ flip cards */
-  $$('.flip').forEach(function (f) {
-    f.setAttribute('tabindex', '0');
-    f.setAttribute('role', 'button');
-    f.setAttribute('aria-label', 'Flip card');
-    var flip = function () { f.classList.toggle('is-flipped'); };
-    f.addEventListener('click', flip);
-    f.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
-  });
-
   /* -------------------------------------------------------- autogrow areas */
   function autogrow(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
   function initAutogrow(root) {
@@ -210,13 +166,17 @@
     var show = inp.type === 'password';
     inp.type = show ? 'text' : 'password';
     btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-    btn.querySelectorAll('svg').forEach(function (s) { s.hidden = !s.hidden; });
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    btn.querySelector('svg').toggleAttribute('hidden', show);
+    var alternate = btn.querySelector('span');
+    if (alternate) alternate.hidden = !show;
     inp.focus();
   });
 
   /* ------------------------------------------- classic form submit feedback */
   body.addEventListener('submit', function (e) {
     var form = e.target;
+    if (e.defaultPrevented) return;
     if (form.hasAttribute('hx-post') || form.hasAttribute('hx-get')) return;
     pStart();
     var btn = e.submitter || form.querySelector('button[type="submit"], button:not([type])');
@@ -233,18 +193,46 @@
   var csrf = $('meta[name="csrf-token"]');
   csrf = csrf ? csrf.getAttribute('content') : '';
   var swapMemo = {};
+  var requestMemo = {};
   var improveFailed = false;
+
+  function cardFields(row) { return $$('.card-form input:not([type=hidden]), .card-form textarea', row); }
+  function syncDirty(row) {
+    var dirty = cardFields(row).some(function (field) { return field.value !== field.defaultValue; });
+    row.classList.toggle('is-dirty', dirty);
+    if (dirty) row.classList.remove('just-saved');
+  }
 
   body.addEventListener('htmx:configRequest', function (e) { e.detail.headers['X-CSRFToken'] = csrf; });
   body.addEventListener('htmx:beforeRequest', function (e) {
-    pStart();
     var elt = e.detail.elt;
+    var row = elt && elt.closest('.card-row');
+    // One mutation per card; editing can continue while a save is in flight.
+    if (row && requestMemo[row.id]) { e.preventDefault(); return; }
+    pStart();
     if (elt && elt.classList) elt.classList.add('is-busy');
+    if (row) {
+      var values = {};
+      cardFields(row).forEach(function (field) { values[field.name] = field.value; });
+      requestMemo[row.id] = { values: values };
+      row.classList.add(elt.matches('.card-form') ? 'is-saving' : 'is-improving');
+      row.setAttribute('aria-busy', 'true');
+      var label = $('[data-save-label]', row);
+      if (label && elt.matches('.card-form')) label.textContent = 'Saving…';
+    }
   });
   body.addEventListener('htmx:afterRequest', function (e) {
     pDone();
     var elt = e.detail.elt;
     if (elt && elt.classList) elt.classList.remove('is-busy');
+    var row = elt && elt.closest('.card-row');
+    if (row) {
+      row.classList.remove('is-saving', 'is-improving');
+      row.removeAttribute('aria-busy');
+      var label = $('[data-save-label]', row);
+      if (label) label.textContent = 'Save';
+      delete requestMemo[row.id];
+    }
   });
   body.addEventListener('improveError', function () { improveFailed = true; toast('AI improve failed — the card was left unchanged.', 'error'); });
   body.addEventListener('htmx:responseError', function () { toast('Something went wrong. Please retry.', 'error'); });
@@ -255,7 +243,15 @@
     if (!t) return;
     if (t.classList.contains('card-row')) {
       var cb = $('input[name="card_ids"]', t);
-      swapMemo[t.id] = { checked: !!(cb && cb.checked) };
+      var active = doc.activeElement, lateEdits = {}, request = requestMemo[t.id];
+      if (request) cardFields(t).forEach(function (field) {
+        if (field.value !== request.values[field.name]) lateEdits[field.name] = field.value;
+      });
+      swapMemo[t.id] = {
+        checked: !!(cb && cb.checked), lateEdits: lateEdits,
+        focus: t.contains(active) ? { id: active.id, name: active.name, improve: active.hasAttribute('data-improve'),
+          start: active.selectionStart, end: active.selectionEnd, direction: active.selectionDirection } : null
+      };
     }
   });
   // afterSettle, not afterSwap: htmx re-applies server attributes (class, style) to
@@ -265,14 +261,28 @@
     var el = t && t.id ? doc.getElementById(t.id) : null;
     if (!el) return;
     if (el.classList.contains('card-row')) {
-      initAutogrow(el);
       var memo = swapMemo[el.id];
+      if (memo) cardFields(el).forEach(function (field) {
+        if (Object.prototype.hasOwnProperty.call(memo.lateEdits, field.name)) field.value = memo.lateEdits[field.name];
+      });
+      initAutogrow(el);
+      syncDirty(el);
       if (memo && memo.checked) { var cb = $('input[name="card_ids"]', el); if (cb) cb.checked = true; }
       syncSelection();
-      if (!improveFailed) {
+      if (memo && memo.focus && (doc.activeElement === body || el.contains(doc.activeElement))) {
+        var f = memo.focus;
+        var target = f.id ? doc.getElementById(f.id) : $(f.name === 'card_ids' ? 'input[name=card_ids]' : f.improve ? '[data-improve]' : 'button[type=submit]', el);
+        if (target) {
+          target.focus({ preventScroll: true });
+          if (typeof f.start === 'number' && target.setSelectionRange) target.setSelectionRange(f.start, f.end, f.direction);
+        }
+      }
+      if (!improveFailed && !el.classList.contains('is-dirty')) {
         el.classList.add('just-saved');
         setTimeout(function () { el.classList.remove('just-saved'); }, 1800);
       }
+      delete swapMemo[el.id];
+      delete requestMemo[el.id];
       improveFailed = false;
     }
   });
@@ -289,6 +299,8 @@
     });
     if (tray) {
       tray.classList.toggle('is-open', n > 0);
+      tray.inert = n === 0;
+      tray.setAttribute('aria-hidden', String(n === 0));
       var c = $('[data-sel-count]', tray);
       if (c) c.textContent = n;
     }
@@ -304,6 +316,7 @@
   body.addEventListener('click', function (e) {
     if (e.target.closest('[data-clear-sel]')) {
       $$('input[name="card_ids"]').forEach(function (b) { b.checked = false; });
+      var selectAll = $('#select-all'); if (selectAll) selectAll.focus({ preventScroll: true });
       syncSelection();
     }
     var improve = e.target.closest('[data-improve]');
@@ -316,7 +329,14 @@
   }, true);
   body.addEventListener('input', function (e) {
     var row = e.target.closest('.card-row');
-    if (row && e.target.closest('.card-form')) row.classList.add('is-dirty');
+    if (row && e.target.closest('.card-form')) syncDirty(row);
+  });
+  body.addEventListener('keydown', function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
+    var form = e.target.closest('.card-form');
+    if (!form) return;
+    e.preventDefault();
+    if (!requestMemo[form.closest('.card-row').id]) form.requestSubmit($('button[type=submit]', form));
   });
   if (tray) {
     var tagIn = $('.tag-in', tray), tagBtn = $('[data-needs-tag]', tray);
@@ -422,13 +442,13 @@
     var root = doc.getElementById('status-root');
     if (!root) return;
     var state = root.getAttribute('data-state');
-    var ring = $('[data-progress]', root);
+    var progress = $('[data-progress]', root);
     var target = parseFloat(root.getAttribute('data-pct')) || 0;
-    if (ring) {
-      ring.style.setProperty('--p', 0);
-      // A timer, not rAF: rAF is paused in background tabs, and the ring should still
+    if (progress) {
+      progress.style.setProperty('--p', 0);
+      // A timer, not rAF: rAF is paused in background tabs, and progress should still
       // land on the right value even if the page finishes loading while hidden.
-      setTimeout(function () { ring.style.setProperty('--p', target); }, 40);
+      setTimeout(function () { progress.style.setProperty('--p', target); }, 40);
       var num = $('[data-progress-num]', root);
       if (num) tween(num, 0, target, 900);
     }
@@ -450,8 +470,10 @@
           setTimeout(function () { window.location.reload(); }, 500);
           return;
         }
-        if (ring) {
-          ring.style.setProperty('--p', data.pct);
+        if (progress) {
+          progress.style.setProperty('--p', data.pct);
+          var bar = $('[role="progressbar"]', progress);
+          if (bar) bar.setAttribute('aria-valuenow', data.pct);
           var num = $('[data-progress-num]', root);
           if (num) tween(num, lastPct, data.pct, 700);
           lastPct = data.pct;
@@ -461,6 +483,7 @@
         setTimeout(poll, 1500);
       }).catch(function () {
         failures++;
+        if (failures === 3) toast('Connection interrupted. Retrying the progress update; your deck may still be building.', 'error');
         setTimeout(poll, Math.min(8000, 1500 * failures));
       });
     }

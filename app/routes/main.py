@@ -135,7 +135,14 @@ def _parse_page(value):
 @auth_required
 def new_deck():
     if request.method == "POST":
-        title = request.form.get("title", "").strip() or "Untitled Deck"
+        def invalid(message):
+            return render_template("deck_new.html", form_error=message)
+
+        title = request.form.get("title", "").strip()
+        if not title:
+            return invalid("Give your deck a title before continuing.")
+        if len(title) > 200:
+            return invalid("Keep the deck title to 200 characters or fewer.")
         source_type = request.form.get("source_type")
         card_style = request.form.get("card_style") or current_app.config["DEFAULT_CARD_STYLE"]
         if card_style not in CARD_STYLES:
@@ -146,16 +153,22 @@ def new_deck():
         figures = []
         if source_type == "text":
             source_text = text_input
+            if not source_text:
+                return invalid("Paste some source material before continuing.")
         elif source_type == "pdf":
+            start = _parse_page(request.form.get("page_start"))
+            end = _parse_page(request.form.get("page_end"))
+            if any(request.form.get(key) and value is None for key, value in (("page_start", start), ("page_end", end))):
+                return invalid("Page numbers must be whole numbers starting at 1.")
+            if start and end and end < start:
+                return invalid("End page must be the same as or after the start page.")
             pdf_file = request.files.get("pdf_file")
             if not pdf_file or not pdf_file.filename:
-                flash("PDF file is required", "error")
-                return render_template("deck_new.html")
+                return invalid("PDF file is required. Choose your PDF to continue.")
             allowed = current_app.config["ALLOWED_UPLOAD_EXTENSIONS"]
             ext = pdf_file.filename.rsplit(".", 1)[-1].lower() if "." in pdf_file.filename else ""
             if ext not in allowed:
-                flash("Only PDF files are supported.", "error")
-                return render_template("deck_new.html")
+                return invalid("Only PDF files are supported.")
             # Never trust the client filename. Store under a server-generated name to
             # prevent path traversal and cross-user collisions.
             safe_name = f"{uuid.uuid4().hex}_{secure_filename(pdf_file.filename)}"
@@ -177,15 +190,12 @@ def new_deck():
                 except OSError:
                     pass
         else:
-            flash("Choose a source type.", "error")
-            return render_template("deck_new.html")
+            return invalid("Choose a source type.")
         if not source_text:
-            flash(
+            return invalid(
                 "No text could be extracted. If this is a scanned PDF, it has no "
-                "selectable text (OCR is not supported).",
-                "error",
+                "selectable text (OCR is not supported). Choose a text-based PDF or paste your notes.",
             )
-            return render_template("deck_new.html")
         max_source_chars = current_app.config["MAX_SOURCE_CHARS"]
         if max_source_chars and len(source_text) > max_source_chars:
             source_text = source_text[:max_source_chars]
@@ -232,7 +242,7 @@ def _read_settings_form(deck):
         except ValueError:
             settings["target_cards"] = None
     settings["review_plan"] = request.form.get("review_plan") == "on"
-    settings["use_figures"] = request.form.get("use_figures", "on") == "on"
+    settings["use_figures"] = "on" in request.form.getlist("use_figures") if "use_figures" in request.form else True
     settings["card_style"] = deck.card_style
     settings.pop("max_chars", None)
     return settings
@@ -250,7 +260,8 @@ def preview_deck(deck_id):
         dispatch_generation(deck.id)
         return redirect(url_for("main.status", deck_id=deck.id))
     figure_count = Figure.query.filter_by(deck_id=deck.id).count()
-    return render_template("deck_preview.html", deck=deck, figure_count=figure_count)
+    figures = Figure.query.filter_by(deck_id=deck.id).order_by(Figure.page, Figure.id).limit(6).all()
+    return render_template("deck_preview.html", deck=deck, figure_count=figure_count, figures=figures)
 
 
 def _status_payload(deck):
@@ -408,8 +419,12 @@ def deck_editor(deck_id):
         if strategy_filter:
             query = query.filter_by(strategy=strategy_filter)
         cards = query.order_by(Card.order_key, Card.id).all()
+    if request.args.get("view") == "coach":
+        cards = [c for c in cards if (c.review_stats_json or {}).get("struggling") or (c.critic_json or {}).get("coach")]
+        if not status_filter:
+            cards = [c for c in cards if c.status != "deleted"]
     strategies_used = [s for (s,) in db.session.query(Card.strategy).filter_by(deck_id=deck_id).distinct().all() if s]
-    struggling = sum(1 for c in Card.query.filter_by(deck_id=deck_id).all() if (c.review_stats_json or {}).get("struggling"))
+    struggling = sum(1 for c in Card.query.filter_by(deck_id=deck_id).filter(Card.status != "deleted").all() if (c.review_stats_json or {}).get("struggling"))
     units = Source.query.filter_by(deck_id=deck_id).order_by(Source.idx).all()
     return render_template(
         "deck_editor.html",
@@ -451,7 +466,9 @@ def update_card(card_id):
     else:
         card.cloze_text = request.form.get("cloze_text", "").strip()
         card.extra = request.form.get("extra", "").strip()
-        if not is_valid_cloze(card.cloze_text):
+        if card.status == "deleted":
+            pass  # Editing a deleted card must not implicitly restore it.
+        elif not is_valid_cloze(card.cloze_text):
             card.status = "needs_review"
         else:
             card.status = "ok"
@@ -542,25 +559,27 @@ def improve(card_id):
 @auth_required
 def import_reviews(deck_id):
     deck = get_owned_deck(deck_id)
+    def result(message, ok=False, matched=0, struggling=0):
+        destination = url_for("main.deck_editor", deck_id=deck.id, view="coach")
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify(ok=ok, message=message, matched=matched, struggling=struggling, url=destination), (200 if ok else 422)
+        flash(message, "success" if ok else "error")
+        return redirect(destination)
+
     upload = request.files.get("anki_package")
     if not upload or not upload.filename:
-        flash("Choose an .apkg or .colpkg exported from Anki.", "error")
-        return redirect(url_for("main.deck_editor", deck_id=deck.id))
+        return result("Choose an .apkg or .colpkg exported from Anki.")
     try:
         stats = read_review_stats(upload.read())
     except ImportError_ as exc:
-        flash(str(exc), "error")
-        return redirect(url_for("main.deck_editor", deck_id=deck.id))
+        return result(str(exc))
     except Exception:
         current_app.logger.exception("Review import failed for deck %s", deck.id)
-        flash("Could not read that Anki package.", "error")
-        return redirect(url_for("main.deck_editor", deck_id=deck.id))
+        return result("Could not read that Anki package.")
     matched, struggling = apply_review_stats(deck.id, stats)
     if not matched:
-        flash("No cards from this deck were found in that package. Export this deck first, study it in Anki, then export it back with scheduling information.", "error")
-    else:
-        flash(f"Imported review history for {matched} cards · {struggling} struggling.", "success")
-    return redirect(url_for("main.deck_editor", deck_id=deck.id, strategy="struggling" if struggling else ""))
+        return result("No cards from this deck were found in that package. Export this deck first, study it in Anki, then export it back with scheduling information.")
+    return result(f"Imported review history for {matched} cards · {struggling} struggling.", True, matched, struggling)
 
 
 @bp.route("/decks/<int:deck_id>/coach", methods=["POST"])
@@ -577,7 +596,7 @@ def coach(deck_id):
         flash("No struggling cards to coach. Import review history first.", "info")
     else:
         flash(f"Coach: {result['rewritten']} rewritten, {result['split']} split, {result['kept']} kept. Rewritten cards are marked Needs review.", "success")
-    return redirect(url_for("main.deck_editor", deck_id=deck.id, status="needs_review"))
+    return redirect(url_for("main.deck_editor", deck_id=deck.id, status="needs_review", view="coach"))
 
 
 @bp.route("/decks/<int:deck_id>/export", methods=["POST"])

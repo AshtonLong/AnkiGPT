@@ -8,20 +8,22 @@
   <div class="page-head" data-reveal>
     <div>
       <span class="eyebrow ember">New deck</span>
-      <h1>What are we <span class="grad">learning</span>?</h1>
+      <h1>Start with your material.</h1>
       <p>Name the deck, pick a card style, then add your source material. You'll review the extracted text before
         anything is generated.</p>
     </div>
   </div>
 
+  <div class="create-layout">
   <form method="post" enctype="multipart/form-data" class="panel form-card" id="new-deck-form" data-reveal style="--d:90">
+    {% if form_error %}<div class="form-error" role="alert">{{ form_error }}</div>{% endif %}
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <div class="field">
       <label for="deck-title">Deck title</label>
       <div class="with-icon">
         {{ icon('layers') }}
-        <input type="text" id="deck-title" name="title" placeholder="e.g. Cell biology — Chapter 4" required autofocus
+        <input type="text" id="deck-title" name="title" value="{{ request.form.get('title', '') }}" placeholder="e.g. Cell biology — Chapter 4" required autofocus
           autocomplete="off" maxlength="200">
       </div>
     </div>
@@ -30,24 +32,24 @@
       <label>Card style</label>
       <div class="tiles">
         <label class="tile">
-          <input type="radio" name="card_style" value="basic" checked>
+          <input type="radio" name="card_style" value="basic" {% if request.form.get('card_style', 'basic') == 'basic' %}checked{% endif %}>
           <div class="tile-body">
             <div class="tile-ic">{{ icon('help') }}</div>
             <div><b>Basic</b><span>Question on the front, answer on the back. Best for definitions and discrete facts.</span></div>
           </div>
         </label>
         <label class="tile">
-          <input type="radio" name="card_style" value="cloze">
+          <input type="radio" name="card_style" value="cloze" {% if request.form.get('card_style') == 'cloze' %}checked{% endif %}>
           <div class="tile-body">
             <div class="tile-ic">{{ icon('scissors') }}</div>
             <div><b>Cloze</b><span>Fill-in-the-blank deletions. Best for processes, sequences and formulas.</span></div>
           </div>
         </label>
         <label class="tile">
-          <input type="radio" name="card_style" value="mixed">
+          <input type="radio" name="card_style" value="mixed" {% if request.form.get('card_style') == 'mixed' %}checked{% endif %}>
           <div class="tile-body">
             <div class="tile-ic">{{ icon('brain') }}</div>
-            <div><b>Let the agent decide</b><span>Each worker picks the better shape per fact. Recommended for mixed material.</span></div>
+            <div><b>Mixed</b><span>Choose the most useful card format for each idea.</span></div>
           </div>
         </label>
       </div>
@@ -58,9 +60,9 @@
     <div class="field">
       <label>Source material</label>
       <div class="segmented" style="--n:2">
-        <input type="radio" name="source_type" value="text" id="src-text" checked>
+        <input type="radio" name="source_type" value="text" id="src-text" {% if request.form.get('source_type', 'text') == 'text' %}checked{% endif %}>
         <label for="src-text">{{ icon('file-text', 16) }} Paste text</label>
-        <input type="radio" name="source_type" value="pdf" id="src-pdf">
+        <input type="radio" name="source_type" value="pdf" id="src-pdf" {% if request.form.get('source_type') == 'pdf' %}checked{% endif %}>
         <label for="src-pdf">{{ icon('upload', 16) }} Upload PDF</label>
         <span class="thumb" aria-hidden="true"></span>
       </div>
@@ -68,11 +70,12 @@
 
     <div class="src-section" id="source-text">
       <div class="field">
+        <label for="text-input" class="sr-only">Source text</label>
         <textarea name="text_input" id="text-input" rows="10" data-counter
           {% if config.MAX_SOURCE_CHARS %}maxlength="{{ config.MAX_SOURCE_CHARS }}"{% endif %}
-          placeholder="Paste lecture notes, a textbook section, or a study guide…"></textarea>
+          placeholder="Paste lecture notes, a textbook section, or a study guide…">{{ request.form.get('text_input', '') }}</textarea>
         <div class="label-row">
-          <span class="hint">Headings and paragraphs help the chunker keep related ideas together.</span>
+          <span class="hint">Headings and paragraphs help keep related ideas together.</span>
           <span class="counter"><b id="cc">0</b> chars · <b id="wc">0</b> words</span>
         </div>
       </div>
@@ -95,19 +98,21 @@
       <div class="grid-2" style="margin-top:1rem">
         <div class="field">
           <label for="page-start">Start page</label>
-          <input type="number" id="page-start" name="page_start" min="1" placeholder="1" inputmode="numeric">
+          <input type="number" id="page-start" name="page_start" value="{{ request.form.get('page_start', '') }}" min="1" placeholder="1" inputmode="numeric">
         </div>
         <div class="field">
           <label for="page-end">End page</label>
-          <input type="number" id="page-end" name="page_end" min="1" placeholder="Last" inputmode="numeric">
+          <input type="number" id="page-end" name="page_end" value="{{ request.form.get('page_end', '') }}" min="1" placeholder="Last" inputmode="numeric">
         </div>
       </div>
     </div>
 
     <button type="submit" class="btn primary lg block" style="margin-top:.5rem">
-      Continue to review <span class="arrow">{{ icon('arrow-right', 16) }}</span>
+      Continue to source review <span class="arrow">{{ icon('arrow-right', 16) }}</span>
     </button>
     <p class="note">{{ icon('shield', 14) }} Uploaded PDFs are extracted and then deleted from the server.</p>
   </form>
+  <aside class="create-aside"><span class="eyebrow">FROM SOURCE TO RECALL</span><h3>Good cards start here.</h3><p>Bring the material you want to remember. Review the source before generating.</p>{% include 'partials/source_illustration.html' %}</aside>
+  </div>
 </div>
 {% endblock %}

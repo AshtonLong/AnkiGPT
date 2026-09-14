@@ -1,32 +1,32 @@
 {% extends "base.html" %}
-{% from "partials/ui.html" import icon, card_stack %}
+{% from "partials/ui.html" import icon %}
 {% block title %}Create account · AnkiGPT{% endblock %}
 {% block body_class %}no-nav{% endblock %}
 {% block main %}
 <div class="auth">
-  <aside class="auth-side" data-tilt>
+  <aside class="auth-side">
     <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
       <span class="logo-mark" aria-hidden="true"></span>
       <span class="logo-word"><b>Anki</b><i>GPT</i></span>
     </a>
-    {{ card_stack() }}
+    {% include 'partials/source_illustration.html' %}
     <div class="quote">
-      <h2>Your notes, <span class="grad">dealt</span> into cards.</h2>
-      <p>Upload a PDF or paste text, review the cheat sheet, export to Anki. Free to start.</p>
+      <h2>Your notes.<br><span class="grad">Your next deck.</span></h2>
+      <p>Bring your material, refine your cards, and take them straight into your Anki routine.</p>
     </div>
   </aside>
 
   <div class="auth-main">
     <div class="panel auth-card">
       <h1>Create your account</h1>
-      <p>Start generating flashcards in seconds.</p>
+      <p>A workspace for your sources, cards, and next study session.</p>
       <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
           <label for="email">Email</label>
           <div class="with-icon">
             {{ icon('mail') }}
-            <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email" autofocus>
+            <input type="email" id="email" name="email" value="{{ request.form.get('email', '') }}" placeholder="you@example.com" required autocomplete="email" autofocus>
           </div>
         </div>
         <div class="field">

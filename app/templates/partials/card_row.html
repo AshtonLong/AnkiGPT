@@ -8,8 +8,9 @@
       aria-label="Select card {{ card.id }}">
   </div>
 
-  <form class="card-form" hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
+  <form class="card-form" method="post" action="{{ url_for('main.update_card', card_id=card.id) }}" hx-post="{{ url_for('main.update_card', card_id=card.id) }}" hx-target="#card-{{ card.id }}"
     hx-swap="outerHTML" hx-indicator="#card-{{ card.id }}" hx-disabled-elt="find button[type='submit']">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if card.figure_id %}
     <a class="card-figure" href="{{ url_for('main.figure_image', figure_id=card.figure_id) }}" target="_blank" rel="noopener">
       <img src="{{ url_for('main.figure_image', figure_id=card.figure_id) }}" alt="Figure used by this card" loading="lazy">
@@ -53,8 +54,15 @@
       {% if rs %}<span class="cn stats {{ 'bad' if rs.struggling else '' }}" title="Imported Anki review history">{{ icon('activity', 12) }} {{ rs.reps }} reps · {{ rs.lapses }} lapses · {{ (rs.again_rate * 100)|round|int }}% again</span>{% endif %}
     </div>
     {% endif %}
+    {% if critic.coach and critic.coach.original %}
+    <details class="coach-original"><summary>Compare with original</summary><span class="mono">BEFORE COACH</span>
+      {% set original = critic.coach.original %}
+      <p>{{ original.front or original.cloze_text or '' }}</p><p>{{ original.back or original.extra or '' }}</p>
+      <span class="hint">The fields above contain the current version. Edit and save to complete your review.</span>
+    </details>
+    {% endif %}
     <div class="card-actions">
-      <button class="btn sm" type="submit">{{ icon('save', 14) }} Save</button>
+      <button class="btn sm card-save" type="submit" title="Save card (Ctrl+S / ⌘S)"><span class="btn-icon">{{ icon('save', 14) }}</span><span class="btn-spinner" aria-hidden="true"></span><span data-save-label>Save</span></button>
       <button class="btn sm cool" type="button" data-improve hx-post="{{ url_for('main.improve', card_id=card.id) }}"
         hx-target="#card-{{ card.id }}" hx-swap="outerHTML" hx-indicator="#card-{{ card.id }}" hx-disabled-elt="this"
         title="Ask the AI to tighten this card">
@@ -62,7 +70,7 @@
         <span>AI improve</span>
       </button>
       <span class="dirty">Unsaved changes</span>
-      <span class="saved">{{ icon('check', 13) }} Saved</span>
+      <span class="saved" role="status">{{ icon('check', 13) }} Saved</span>
     </div>
   </form>
 

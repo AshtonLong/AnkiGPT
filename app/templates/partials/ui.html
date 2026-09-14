@@ -58,7 +58,7 @@
 {%- endmacro %}
 
 {% macro stepper(step, done=false) -%}
-{% set steps = ['Source', 'Configure', 'Generate'] %}
+{% set steps = ['Source', 'Brief', 'Plan', 'Cards'] %}
 <ol class="stepper" aria-label="Progress">
   {% for name in steps %}
   {% set n = loop.index %}
@@ -70,38 +70,4 @@
   {% if not loop.last %}<li class="bar {{ 'done' if n < step or (done and n == step) else '' }}" aria-hidden="true"></li>{% endif %}
   {% endfor %}
 </ol>
-{%- endmacro %}
-
-{% macro card_stack() -%}
-<div class="stack" aria-hidden="true">
-  <div class="stack-glow"></div>
-  <div class="stack-inner">
-    <div class="slot s1"><div class="fcard">
-      <div class="face">
-        <div class="face-top"><span><b>Basic</b> · 014</span><span>Biochem</span></div>
-        <div class="face-q">Which enzyme unwinds the DNA double helix at the replication fork?</div>
-        <div class="face-tags"><span>replication</span><span>enzymes</span></div>
-      </div>
-    </div></div>
-    <div class="slot s2"><div class="fcard">
-      <div class="face">
-        <div class="face-top"><span><b>Cloze</b> · 027</span><span>Neuro</span></div>
-        <div class="face-q">Wernicke&rsquo;s area, in the <span class="cloze"><span class="hid">[&hellip;]</span><span class="rev">posterior superior temporal gyrus</span></span>, handles language comprehension.</div>
-        <div class="face-tags"><span>language</span><span>cortex</span></div>
-      </div>
-    </div></div>
-    <div class="slot s3"><div class="fcard">
-      <div class="face front">
-        <div class="face-top"><span><b>Basic</b> · 003</span><span>Front</span></div>
-        <div class="face-q">What is the primary function of the cerebellum?</div>
-        <div class="face-tags"><span>anatomy</span><span>motor</span></div>
-      </div>
-      <div class="face back">
-        <div class="face-top"><span><b>Answer</b> · 003</span><span>Back</span></div>
-        <div class="face-a">Coordinating voluntary movement, balance and posture &mdash; it fine-tunes motor activity using sensory feedback from the body and cortex.</div>
-        <div class="face-tags"><span>anatomy</span><span>motor</span></div>
-      </div>
-    </div></div>
-  </div>
-</div>
 {%- endmacro %}
