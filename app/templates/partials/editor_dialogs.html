@@ -1,0 +1,53 @@
+{% from 'partials/ui.html' import icon %}
+<dialog id="import-dialog" aria-labelledby="import-title">
+  <div class="dialog-head">
+<span class="eyebrow">FROM ANKI, BACK TO YOUR CARDS</span>
+<button class="btn icon ghost" type="button" data-close-dialog aria-label="Close">{{ icon('x') }}</button>
+</div>
+  <h2 id="import-title">Import review history</h2>
+  <p>Find the cards that keep coming back. Import an Anki package with scheduling information to match your reviews to this deck.</p>
+  <p class="dialog-help">
+<b>In Anki desktop</b>
+<br>File → Export → choose .apkg or .colpkg → include scheduling information.</p>
+  <form action="{{ url_for('main.import_reviews', deck_id=deck.id) }}" method="post" enctype="multipart/form-data" class="review-form" data-import-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="review-package">Anki package</label>
+<input id="review-package" type="file" name="anki_package" accept=".apkg,.colpkg" required>
+    <div class="hint" data-import-file>No file selected · .apkg or .colpkg</div>
+    <div data-import-result role="status" hidden>
+</div>
+    <div class="dialog-actions">
+<button class="btn" type="button" data-close-dialog>Cancel</button>
+<button class="btn primary" type="submit">{{ icon('upload',16) }} Import reviews</button>
+</div>
+  </form>
+</dialog>
+<dialog id="export-dialog" aria-labelledby="export-title">
+  <div class="dialog-head">
+<span class="eyebrow">READY FOR YOUR ROUTINE</span>
+<button class="btn icon ghost" type="button" data-close-dialog aria-label="Close">{{ icon('x') }}</button>
+</div>
+  <h2 id="export-title">Take your deck to Anki.</h2>
+  <div class="dialog-file">{{ icon('package',28) }}<div>
+<b>{{ deck.title }}.apkg</b>
+<small>{{ export_count }} reviewed cards · {{ deck.card_style }}</small>
+</div>
+</div>
+  <p class="hint">Deleted cards and cards marked Needs review are excluded. Save your reviewed edits to include them.</p>
+  <ul class="dialog-checklist">
+<li>{{ icon('check',15) }} Card text and formatting</li>
+<li>{{ icon('check',15) }} Your tags</li>
+<li>{{ icon('check',15) }} Images attached to your cards</li>
+</ul>
+  <p class="dialog-help">In Anki desktop, choose <b>File → Import</b> and select the downloaded .apkg. Review AI-generated cards against your source before studying.</p>
+  <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post" data-export-form data-filename="{{ deck.title }}.apkg">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div data-export-result role="status" hidden>
+</div>
+    <div class="dialog-actions">
+<button class="btn" type="button" data-close-dialog>Back to cards</button>
+<button class="btn primary" type="submit" {% if not export_count %}disabled{% endif %}>{{ icon('download',16) }} Download .apkg</button>
+</div>
+  </form>
+  {% if not export_count %}<p class="hint">There are no reviewed cards to export. Review, save, or restore your cards first.</p>{% endif %}
+</dialog>

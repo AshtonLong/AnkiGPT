@@ -9,7 +9,7 @@
 <section class="status wide" id="status-root" data-state="{{ state }}" data-pct="{{ payload.pct }}"
   data-progress-url="{{ url_for('main.progress_json', deck_id=deck.id) }}"
   data-editor-url="{{ url_for('main.deck_editor', deck_id=deck.id) }}">
-  {{ stepper(3, done=(state == 'ready')) }}
+  {{ stepper(4, done=(state == 'ready')) }}
 
   <div class="panel status-card" role="status" aria-live="polite">
     {% if state == 'processing' %}
@@ -23,22 +23,9 @@
     </div>
 
     <div class="status-hero">
-      <div class="ring-wrap" data-progress="{{ payload.pct }}">
-        <svg class="ring" viewBox="0 0 160 160" aria-hidden="true">
-          <defs>
-            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#ff5c5c" />
-              <stop offset=".55" stop-color="#ff8a3d" />
-              <stop offset="1" stop-color="#ffc541" />
-            </linearGradient>
-          </defs>
-          <circle class="track" cx="80" cy="80" r="72" />
-          <circle class="fill" cx="80" cy="80" r="72" />
-        </svg>
-        <div class="ring-label">
-          <b><span data-progress-num>{{ payload.pct }}</span><small>%</small></b>
-          <span><span data-cards-ok>{{ payload.cards_ok }}</span> cards</span>
-        </div>
+      <div class="generation-progress" data-progress="{{ payload.pct }}" style="--p:{{ payload.pct }}">
+        <div class="progress-label"><span><b data-cards-ok>{{ payload.cards_ok }}</b> cards so far</span><b><span data-progress-num>{{ payload.pct }}</span>%</b></div>
+        <div class="progress-track" role="progressbar" aria-label="Deck generation" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ payload.pct }}"></div>
       </div>
       <div class="status-copy">
         <h2 data-headline>{{ icon('loader', 18) }} Starting the <span class="grad">agent</span></h2>
@@ -84,12 +71,6 @@
     </div>
 
     {% elif state == 'ready' %}
-    <div class="confetti" aria-hidden="true">
-      {% set colors = ['#ff6b57', '#ffc541', '#5ff0b0', '#6cb8ff', '#a98bff'] %}
-      {% for i in range(16) %}
-      <i style="--x:{{ (i * 6.3 + 2)|round(1) }}%; --dl:{{ ((i % 5) * 0.13)|round(2) }}s; --rot:{{ 540 if i % 2 else -540 }}deg; --c:{{ colors[i % 5] }}"></i>
-      {% endfor %}
-    </div>
     <div class="status-icon ok">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 12.5l5 5L20 6.5" />
@@ -97,7 +78,6 @@
     </div>
     <h2>Your deck is <span class="grad">ready</span></h2>
     <p class="sub">{{ deck.title }} · {{ stats.cards_ok or payload.cards_ok }} cards</p>
-    <div class="fan" aria-hidden="true">{% for i in range(5) %}<i style="--i:{{ i }}"></i>{% endfor %}</div>
 
     <div class="ready-stats" data-stagger="60">
       <div class="rs" data-reveal><b data-count="{{ stats.cards_ok or payload.cards_ok }}">0</b><span>cards kept</span></div>
@@ -125,7 +105,7 @@
 
     {% else %}
     <div class="status-icon err">{{ icon('x-circle', 52) }}</div>
-    <h2>Generation failed</h2>
+    <h2>Generation paused here.</h2><p class="sub">Your source is saved. Review the issue below, then retry.</p>
     <p class="sub">{{ deck.title }}</p>
     <div class="status-msg">
       {{ icon('alert', 16) }}
@@ -150,7 +130,8 @@
         <input type="hidden" name="glossary" value="{{ s.get('glossary', '') }}">
         <input type="hidden" name="exam_context" value="{{ s.get('exam_context', '') }}">
         <input type="hidden" name="target_cards" value="{{ s.get('target_cards') or 'auto' }}">
-        {% if s.get('use_figures', True) %}<input type="hidden" name="use_figures" value="on">{% endif %}
+        {% if s.get('review_plan') %}<input type="hidden" name="review_plan" value="on">{% endif %}
+        <input type="hidden" name="use_figures" value="{{ 'on' if s.get('use_figures', True) else 'off' }}">
         <button class="btn primary" type="submit">{{ icon('refresh') }} Retry generation</button>
       </form>
       <a class="btn" href="{{ url_for('main.preview_deck', deck_id=deck.id) }}">{{ icon('settings') }} Edit brief</a>

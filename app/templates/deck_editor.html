@@ -2,6 +2,8 @@
 {% from "partials/ui.html" import icon %}
 {% block title %}{{ deck.title }} · Editor · AnkiGPT{% endblock %}
 {% block content %}
+{% set view = request.args.get('view', 'cards') %}
+{% set export_count = deck.cards|selectattr('status', 'equalto', 'ok')|list|length %}
 {% set filtered = q or card_type or status or strategy %}
 {% set total = deck.cards|length %}
 {% set run = insights.run or {} %}
@@ -30,15 +32,23 @@
     <a class="btn cool" href="{{ url_for('main.plan_deck', deck_id=deck.id) }}">{{ icon('brain', 15) }} Review plan</a>
     {% endif %}
     <a class="btn" href="{{ url_for('main.status', deck_id=deck.id) }}">{{ icon('git', 15) }} Run trace</a>
-    <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button class="btn primary" type="submit">{{ icon('download') }} Export .apkg</button>
-    </form>
+    <button class="btn primary" type="button" data-open-dialog="export-dialog">{{ icon('download') }} Export deck</button>
   </div>
 </div>
 
-{% if stats or units %}
-<details class="panel insights" data-reveal style="--d:40">
+<nav class="editor-tabs" aria-label="Deck views">
+  <a href="{{ url_for('main.deck_editor', deck_id=deck.id) }}" {% if view == 'cards' %}aria-current="page"{% endif %}>Cards <span class="pill">{{ total }}</span></a>
+  <a href="{{ url_for('main.deck_editor', deck_id=deck.id, view='insights') }}" {% if view == 'insights' %}aria-current="page"{% endif %}>Run insights</a>
+  <a href="{{ url_for('main.deck_editor', deck_id=deck.id, view='coach') }}" {% if view == 'coach' %}aria-current="page"{% endif %}>Coach {% if struggling %}<span class="pill warn">{{ struggling }}</span>{% endif %}</a>
+  <span class="spacer"></span><button type="button" data-open-dialog="import-dialog">{{ icon('upload',14) }} Import reviews</button>
+</nav>
+{% if view == 'coach' %}
+<section class="panel coach-banner"><div><span class="eyebrow">CLOSE THE LOOP</span><h2>Make the hard cards clearer.</h2><p>Import your Anki review history to find struggling cards. Coach can rewrite or split them; review each suggestion before studying.</p></div><div class="actions">
+{% if struggling %}<form action="{{ url_for('main.coach', deck_id=deck.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn primary" type="submit">{{ icon('brain',16) }} Coach {{ struggling }} cards</button></form>{% else %}<button class="btn" type="button" data-open-dialog="import-dialog">Import review history</button>{% endif %}
+</div></section>
+{% endif %}
+{% if view == 'insights' %}
+<details open class="panel insights" data-reveal style="--d:40">
   <summary>
     <span class="panel-title">{{ icon('gauge') }} Run insights</span>
     <span class="ins-summary">
@@ -53,6 +63,7 @@
       <div class="ins-col">
         <h4>{{ icon('coins', 14) }} Cost by phase</h4>
         <table class="ins-table">
+          {% if not insights.by_phase %}<tr><td>No phase costs have been recorded for this deck yet.</td></tr>{% endif %}
           {% for key, label in phases %}
           {% set row = insights.by_phase.get(key) %}
           {% if row %}
@@ -79,47 +90,37 @@
             <span class="u-idx">{{ u.idx }}</span>
             <div><b>{{ u.title }}</b><small>{{ u.kind }} · density {{ u.density }}{% if u.skipped %} · skipped: {{ u.skip_reason }}{% endif %}</small></div>
           </li>
+          {% else %}<li class="unit"><span class="hint">Your document map will appear after planning.</span></li>
           {% endfor %}
         </ol>
       </div>
-      <div class="ins-col">
-        <h4>{{ icon('activity', 14) }} Close the loop with Anki</h4>
-        <p class="hint" style="margin-bottom:.8rem">Study the exported deck, then export it back from Anki (<i>File → Export → include scheduling</i>) and drop it here. Cards you keep failing get flagged, and the coach rewrites them.</p>
-        <form action="{{ url_for('main.import_reviews', deck_id=deck.id) }}" method="post" enctype="multipart/form-data" class="review-form">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="file" name="anki_package" accept=".apkg,.colpkg" required aria-label="Anki package">
-          <button class="btn sm" type="submit">{{ icon('upload', 14) }} Import reviews</button>
-        </form>
-        {% if struggling %}
-        <form action="{{ url_for('main.coach', deck_id=deck.id) }}" method="post" style="margin-top:.6rem">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn sm cool" type="submit">{{ icon('sparkles', 14) }} Coach {{ struggling }} struggling cards</button>
-        </form>
-        {% endif %}
-      </div>
+
     </div>
   </div>
 </details>
 {% endif %}
 
+{% if view != 'insights' %}
 <form method="get" class="panel toolbar" data-reveal style="--d:70" role="search">
+  {% if view == 'coach' %}<input type="hidden" name="view" value="coach">{% endif %}
+  <button class="btn filter-toggle" type="button" data-toggle-filters aria-expanded="false">{{ icon('settings',14) }} Filters</button>
   <div class="with-icon search">
     {{ icon('search') }}
     <input type="search" name="q" value="{{ q }}" placeholder="Search cards… press Enter" aria-label="Search cards">
   </div>
-  <div class="chips" role="group" aria-label="Card type">
+  <div class="chips filter-detail" role="group" aria-label="Card type">
     <input type="radio" name="type" value="" id="t-all" {% if not card_type %}checked{% endif %} data-autosubmit><label for="t-all">All types</label>
     <input type="radio" name="type" value="basic" id="t-basic" {% if card_type == 'basic' %}checked{% endif %} data-autosubmit><label for="t-basic">Basic</label>
     <input type="radio" name="type" value="cloze" id="t-cloze" {% if card_type == 'cloze' %}checked{% endif %} data-autosubmit><label for="t-cloze">Cloze</label>
   </div>
-  <div class="chips" role="group" aria-label="Card status">
+  <div class="chips filter-detail" role="group" aria-label="Card status">
     <input type="radio" name="status" value="" id="s-all" {% if not status %}checked{% endif %} data-autosubmit><label for="s-all">Any status</label>
-    <input type="radio" name="status" value="ok" id="s-ok" {% if status == 'ok' %}checked{% endif %} data-autosubmit><label for="s-ok">OK</label>
+    <input type="radio" name="status" value="ok" id="s-ok" {% if status == 'ok' %}checked{% endif %} data-autosubmit><label for="s-ok">Reviewed</label>
     <input type="radio" name="status" value="needs_review" id="s-rev" {% if status == 'needs_review' %}checked{% endif %} data-autosubmit><label for="s-rev">Needs review</label>
     <input type="radio" name="status" value="deleted" id="s-del" {% if status == 'deleted' %}checked{% endif %} data-autosubmit><label for="s-del">Deleted</label>
   </div>
   {% if strategies_used or struggling %}
-  <div class="select-wrap sm">
+  <div class="select-wrap sm filter-detail">
     <select name="strategy" aria-label="Strategy" data-autosubmit>
       <option value="">All strategies</option>
       {% for s in strategies_used %}<option value="{{ s }}" {% if strategy == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
@@ -138,7 +139,7 @@
 </form>
 
 <!-- Floating bulk-action tray; card checkboxes bind to it via form="bulk-actions-form". -->
-<form action="{{ url_for('main.bulk_cards') }}" method="post" id="bulk-actions-form" class="tray" aria-label="Bulk actions">
+<form action="{{ url_for('main.bulk_cards') }}" method="post" id="bulk-actions-form" class="tray" aria-label="Bulk actions" aria-hidden="true" inert>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <span class="count"><b data-sel-count>0</b>selected</span>
   <button class="btn sm" type="submit" name="action" value="restore">{{ icon('refresh', 14) }} Restore</button>
@@ -164,8 +165,8 @@
 <section class="panel" data-reveal>
   <div class="empty">
     <div class="empty-deck" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h3>No cards {% if filtered %}match{% else %}yet{% endif %}</h3>
-    <p>{% if filtered %}Try a different search or clear the filters.{% elif deck.status == 'processing' %}This deck is still generating — check its progress.{% elif deck.status == 'planned' %}The plan is waiting for your review.{% else %}This deck doesn't have any cards yet.{% endif %}</p>
+    <h3>{% if view == 'coach' and not filtered %}No cards need coaching yet{% else %}No cards {% if filtered %}match{% else %}yet{% endif %}{% endif %}</h3>
+    <p>{% if filtered %}Try a different search or clear the filters.{% elif view == 'coach' %}Import review history after studying in Anki. Struggling cards and Coach suggestions will appear here.{% elif deck.status == 'processing' %}This deck is still generating — check its progress.{% elif deck.status == 'planned' %}The plan is waiting for your review.{% else %}This deck doesn't have any cards yet.{% endif %}</p>
     {% if filtered %}
     <a class="btn" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('x', 14) }} Clear filters</a>
     {% elif deck.status == 'processing' %}
@@ -176,4 +177,6 @@
   </div>
 </section>
 {% endif %}
+{% endif %}
+{% include 'partials/editor_dialogs.html' %}
 {% endblock %}

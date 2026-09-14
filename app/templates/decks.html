@@ -24,7 +24,7 @@
   </div>
   <div class="stat" data-reveal>
     <div class="stat-ic">{{ icon('cards') }}</div>
-    <div><b data-count="{{ total_cards }}">0</b><span>cards generated</span></div>
+    <div><b data-count="{{ total_cards }}">0</b><span>active cards</span></div>
   </div>
   <div class="stat" data-reveal>
     <div class="stat-ic">{{ icon('check') }}</div>
@@ -67,11 +67,11 @@
     </div>
     <div class="deck-foot">
       <span class="open">
-        {% if deck.status == 'ready' %}Open editor{% elif deck.status == 'draft' %}Configure{% elif deck.status == 'processing' %}View progress{% elif deck.status == 'planned' %}Review plan{% else %}View details{% endif %}
+        {% if deck.status == 'ready' %}Open editor{% elif deck.status == 'draft' %}Continue setup{% elif deck.status == 'processing' %}View progress{% elif deck.status == 'planned' %}Review plan{% else %}View details{% endif %}
         {{ icon('arrow-right', 15) }}
       </span>
       <form action="{{ url_for('main.delete_deck', deck_id=deck.id) }}" method="post"
-        onsubmit="return confirm('Delete “{{ deck.title|e }}”? This cannot be undone.');">
+        data-confirm-deck="{{ deck.title }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn icon" type="submit" aria-label="Delete deck {{ deck.title }}" title="Delete deck">{{ icon('trash', 15) }}</button>
       </form>

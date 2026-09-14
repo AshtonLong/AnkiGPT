@@ -1,83 +1,109 @@
 <!doctype html>
 <html lang="en">
 {% from "partials/ui.html" import icon %}
-
+{% set app_page = request.endpoint and request.endpoint.startswith('main.') and request.endpoint != 'main.index' %}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <meta name="theme-color" content="#0a0a0d">
-  <title>{% block title %}{{ title or "AnkiGPT" }}{% endblock %}</title>
-  <meta name="description"
-    content="Turn any PDF or set of notes into validated, editable Anki flashcards. Upload, generate, export.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff5c5c'/%3E%3Cstop offset='1' stop-color='%23ffc541'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Crect x='8' y='11' width='14' height='10' rx='2' fill='%231a0b06' opacity='.5' transform='rotate(-10 15 16)'/%3E%3Crect x='11' y='11' width='14' height='10' rx='2' fill='%23fff' transform='rotate(6 18 16)'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#FAFBFC">
+  <title>{% block title %}{{ title or 'AnkiGPT' }}{% endblock %}</title>
+  <meta name="description" content="Turn your PDFs and notes into editable flashcards. Review what matters, then take your deck straight into Anki.">
+  <link rel="icon" href="{{ url_for('static', filename='brand.svg') }}" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Fragment+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js" defer></script>
-  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js" defer>
+</script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer>
+</script>
+  <script src="{{ url_for('static', filename='experience.js') }}" defer>
+</script>
 </head>
-
-<body class="{% block body_class %}{% endblock %}">
-  <div class="pbar" aria-hidden="true"></div>
-
-  <!-- Ambient backdrop: drifting aurora orbs, a masked dot grid, film grain. -->
-  <div class="backdrop" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-    <div class="dots"></div>
-  </div>
-  <div class="grain" aria-hidden="true"></div>
-
+<body class="{{ 'app-shell' if app_page else 'public-shell' }} {% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="pbar" aria-hidden="true">
+</div>
+  {% if app_page %}
+  <aside class="sidebar" id="app-navigation">
+    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
+<span class="logo-mark" aria-hidden="true">
+</span>
+<span class="logo-word">AnkiGPT</span>
+</a>
+    <span class="nav-caption">WORKSPACE</span>
+    <nav aria-label="Workspace">
+      <a href="{{ url_for('main.decks') }}" {% if request.endpoint != 'main.new_deck' %}aria-current="page"{% endif %}>{{ icon('cards') }} Your decks</a>
+      <a href="{{ url_for('main.new_deck') }}" {% if request.endpoint == 'main.new_deck' %}aria-current="page"{% endif %}>{{ icon('plus') }} New deck</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-note">
+<span class="mini-mark">↗</span>
+<b>Source to recall.</b>
+<p>Your material. Your edits.<br>Your Anki routine.</p>
+</div>
+      {% if current_user.is_authenticated %}
+      <div class="account">{{ icon('user', 18) }} <span title="{{ current_user.email }}">{{ current_user.email }}</span>
+</div>
+      <form action="{{ url_for('auth.logout') }}" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<button class="btn ghost block" type="submit">{{ icon('logout', 16) }} Sign out</button>
+</form>
+      {% else %}<span class="hint">Local workspace</span>{% endif %}
+    </div>
+  </aside>
+  <button class="nav-scrim" type="button" data-close-nav aria-label="Close navigation" hidden>
+</button>
+  {% endif %}
   <header class="topbar">
     <div class="wrap">
       <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
-        <span class="logo-mark" aria-hidden="true"></span>
-        <span class="logo-word"><b>Anki</b><i>GPT</i></span>
-      </a>
-      <nav class="nav-links" aria-label="Primary">
-        {% block nav %}
-        <a href="{{ url_for('main.decks') }}" {% if request.endpoint == 'main.decks' %}aria-current="page"{% endif %}>Decks</a>
-        <a href="{{ url_for('main.new_deck') }}" {% if request.endpoint == 'main.new_deck' %}aria-current="page"{% endif %}>New deck</a>
-        {% if current_user.is_authenticated %}
-        <form action="{{ url_for('auth.logout') }}" method="post">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit">{{ icon('logout', 15) }} Log out</button>
-        </form>
-        {% elif config.AUTH_REQUIRED %}
-        <a href="{{ url_for('auth.login') }}">Sign in</a>
-        {% endif %}
-        {% endblock %}
-      </nav>
+<span class="logo-mark" aria-hidden="true">
+</span>
+<span class="logo-word">AnkiGPT</span>
+</a>
+      {% if app_page %}
+      <div class="breadcrumbs">
+<a href="{{ url_for('main.decks') }}">Workspace</a>
+<span>/</span>
+<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor'}.get(request.endpoint, 'Your decks') }}</b>
+</div>
+      <span class="topbar-note">SOURCE TO RECALL</span>
+      <button class="btn icon menu-button" type="button" data-nav-toggle aria-controls="app-navigation" aria-expanded="false" aria-label="Open navigation">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+<path d="M4 7h16M4 12h16M4 17h16"/>
+</svg>
+</button>
+      {% else %}
+      <nav class="nav-links" aria-label="Primary">{% block nav %}<a href="{{ url_for('main.index') }}">Back to home {{ icon('arrow-right', 14) }}</a>{% endblock %}</nav>
+      {% endif %}
     </div>
   </header>
-
-  <!-- Flash messages render as toasts; app.js handles dismissal and auto-expiry. -->
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false">
-    {% with messages = get_flashed_messages(with_categories=True) %}
-    {% for category, message in messages %}
+    {% with messages = get_flashed_messages(with_categories=True) %}{% for category, message in messages %}
     {% set kind = 'error' if category == 'error' else ('success' if category == 'success' else 'info') %}
     <div class="toast {{ kind }}" role="status">
-      <span class="t-ic">{{ icon('alert' if kind == 'error' else ('check' if kind == 'success' else 'info'), 20) }}</span>
-      <div>{{ message }}</div>
-      <button class="t-x" type="button" aria-label="Dismiss" data-dismiss>{{ icon('x', 14) }}</button>
-      <span class="t-bar" aria-hidden="true"></span>
-    </div>
-    {% endfor %}
-    {% endwith %}
+<span class="t-ic">{{ icon('alert' if kind == 'error' else ('check' if kind == 'success' else 'info'), 20) }}</span>
+<div>{{ message }}</div>
+<button class="t-x" type="button" aria-label="Dismiss" data-dismiss>{{ icon('x', 14) }}</button>{% if kind != 'error' %}<span class="t-bar" aria-hidden="true">
+</span>{% endif %}</div>
+    {% endfor %}{% endwith %}
   </div>
-
-  <main class="page">
-    {% block main %}
-    <div class="wrap">
-      {% block content %}{% endblock %}
-    </div>
-    {% endblock %}
-  </main>
+  <main class="page" id="main" tabindex="-1">{% block main %}<div class="wrap">{% block content %}{% endblock %}</div>{% endblock %}</main>
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+<div class="dialog-head">
+<span class="eyebrow">Your library</span>
+<button class="btn icon ghost" type="button" data-close-dialog aria-label="Close">{{ icon('x') }}</button>
+</div>
+<h2 id="confirm-title">Delete this deck?</h2>
+<p data-confirm-copy>
+</p>
+<p>Its source, cards, and review history will be permanently removed. This cannot be undone.</p>
+<div class="dialog-actions">
+<button class="btn" type="button" data-close-dialog>Keep deck</button>
+<button class="btn danger solid" type="button" data-confirm-accept>Delete deck</button>
+</div>
+</dialog>
 </body>
-
 </html>

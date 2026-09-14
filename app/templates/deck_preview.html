@@ -10,9 +10,9 @@
 
 <div class="page-head" data-reveal>
   <div>
-    <span class="eyebrow ember">Review &amp; brief the agent</span>
+    <span class="eyebrow ember">Source review</span>
     <h1>{{ deck.title }}</h1>
-    <p>Check the extracted text, then brief the planning agent. It maps the document, decides how to carve it up, and delegates card writing to specialist workers.</p>
+    <p>Check your extracted material, then tell the planner what to focus on. Your cards will be written from this source.</p>
   </div>
   <div class="actions">
     <span class="pill {{ 'info' if deck.card_style == 'cloze' else ('violet' if deck.card_style == 'mixed' else 'ok') }}">{{ deck.card_style }}</span>
@@ -32,6 +32,7 @@
       {% if n > preview_len %}<span class="trunc">Showing the first {{ '{:,}'.format(preview_len) }} of {{ '{:,}'.format(n) }} characters. The full text is used for generation.</span>{% endif %}
       <div class="fade" aria-hidden="true"></div>
     </div>
+    {% if figures %}<div class="source-figures"><span class="mono">FIGURES FROM YOUR PDF</span><div>{% for figure in figures %}<a href="{{ url_for('main.figure_image', figure_id=figure.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('main.figure_image', figure_id=figure.id) }}" alt="Extracted figure {{ loop.index }}{% if figure.page %}, page {{ figure.page }}{% endif %}" loading="lazy"><span class="hint">{% if figure.page %}Page {{ figure.page }}{% else %}Figure {{ loop.index }}{% endif %}</span></a>{% endfor %}</div>{% if figure_count > 6 %}<p class="hint">Showing 6 of {{ figure_count }} figures.</p>{% endif %}</div>{% endif %}
   </section>
 
   <form method="post" class="panel form-card sticky" data-reveal style="--d:110" data-source-chars="{{ n }}">
@@ -82,6 +83,7 @@
         <span class="tg-text"><b>Review the plan before writing</b><small>Pause after planning so you can skip units, resize tasks, or change strategies.</small></span>
       </label>
       {% if figure_count %}
+      <input type="hidden" name="use_figures" value="off">
       <label class="toggle">
         <input type="checkbox" name="use_figures" {% if s.get('use_figures', True) %}checked{% endif %}>
         <span class="tg"></span>
@@ -91,7 +93,7 @@
     </div>
 
     <button type="submit" class="btn primary lg block">{{ icon('zap') }} Plan &amp; generate</button>
-    <p class="note">{{ icon('clock', 14) }} Workers run in parallel; most decks finish in two to four minutes.</p>
+    <p class="note">{{ icon('clock', 14) }} You can leave the next page while your deck builds.</p>
   </form>
 </div>
 {% endblock %}

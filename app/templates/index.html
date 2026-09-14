@@ -1,210 +1,222 @@
 {% extends "base.html" %}
-{% from "partials/ui.html" import icon, card_stack %}
-{% block title %}AnkiGPT — Turn anything into Anki flashcards{% endblock %}
-
+{% from "partials/ui.html" import icon %}
+{% block title %}AnkiGPT · From source material to study-ready{% endblock %}
+{% block body_class %}landing{% endblock %}
 {% block nav %}
 <a href="#how">How it works</a>
-<a href="#features">Features</a>
-{% if current_user.is_authenticated or not config.AUTH_REQUIRED %}
-<a class="btn sm" href="{{ url_for('main.decks') }}">My decks {{ icon('arrow-right', 14) }}</a>
-{% else %}
-<a href="{{ url_for('auth.login') }}">Sign in</a>
-<a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started</a>
-{% endif %}
+<a href="#coach">Coach</a>
+<a href="#faq">FAQs</a>
+{% if current_user.is_authenticated or not config.AUTH_REQUIRED %}<a class="btn sm" href="{{ url_for('main.decks') }}">Your decks {{ icon('arrow-right',14) }}</a>{% else %}<a href="{{ url_for('auth.login') }}">Sign in</a>
+<a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started {{ icon('arrow-right',14) }}</a>{% endif %}
 {% endblock %}
-
 {% block main %}
-<section class="hero wrap" data-tilt>
-  <div class="hero-copy">
-    <div class="hero-chip">
-      <span class="spark">{{ icon('sparkles', 12) }}</span>
-      AI flashcards from PDFs and notes
-    </div>
-    <h1>
-      <span class="w" style="--i:0"><span>Study</span></span>
-      <span class="w" style="--i:1"><span>less.</span></span><br>
-      <span class="w" style="--i:2"><span>Remember</span></span><br>
-      <span class="w" style="--i:3"><span><em>more.</em></span></span>
-    </h1>
-    <p>Drop in a lecture PDF or paste your notes. AnkiGPT distills it into an exam cheat sheet, then deals out
-      validated Basic and Cloze cards you can edit in place and export straight into Anki.</p>
-    <div class="hero-actions">
-      <a class="btn primary lg" href="{{ url_for('main.new_deck') }}">{{ icon('plus') }} Create a deck</a>
-      <a class="btn lg ghost" href="#how">See how it works <span class="arrow">{{ icon('arrow-right', 16) }}</span></a>
-    </div>
-    <div class="hero-ticks">
-      <span>PDF + text input</span>
-      <span>Basic &amp; cloze</span>
-      <span>Validated output</span>
-      <span>.apkg export</span>
-    </div>
-  </div>
-  {{ card_stack() }}
-</section>
-
-<div class="marquee" aria-hidden="true">
-  <div class="marquee-track">
-    {% for _ in range(2) %}
-    <span>Anatomy</span><span>Organic chemistry</span><span>Constitutional law</span><span>Pharmacology</span>
-    <span>Microeconomics</span><span>Cell biology</span><span>Spanish vocabulary</span><span>Data structures</span>
-    <span>Art history</span><span>Neuroscience</span><span>Thermodynamics</span><span>Immunology</span>
-    {% endfor %}
-  </div>
+<section class="hero wrap">
+  <span class="hero-chip" data-reveal>
+<i class="dot">
+</i> AI flashcards. Built around your material.</span>
+  <h1 data-reveal>From source material.<br>
+<span>To study-ready<i class="hero-period">.</i>
+</span>
+</h1>
+  <p data-reveal>Turn your PDFs and notes into editable flashcards.<br class="desktop-only"> Review what matters, then take your deck straight into Anki.</p>
+  <div class="hero-actions" data-reveal>
+<a class="btn primary lg" href="{{ url_for('main.new_deck') }}">Create a deck {{ icon('arrow-right',16) }}</a>
+<a class="btn lg" href="#sample">Explore a sample {{ icon('cards',16) }}</a>
 </div>
-
-<section class="section" id="how">
-  <div class="wrap">
-    <div class="section-head" data-reveal>
-      <span class="eyebrow">How it works</span>
-      <h2>Source in. <span class="grad">Deck</span> out.</h2>
-      <p>Most generators throw raw text at a model and hope. AnkiGPT builds an exam cheat sheet first, then writes
-        cards from that — so every card is anchored to what actually matters.</p>
-    </div>
-    <div class="pipeline">
-      <div class="pnode" data-reveal>
-        <div class="pviz doc" aria-hidden="true">
-          <i style="--i:0;--w:52%"></i><i style="--i:1;--w:88%"></i><i style="--i:2;--w:74%"></i>
-          <i style="--i:3;--w:92%"></i><i style="--i:4;--w:60%"></i><i style="--i:5;--w:80%"></i>
-        </div>
-        <div class="step-tag">01 / UPLOAD</div>
-        <h3>Bring the material</h3>
-        <p>A PDF (with an optional page range) or pasted notes. Text is extracted to clean Markdown so headings and
-          structure survive.</p>
-      </div>
-      <div class="plink l1" aria-hidden="true"></div>
-      <div class="pnode" data-reveal style="--d:120">
-        <div class="pviz sheet" aria-hidden="true">
-          <b style="--i:0">Key concepts</b><i style="--i:1;--w:85%"></i><i style="--i:2;--w:64%"></i>
-          <b style="--i:3">Formulas</b><i style="--i:4;--w:72%"></i><i style="--i:5;--w:50%"></i>
-        </div>
-        <div class="step-tag">02 / DISTILL</div>
-        <h3>Build the cheat sheet</h3>
-        <p>Each chunk is condensed into an exam-focused sheet using your focus, exclusions and must-include terms.</p>
-      </div>
-      <div class="plink l2" aria-hidden="true"></div>
-      <div class="pnode" data-reveal style="--d:240">
-        <div class="pviz deck" aria-hidden="true">
-          <em style="--i:0;--x:-72px;--y:-14px;--r:-16deg"></em>
-          <em style="--i:1;--x:-26px;--y:-28px;--r:-6deg"></em>
-          <em style="--i:2;--x:26px;--y:-28px;--r:6deg"></em>
-          <em style="--i:3;--x:72px;--y:-14px;--r:16deg"></em>
-        </div>
-        <div class="step-tag">03 / DEAL</div>
-        <h3>Generate &amp; validate</h3>
-        <p>Cards are written per section, checked for cloze syntax, math and scope, de-duplicated, then handed to you
-          to edit and export.</p>
-      </div>
-    </div>
-  </div>
+  <small class="hero-foot">Your source. Your edits. Your Anki routine.</small>
 </section>
-
-<section class="section tight" id="features">
-  <div class="wrap">
-    <div class="section-head" data-reveal>
-      <span class="eyebrow">Capabilities</span>
-      <h2>Built to make you <span class="grad">dangerously</span> efficient</h2>
-      <p>Everything exists to shrink the gap between “I should study this” and sitting down with Anki.</p>
+<section class="wrap workbench-wrap" id="sample" aria-labelledby="sample-title" data-reveal>
+  <div class="workbench" data-demo>
+    <div class="workbench-head">
+<div>
+<span class="logo-mark small" aria-hidden="true">
+</span>
+<b id="sample-title">Source to recall</b>
+<span class="pill">Interactive sample</span>
+</div>
+<label class="sample-topic">
+<span class="sr-only">Sample topic</span>
+<select data-demo-topic>
+<option value="data">Data structures</option>
+<option value="french">French vocabulary</option>
+</select>
+</label>
+</div>
+    <div class="workbench-tabs" role="tablist" aria-label="Sample workflow">
+<button type="button" role="tab" id="demo-source-tab" aria-controls="demo-source" aria-selected="true" data-demo-tab="source">01 <span>Source</span>
+</button>
+<button type="button" role="tab" id="demo-review-tab" aria-controls="demo-review" aria-selected="false" tabindex="-1" data-demo-tab="review">02 <span>Review</span>
+</button>
+<button type="button" role="tab" id="demo-export-tab" aria-controls="demo-export" aria-selected="false" tabindex="-1" data-demo-tab="export">03 <span>Export</span>
+</button>
+<span class="hint">Made from your material. Refined by you.</span>
+</div>
+    <div id="demo-source" role="tabpanel" aria-labelledby="demo-source-tab" class="demo-source-grid">
+      <div class="demo-document">
+<span class="mono" data-demo-filename>DATA_STRUCTURES.PDF / SAMPLE</span>
+<h3 data-demo-title>Stacks &amp; queues</h3>
+<p class="hint">A little structure goes a long way.</p>
+<button class="source-passage selected" type="button" data-demo-card="0" aria-pressed="true">A <b>stack</b> follows a <mark>last-in, first-out (LIFO)</mark> order. The most recently added item is the first to be removed.</button>
+<button class="source-passage" type="button" data-demo-card="1" aria-pressed="false">A <b>queue</b> follows a <mark>first-in, first-out (FIFO)</mark> order. The earliest added item is removed first.</button>
+<span class="source-caption">{{ icon('file-text',14) }} Select a passage to see its card.</span>
+</div>
+      <div class="demo-cards">
+<div class="label-row">
+<span class="mono">YOUR CARDS</span>
+<span class="pill ok">2 in this sample</span>
+</div>
+<article class="demo-active-card">
+<div class="label-row">
+<span class="pill" data-demo-type>Basic</span>
+<span class="hint" data-demo-number>01 / 02</span>
+</div>
+<h3 data-demo-question>Which order does a stack follow?</h3>
+<div class="demo-answer" data-demo-answer hidden>Last in, first out (LIFO).</div>
+<button class="btn block" type="button" data-demo-reveal>Reveal answer {{ icon('eye',15) }}</button>
+</article>
+<div class="source-link">{{ icon('file-text',15) }} Linked to the highlighted passage</div>
+<button class="btn ghost" type="button" data-demo-next="review">Make it your own {{ icon('arrow-right',15) }}</button>
+</div>
     </div>
-    <div class="feat-grid" data-stagger="70">
-      <div class="feat" data-reveal>
-        <div class="feat-ic">{{ icon('file-text', 20) }}</div>
-        <h3>PDF &amp; text input</h3>
-        <p>Upload a PDF with an optional page range, or paste raw text from anywhere. Layout-aware extraction keeps
-          headings intact.</p>
-      </div>
-      <div class="feat" data-reveal>
-        <div class="feat-ic">{{ icon('sheet', 20) }}</div>
-        <h3>Cheat-sheet-first</h3>
-        <p>The source is distilled into a Markdown cheat sheet before any card is written, so cards test what matters.
-        </p>
-      </div>
-      <div class="feat" data-reveal>
-        <div class="feat-ic">{{ icon('scissors', 20) }}</div>
-        <h3>Basic &amp; cloze</h3>
-        <p>Question/answer cards for facts, cloze deletions for sequences and formulas. Pick a style per deck.</p>
-      </div>
-      <div class="feat" data-reveal>
-        <div class="feat-ic">{{ icon('shield', 20) }}</div>
-        <h3>Validation pipeline</h3>
-        <p>Cloze syntax, math normalisation, source-scope checks and de-duplication run on every card before you see
-          it.</p>
-      </div>
-      <div class="feat" data-reveal>
-        <div class="feat-ic">{{ icon('wand', 20) }}</div>
-        <h3>Inline editor</h3>
-        <p>Edit any card in place, tag or restore in bulk, regenerate a section, or let the AI polish a single card.
-        </p>
-      </div>
-      <div class="feat" data-reveal>
-        <div class="feat-ic">{{ icon('package', 20) }}</div>
-        <h3>Native .apkg export</h3>
-        <p>One click produces an Anki package with tags and formatting. Import and start reviewing immediately.</p>
-      </div>
-    </div>
+    <div id="demo-review" role="tabpanel" aria-labelledby="demo-review-tab" class="demo-review-grid" hidden>
+<div class="demo-document">
+<span class="mono">YOU HAVE THE FINAL SAY</span>
+<h3>Good first draft.<br>Better with your edits.</h3>
+<p>Make the question specific. Keep the answer focused. Every field is yours to change.</p>
+<div class="source-link">{{ icon('shield-check',18) }} Review AI output against your source.</div>
+</div>
+<form class="demo-edit" data-demo-form>
+<div class="label-row">
+<span class="pill" data-demo-edit-type>Basic</span>
+<span class="hint">Sample card · editable</span>
+</div>
+<div class="field">
+<label for="demo-front">Front</label>
+<input id="demo-front" required value="Which order does a stack follow?">
+</div>
+<div class="field">
+<label for="demo-back">Back</label>
+<textarea id="demo-back" required rows="3">Last in, first out (LIFO).</textarea>
+</div>
+<div class="actions">
+<button class="btn primary" type="submit">{{ icon('check',15) }} Save sample</button>
+<span data-demo-saved role="status" class="hint">
+</span>
+</div>
+</form>
+</div>
+    <div id="demo-export" role="tabpanel" aria-labelledby="demo-export-tab" class="demo-export" hidden>
+<div class="export-package">{{ icon('package',40) }}</div>
+<span class="mono">READY FOR YOUR ROUTINE</span>
+<h3>Your next Anki deck.</h3>
+<p>Cards, tags, formatting, and included images.<br>One .apkg file to import into Anki.</p>
+<div class="sample-file">{{ icon('file-text',22) }} <b data-demo-export-name>Data structures.apkg</b>
+<span class="pill">Sample preview</span>
+</div>
+<a href="{{ url_for('main.new_deck') }}" class="btn primary">Create your own deck {{ icon('arrow-right',15) }}</a>
+</div>
+    <div class="workbench-foot">
+<span>
+<i class="dot">
+</i> Illustrative sample — your own material stays in your workspace</span>
+<span>Basic + Cloze → .apkg</span>
+</div>
   </div>
+  <div class="capability-strip">
+<span>{{ icon('file-text',17) }} PDF &amp; text</span>
+<span>{{ icon('cards',17) }} Basic &amp; Cloze</span>
+<span>{{ icon('edit',17) }} Fully editable</span>
+<span>{{ icon('package',17) }} Native .apkg export</span>
+</div>
 </section>
-
-<section class="section tight">
-  <div class="wrap">
-    <div class="section-head" data-reveal>
-      <span class="eyebrow">Sample output</span>
-      <h2>Cards that actually <span class="grad">work</span></h2>
-      <p>Tap a card to flip it. These are real examples from generated decks.</p>
-    </div>
-    <div class="show-grid" data-stagger="120">
-      <div class="flip" data-reveal="scale">
-        <div class="flip-inner">
-          <div class="face front">
-            <div class="face-top"><span><b>Basic</b> · Anatomy</span><span>Front</span></div>
-            <div class="face-q">What is the primary function of the cerebellum?</div>
-            <span class="flip-hint">Flip</span>
-          </div>
-          <div class="face back">
-            <div class="face-top"><span><b>Answer</b> · Anatomy</span><span>Back</span></div>
-            <div class="face-a">Coordination of voluntary movement, balance, posture and motor learning. It receives
-              sensory input and fine-tunes motor activity from other brain regions.</div>
-            <span class="flip-hint">Flip</span>
-          </div>
-        </div>
-      </div>
-      <div class="flip" data-reveal="scale">
-        <div class="flip-inner">
-          <div class="face front">
-            <div class="face-top"><span><b>Cloze</b> · Neuroscience</span><span>Front</span></div>
-            <div class="face-q">Wernicke's area, located in the <span class="cloze"><span>[…]</span></span>, is critical
-              for language comprehension.</div>
-            <span class="flip-hint">Flip</span>
-          </div>
-          <div class="face back">
-            <div class="face-top"><span><b>Revealed</b> · Neuroscience</span><span>Back</span></div>
-            <div class="face-q">Wernicke's area, located in the <span class="cloze"><span>posterior superior temporal
-                  gyrus</span></span>, is critical for language comprehension.</div>
-            <span class="flip-hint">Flip</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<section class="section wrap" id="how">
+<div class="section-head" data-reveal>
+<span class="eyebrow">A SHORTER PATH TO STUDYING</span>
+<h2>Keep the learning.<br>Skip the card-making marathon.</h2>
+<p>A clear workflow, from the material in front of you to the deck you'll actually use.</p>
+</div>
+<div class="workflow-grid">
+{% for number,title,copy,ic in [('01','Bring your material','Upload a PDF or paste your notes. Choose a page range and tell the planner what matters.','file-text'),('02','Make it your own','Review the plan, refine each card, and check its source. You stay in control of the finished deck.','edit'),('03','Take it to Anki','Export your deck as an .apkg, including tags and images. Import it and keep your study routine.','package')] %}<article data-reveal>
+<span class="workflow-number">{{ number }}</span>
+<div class="workflow-icon">{{ icon(ic,26) }}</div>
+<h3>{{ title }}</h3>
+<p>{{ copy }}</p>
+</article>{% endfor %}</div>
 </section>
-
-<section class="section tight">
-  <div class="wrap">
-    <div class="cta-box" data-reveal="scale">
-      <h2>Ready to build something <span class="grad">brilliant</span>?</h2>
-      <p>Go from raw material to an Anki-ready deck in a few minutes. No setup, nothing to install.</p>
-      <a class="btn primary lg" href="{{ url_for('main.new_deck') }}">Create your deck <span class="arrow">{{ icon('arrow-right', 16) }}</span></a>
-    </div>
-  </div>
+<section class="feature-section wrap" id="features">
+<div data-reveal>
+<span class="eyebrow">YOUR SOURCE STAYS IN SIGHT</span>
+<h2>Cards with context.<br>Not loose facts.</h2>
+<p>Generated cards carry source quotes, so you can check where an answer came from. Keep the useful details. Fix anything that needs a second look.</p>
+<ul class="feature-list">
+<li>{{ icon('check',16) }} A plan shaped around your material</li>
+<li>{{ icon('check',16) }} Basic, Cloze, and image-backed cards</li>
+<li>{{ icon('check',16) }} Source quotes alongside your edits</li>
+</ul>
+<a href="{{ url_for('main.new_deck') }}" class="text-link">Start with your notes {{ icon('arrow-right',16) }}</a>
+</div>
+<div class="feature-art" data-reveal>{% include 'partials/source_illustration.html' %}</div>
 </section>
-
+<section class="coach-section" id="coach">
+<div class="wrap coach-grid">
+<div data-reveal>
+<span class="eyebrow">MEET YOUR CARD COACH</span>
+<h2>Pressed “Again”?<br>Give that card<br>a second draft.</h2>
+<p>Bring your Anki review history back. Coach spots struggling cards and helps rewrite or split them into clearer prompts.</p>
+<a class="btn light" href="{{ url_for('main.decks') }}">Explore your workspace {{ icon('arrow-right',16) }}</a>
+<small>Import an Anki export with scheduling information.</small>
+</div>
+<div class="coach-demo" data-reveal>
+<div class="label-row">
+<span class="mono">ILLUSTRATIVE COACH REWRITE</span>{{ icon('brain',22) }}</div>
+<div class="coach-switch" role="group" aria-label="Coach example">
+<button type="button" data-coach-example="before" aria-pressed="true">Original</button>
+<button type="button" data-coach-example="after" aria-pressed="false">After Coach</button>
+</div>
+<div data-coach-before>
+<span class="pill warn">Too much in one prompt</span>
+<h3>Explain stacks and queues, their ordering, and when to use them.</h3>
+<p>Several ideas compete for one answer.</p>
+</div>
+<div data-coach-after hidden>
+<span class="pill ok">One idea at a time</span>
+<h3>Which item is removed first from a stack?</h3>
+<p>The most recently added item — last in, first out.</p>
+<div class="coach-diagnosis">{{ icon('check',16) }} A focused prompt with a clear answer.</div>
+</div>
+<div class="coach-demo-foot">AI suggestions. Your final review.</div>
+</div>
+</div>
+</section>
+<section class="section wrap faq-section" id="faq">
+<div data-reveal>
+<span class="eyebrow">A FEW GOOD QUESTIONS</span>
+<h2>Before you<br>make your first deck.</h2>
+</div>
+<div class="faq-list" data-reveal>{% for q,a in [('What can I upload?','Upload a text-based PDF or paste your notes directly. You can choose a PDF page range. Scanned PDFs need OCR before uploading.'),('Can I edit the generated cards?','Yes. Edit prompts, answers, cloze text, and tags. Review source quotes, restore dropped cards, and ask AI to improve individual cards.'),('How do I get the deck into Anki?','Download the .apkg from your deck editor, then use File → Import in Anki desktop. Your package includes card formatting, tags, and any card images.'),('Should I review the AI output?','Yes. AI can make mistakes. Check the cards against your source and make any edits before studying. You can also review the generation plan before the cards are written.')] %}<details>
+<summary>{{ q }}<span aria-hidden="true">+</span>
+</summary>
+<p>{{ a }}</p>
+</details>{% endfor %}</div>
+</section>
+<section class="closing wrap" data-reveal>
+<span class="logo-mark" aria-hidden="true">
+</span>
+<h2>Your notes.<br>Your next deck.</h2>
+<p>Make room for the part that matters: learning.</p>
+<a class="btn primary lg" href="{{ url_for('main.new_deck') }}">Create a deck {{ icon('arrow-right',16) }}</a>
+</section>
 <footer class="site">
-  <div class="wrap">
-    <span>© 2026 AnkiGPT</span>
-    <nav aria-label="Footer">
-      <a href="{{ url_for('main.decks') }}">Decks</a>
-      <a href="{{ url_for('main.new_deck') }}">New deck</a>
-      <a href="#how">How it works</a>
-    </nav>
-  </div>
+<div class="wrap">
+<a class="logo" href="#">
+<span class="logo-mark small" aria-hidden="true">
+</span>AnkiGPT</a>
+<span>Source to recall.</span>
+<nav aria-label="Footer">
+<a href="{{ url_for('main.decks') }}">Your decks</a>
+<a href="#how">How it works</a>
+<a href="#faq">FAQs</a>
+</nav>
+</div>
 </footer>
 {% endblock %}

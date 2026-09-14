@@ -210,7 +210,8 @@ def coach_cards(deck_id, card_ids=None):
                 action = item.get("action") or "keep"
                 replacements = [r for r in (item.get("replacements") or []) if _valid_replacement(r)]
                 diagnosis = (item.get("diagnosis") or "")[:600]
-                card.critic_json = {**(card.critic_json or {}), "coach": {"action": action, "diagnosis": diagnosis}}
+                coach_info = {"action": action, "diagnosis": diagnosis, "original": _card_dict(card)}
+                card.critic_json = {**(card.critic_json or {}), "coach": coach_info}
                 if action == "keep" or not replacements:
                     kept += 1
                     continue
@@ -228,6 +229,7 @@ def coach_cards(deck_id, card_ids=None):
                                strategy=card.strategy, order_key=card.order_key, source_quote=card.source_quote,
                                tags=_add_tags([t for t in (card.tags or []) if not t.startswith("coach:") and t != "struggling"], ["coach:split_child"]))
                     _apply_replacement(new, r)
+                    new.critic_json = {"coach": {**coach_info, "original_card_id": card.id}}
                     db.session.add(new)
                 split += 1
             node.status = "done"

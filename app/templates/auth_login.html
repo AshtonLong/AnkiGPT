@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% from "partials/ui.html" import icon, card_stack %}
+{% from "partials/ui.html" import icon %}
 {% block title %}Sign in · AnkiGPT{% endblock %}
 {% block body_class %}no-nav{% endblock %}
 {% block main %}
 <div class="auth">
-  <aside class="auth-side" data-tilt>
+  <aside class="auth-side">
     <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
       <span class="logo-mark" aria-hidden="true"></span>
       <span class="logo-word"><b>Anki</b><i>GPT</i></span>
     </a>
-    {{ card_stack() }}
+    {% include 'partials/source_illustration.html' %}
     <div class="quote">
-      <h2>Study less. <span class="grad">Remember more.</span></h2>
-      <p>Turn any PDF or set of notes into a validated, editable Anki deck in minutes.</p>
+      <h2>From source material.<br><span class="grad">To study-ready.</span></h2>
+      <p>Your material becomes a first draft. Your edits make it a deck worth studying.</p>
     </div>
   </aside>
 
@@ -26,7 +26,7 @@
           <label for="email">Email</label>
           <div class="with-icon">
             {{ icon('mail') }}
-            <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email" autofocus>
+            <input type="email" id="email" name="email" value="{{ request.form.get('email', '') }}" placeholder="you@example.com" required autocomplete="email" autofocus>
           </div>
         </div>
         <div class="field">

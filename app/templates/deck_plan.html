@@ -28,7 +28,7 @@
 <div class="plan-layout">
   <form method="post" class="plan-tasks" data-reveal style="--d:80">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="action" value="run">
+
     {% for task in plan.tasks %}
     {% set names = [] %}
     {% for i in task.unit_idxs %}{% if unit_by_idx.get(i) %}{% set _ = names.append(unit_by_idx[i].title) %}{% endif %}{% endfor %}
@@ -64,7 +64,7 @@
       <div class="plan-total">{{ icon('target', 16) }} <span>About <b data-plan-total>{{ total_target }}</b> cards from <b data-plan-count>{{ plan.tasks|length }}</b> tasks</span></div>
       <div class="actions">
         <button class="btn" type="submit" name="action" value="replan" formnovalidate>{{ icon('refresh', 15) }} Re-plan</button>
-        <button class="btn primary lg" type="submit">{{ icon('play', 16) }} Run this plan</button>
+        <button class="btn primary lg" type="submit" name="action" value="run">{{ icon('play', 16) }} Run this plan</button>
       </div>
     </div>
   </form>
