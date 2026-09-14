@@ -18,6 +18,8 @@ instance/
 
 # Secrets — passed in via env_file at runtime, never baked into the image
 .env
+.env.*
+.claude/
 
 # Docs/build artifacts not needed in the image
 *.md

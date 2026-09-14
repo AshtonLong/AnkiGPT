@@ -1,0 +1,11 @@
+{% if current_user.is_authenticated %}
+<a class="profile-trigger" href="{{ url_for('auth.profile') }}" {% if request.endpoint == 'auth.profile' %}aria-current="page"{% endif %}>
+  <span class="profile-avatar avatar-{{ current_user.profile_color }}" aria-hidden="true">{{ current_user.initials }}</span>
+  <span>My profile</span>{{ icon('settings', 15) }}
+</a>
+{% else %}
+<div class="guest-account">
+  <a class="profile-trigger" href="{{ url_for('auth.profile') }}">{{ icon('user', 17) }}<span>My profile</span></a>
+  <a class="btn primary sm auth-control" href="{{ url_for('auth.login') }}">Sign in</a>
+</div>
+{% endif %}

@@ -19,7 +19,7 @@
   <div class="auth-main">
     <div class="panel auth-card">
       <h1>Welcome back</h1>
-      <p>Sign in to keep building decks.</p>
+      <p>{{ 'Sign in to make this workspace your own.' if request.args.get('next') == url_for('auth.profile') else 'Sign in to keep building decks.' }}</p>
       <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
@@ -41,7 +41,7 @@
         </div>
         <button type="submit" class="btn primary lg block">Sign in <span class="arrow">{{ icon('arrow-right', 16) }}</span></button>
       </form>
-      <div class="auth-foot">New here?<a href="{{ url_for('auth.signup') }}">Create an account</a></div>
+      <div class="auth-foot">New here?<a href="{{ url_for('auth.signup', next=url_for('auth.profile')) if request.args.get('next') == url_for('auth.profile') else url_for('auth.signup') }}">Create an account</a></div>
     </div>
   </div>
 </div>

@@ -41,7 +41,7 @@
         </div>
         <button type="submit" class="btn primary lg block">Create account <span class="arrow">{{ icon('arrow-right', 16) }}</span></button>
       </form>
-      <div class="auth-foot">Already have an account?<a href="{{ url_for('auth.login') }}">Sign in</a></div>
+      <div class="auth-foot">Already have an account?<a href="{{ url_for('auth.login', next=url_for('auth.profile')) if request.args.get('next') == url_for('auth.profile') else url_for('auth.login') }}">Sign in</a></div>
     </div>
   </div>
 </div>
