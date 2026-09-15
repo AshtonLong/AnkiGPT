@@ -373,9 +373,12 @@ def _phase_figures(ctx):
                            unit_ids=[idx] if idx is not None else [], model=ctx.client.model_for("vision"))
         nodes[fig.id] = node
         key = make_key("vision", ctx.client.model_for("vision"), figures_mod.VISION_PROMPT_VERSION, fig.hash, context[:6000])
+        # Tracer commits expire ORM attributes. Resolve image data here, while
+        # the DB session is available; pool threads must never load Figure rows.
+        image_bytes, mime = bytes(fig.image), fig.mime or "image/png"
         jobs.append(Job(
             id=fig.id,
-            fn=(lambda f=fig, c=context: figures_mod.analyze_figure(ctx.client, f.image, f.mime or "image/png", c)),
+            fn=(lambda image=image_bytes, m=mime, c=context: figures_mod.analyze_figure(ctx.client, image, m, c)),
             cache_key=key, meta={"role": "vision", "model": ctx.client.model_for("vision")},
         ))
 
@@ -386,6 +389,7 @@ def _phase_figures(ctx):
         node = nodes[res.job.id]
         fig = db.session.get(Figure, res.job.id)
         if not res.ok:
+            logger.warning("Deck %s figure %s analysis failed: %s", ctx.deck.id, fig.id, res.error)
             tracer.finish(node, status="failed", error=res.error)
             return
         data = res.value or {}
@@ -413,8 +417,13 @@ def _phase_figures(ctx):
     results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
                        abort_on=_abort_on)
     _raise_if_terminal(results)
-    useful = sum(1 for f in figs if f.useful)
-    tracer.end_phase("figures", result={"figures": len(figs), "useful": useful, "tasks": len(ctx.figure_tasks)})
+    failed = sum(1 for res in results.values() if not res.ok)
+    useful = sum(1 for res in results.values() if res.ok and (res.value or {}).get("useful"))
+    error = f"{failed} of {len(figs)} figures could not be analyzed. See the failed figure tasks for details." if failed else None
+    tracer.end_phase("figures", status="failed" if failed else "done", error=error,
+                     result={"figures": len(figs), "useful": useful, "tasks": len(ctx.figure_tasks), "failed": failed})
+    logger.info("Deck %s figures: %s found, %s useful, %s tasks, %s failed",
+                ctx.deck.id, len(figs), useful, len(ctx.figure_tasks), failed)
 
 
 # ---------------------------------------------------------------------- write
