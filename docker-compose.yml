@@ -1,4 +1,4 @@
-# AnkiGPT: one Flask container. Generation runs on a background thread inside the web
+# AnkiSpark: one Flask container. Generation runs on a background thread inside the web
 # process, so there is no queue, broker, or worker service to run.
 # Quick start:
 #   cp example.env .env   # then set SECRET_KEY and OPENROUTER_API_KEY

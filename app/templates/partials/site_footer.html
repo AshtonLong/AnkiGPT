@@ -1,0 +1,15 @@
+<footer class="site">
+<div class="wrap">
+<a class="logo" href="{{ url_for('main.index') }}">
+<span class="logo-mark small" aria-hidden="true">
+</span>AnkiSpark</a>
+<span>Source to recall.{% if legal.email %} · <a href="mailto:{{ legal.email }}">{{ legal.email }}</a>{% endif %}</span>
+<nav aria-label="Footer">
+<a href="{{ url_for('main.index') }}#how">How it works</a>
+{% if billing_enabled %}<a href="{{ url_for('billing.pricing') }}">Pricing</a>{% endif %}
+<a href="{{ url_for('legal.terms') }}">Terms</a>
+<a href="{{ url_for('legal.privacy') }}">Privacy</a>
+<a href="{{ url_for('legal.refunds') }}">Refunds</a>
+</nav>
+</div>
+</footer>

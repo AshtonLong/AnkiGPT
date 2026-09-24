@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% block title %}Choose a new password · AnkiSpark{% endblock %}
+{% block body_class %}no-nav{% endblock %}
+{% block main %}
+{% set errors = errors or {} %}
+<div class="auth">
+  <aside class="auth-side">
+    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-word"><b>Anki</b><i>Spark</i></span>
+    </a>
+    {% include 'partials/source_illustration.html' %}
+    <div class="quote">
+      <h2>A fresh start.<br><span class="grad">Same decks.</span></h2>
+      <p>Choose a new password and pick up where you left off.</p>
+    </div>
+  </aside>
+
+  <div class="auth-main">
+    <div class="panel auth-card">
+      {% if invalid %}
+      <h1>This link has expired</h1>
+      <p>Reset links work for one hour and only until the password is changed. Request a new one and use the latest email.</p>
+      <a class="btn primary block lg" href="{{ url_for('auth.forgot_password') }}">Send a new link {{ icon('arrow-right', 16) }}</a>
+      {% else %}
+      <h1>Choose a new password</h1>
+      <p>Use at least 8 characters. You'll be signed in right after.</p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for name, label in [('new_password', 'New password'), ('confirm_password', 'Confirm new password')] %}
+        <div class="field">
+          <label for="{{ name }}">{{ label }}</label>
+          <div class="with-icon has-trail">
+            {{ icon('lock') }}
+            <input type="password" id="{{ name }}" name="{{ name }}" required minlength="8" maxlength="128" autocomplete="new-password" {% if loop.first %}autofocus{% endif %} {% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}>
+            <button type="button" class="eye trail" data-eye="{{ name }}" aria-label="Show {{ label|lower }}" aria-pressed="false">
+              {{ icon('eye', 17) }}<span hidden>{{ icon('eye-off', 17) }}</span>
+            </button>
+          </div>
+          {% if errors.get(name) %}<p class="profile-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn primary lg block">Save and sign in <span class="arrow">{{ icon('arrow-right', 16) }}</span></button>
+      </form>
+      {% endif %}
+      <div class="auth-foot">Changed your mind?<a href="{{ url_for('auth.login') }}">Back to sign in</a></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

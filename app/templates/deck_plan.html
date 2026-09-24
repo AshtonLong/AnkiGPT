@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon, stepper %}
-{% block title %}Review plan · {{ deck.title }} · AnkiGPT{% endblock %}
+{% block title %}Review plan · {{ deck.title }} · AnkiSpark{% endblock %}
 {% block content %}
 {% set doc = run.get('doc_meta') or {} %}
 {% set live_units = units|rejectattr('skipped')|list %}

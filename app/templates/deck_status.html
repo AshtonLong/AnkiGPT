@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Deck ready' if deck.status == 'ready' else ('Generation failed' if deck.status == 'failed' else 'Generating') }} · {{ deck.title }} · AnkiGPT{% endblock %}
+{% block title %}{{ 'Deck ready' if deck.status == 'ready' else ('Generation failed' if deck.status == 'failed' else 'Generating') }} · {{ deck.title }} · AnkiSpark{% endblock %}
 {% block content %}
 {% include "partials/status_panel.html" %}
 {% endblock %}

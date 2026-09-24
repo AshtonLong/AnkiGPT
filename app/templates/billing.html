@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% from "partials/plans.html" import plan_grid, interval_toggle, money with context %}
+{% block title %}Plan & billing · AnkiSpark{% endblock %}
+{% block body_class %}billing-page{% endblock %}
+{% block content %}
+{% set plan = allowance.plan %}
+{% set status = current_user.subscription_status %}
+<div class="page-head" data-reveal>
+  <div>
+    <span class="eyebrow ember">Plan &amp; billing</span>
+    <h1>You're on {{ plan.name }}.</h1>
+    <p>{% if not plan.paid %}{{ plan.pages_per_month }} free pages every month. Upgrade whenever your course load grows.
+      {% elif current_user.cancel_at_period_end and current_user.current_period_end %}Your plan ends on {{ current_user.current_period_end.strftime('%B') }} {{ current_user.current_period_end.day }}. You keep every page until then.
+      {% elif current_user.current_period_end %}Renews {{ current_user.current_period_end.strftime('%B') }} {{ current_user.current_period_end.day }} at ${{ money(plan.price_cents(current_user.billing_interval)) }} / {{ current_user.billing_interval or 'month' }}.
+      {% else %}Thanks for supporting AnkiSpark.{% endif %}</p>
+  </div>
+  <div class="actions">
+    {% if status == 'past_due' %}<span class="pill warn">{{ icon('alert', 12) }} Payment failed</span>{% elif current_user.cancel_at_period_end %}<span class="pill warn">Cancels at period end</span>{% elif plan.paid %}<span class="pill ok">{{ icon('check', 12) }} Active</span>{% endif %}
+    {% if current_user.stripe_customer_id %}
+    <form method="post" action="{{ url_for('billing.portal') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ icon('settings', 15) }} Manage billing</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if status == 'past_due' %}
+<div class="billing-alert" role="alert" data-reveal>{{ icon('alert', 19) }}<span><b>Your last payment didn't go through.</b> Update your card in Manage billing to keep {{ plan.name }}. Stripe will retry automatically.</span></div>
+{% endif %}
+
+<div class="billing-layout">
+  <section class="panel usage-panel" aria-labelledby="usage-title" data-reveal>
+    <div class="panel-head"><span class="panel-title" id="usage-title">{{ icon('gauge') }} This month</span><span class="hint">Resets {{ allowance.reset_label }}</span></div>
+    <div class="usage-body">
+      <div class="usage-ring{{ ' is-low' if allowance.pct >= 85 else '' }}" style="--pct:{{ allowance.pct }}">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="ring-track" cx="60" cy="60" r="52" pathLength="100"/><circle class="ring-fill" cx="60" cy="60" r="52" pathLength="100"/></svg>
+        <div class="usage-ring-label"><b data-count="{{ allowance.remaining }}">{{ allowance.remaining }}</b><span>pages left</span></div>
+      </div>
+      <dl class="usage-stats">
+        <div><dt>Used</dt><dd><b>{{ allowance.used }}</b> / {{ allowance.limit }} pages</dd></div>
+        <div><dt>Largest deck</dt><dd><b>{{ plan.pages_per_deck }}</b> pages · {{ '{:,}'.format(plan.max_deck_chars) }} chars</dd></div>
+        <div><dt>Free reruns</dt><dd><b>{{ free_reruns }}</b> per deck</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="panel history-panel" aria-labelledby="history-title" data-reveal style="--d:90">
+    <div class="panel-head"><span class="panel-title" id="history-title">{{ icon('activity') }} Recent runs</span><span class="hint">1 page = {{ '{:,}'.format(chars_per_page) }} chars</span></div>
+    {% if usage %}
+    <ol class="usage-list">
+      {% for record in usage %}
+      <li>
+        <span class="usage-dot{{ ' free' if not record.pages else '' }}" aria-hidden="true"></span>
+        <div>{% if record.deck_id %}<a href="{{ url_for('main.deck_editor', deck_id=record.deck_id) }}">{{ record.deck_title or 'Untitled deck' }}</a>{% else %}<span>{{ record.deck_title or 'Deleted deck' }}</span>{% endif %}
+          <small>{{ record.created_at.strftime('%b') }} {{ record.created_at.day }} · {{ '{:,}'.format(record.chars or 0) }} chars</small></div>
+        <b>{{ (record.pages ~ (' page' if record.pages == 1 else ' pages')) if record.pages else 'Free rerun' }}</b>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="usage-empty">{{ icon('cards', 26) }}<p>No generation runs yet.</p><a class="btn primary sm" href="{{ url_for('main.new_deck') }}">Create a deck {{ icon('arrow-right', 14) }}</a></div>
+    {% endif %}
+  </section>
+</div>
+
+<section class="billing-plans" aria-labelledby="plans-title">
+  <div class="billing-plans-head" data-reveal>
+    <div><span class="eyebrow">{{ 'CHANGE PLAN' if plan.paid else 'MORE PAGES' }}</span><h2 id="plans-title">{{ 'Switch anytime.' if plan.paid else 'Need more room?' }}</h2></div>
+    {{ interval_toggle() }}
+  </div>
+  {{ plan_grid(plans, current_plan, subscribed) }}
+  <p class="billing-footnote" data-reveal>{{ icon('lock', 14) }} Payments are processed by Stripe. Upgrades apply immediately with a prorated charge; cancellations take effect at the end of the paid period. <a class="text-link" href="{{ url_for('legal.refunds') }}">Refunds &amp; cancellation</a></p>
+</section>
+<script src="{{ url_for('static', filename='billing.js') }}" defer></script>
+{% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}{{ deck.title }} · Editor · AnkiGPT{% endblock %}
+{% block title %}{{ deck.title }} · Editor · AnkiSpark{% endblock %}
 {% block content %}
 {% set view = request.args.get('view', 'cards') %}
 {% set export_count = deck.cards|selectattr('status', 'equalto', 'ok')|list|length %}

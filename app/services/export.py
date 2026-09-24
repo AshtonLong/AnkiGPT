@@ -19,7 +19,7 @@ def sanitize_tag(tag):
 def build_basic_model():
     return genanki.Model(
         1607392319,
-        "AnkiGPT Basic",
+        "AnkiSpark Basic",
         fields=[{"name": "Front"}, {"name": "Back"}],
         templates=[
             {
@@ -36,7 +36,7 @@ def build_cloze_model():
     model_type = getattr(genanki, "MODEL_CLOZE", 1)
     return genanki.Model(
         998877661,
-        "AnkiGPT Cloze",
+        "AnkiSpark Cloze",
         fields=[{"name": "Text"}, {"name": "Extra"}],
         templates=[{"name": "Cloze", "qfmt": "<div class='container'>{{cloze:Text}}</div>", "afmt": "<div class='container'>{{cloze:Text}}<hr id='answer'>{{Extra}}</div>"}],
         css=card_css(),
@@ -141,9 +141,9 @@ blockquote {
 
 def safe_filename(name):
     if not name:
-        return "ankigpt_deck"
+        return "ankispark_deck"
     clean = "".join([c if c.isalnum() or c in ("-", "_") else "_" for c in name.lower()])
-    return clean.strip("_") or "ankigpt_deck"
+    return clean.strip("_") or "ankispark_deck"
 
 
 def figure_media_name(figure_id):
@@ -151,7 +151,11 @@ def figure_media_name(figure_id):
 
 
 def note_guid(deck_id, card_id):
-    """Stable per-card guid so review stats can be matched back after study."""
+    """Stable per-card guid so review stats can be matched back after study.
+
+    The "ankigpt" seed predates the AnkiSpark name and must never change: decks
+    already in users' Anki collections carry guids derived from it.
+    """
     return genanki.guid_for("ankigpt", deck_id, card_id)
 
 

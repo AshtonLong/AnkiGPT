@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}Your decks · AnkiGPT{% endblock %}
+{% block title %}Your decks · AnkiSpark{% endblock %}
 {% block content %}
 {% set total_cards = card_counts.values()|sum %}
 {% set ready = decks|selectattr('status', 'equalto', 'ready')|list|length %}
@@ -84,7 +84,7 @@
   <div class="empty">
     <div class="empty-deck" aria-hidden="true"><i></i><i></i><i></i></div>
     <h3>No decks yet</h3>
-    <p>Create your first deck and AnkiGPT will turn your material into cards you can review, edit and export.</p>
+    <p>Create your first deck and AnkiSpark will turn your material into cards you can review, edit and export.</p>
     <a class="btn primary lg" href="{{ url_for('main.new_deck') }}">{{ icon('plus') }} Create your first deck</a>
   </div>
 </section>

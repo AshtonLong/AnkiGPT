@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}Create account · AnkiGPT{% endblock %}
+{% block title %}Create account · AnkiSpark{% endblock %}
 {% block body_class %}no-nav{% endblock %}
 {% block main %}
 <div class="auth">
   <aside class="auth-side">
-    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
+    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
       <span class="logo-mark" aria-hidden="true"></span>
-      <span class="logo-word"><b>Anki</b><i>GPT</i></span>
+      <span class="logo-word"><b>Anki</b><i>Spark</i></span>
     </a>
     {% include 'partials/source_illustration.html' %}
     <div class="quote">
@@ -41,6 +41,7 @@
         </div>
         <button type="submit" class="btn primary lg block">Create account <span class="arrow">{{ icon('arrow-right', 16) }}</span></button>
       </form>
+      <p class="auth-legal">By creating an account you agree to the <a href="{{ url_for('legal.terms') }}">Terms</a> and <a href="{{ url_for('legal.privacy') }}">Privacy Policy</a>.</p>
       <div class="auth-foot">Already have an account?<a href="{{ url_for('auth.login', next=url_for('auth.profile')) if request.args.get('next') == url_for('auth.profile') else url_for('auth.login') }}">Sign in</a></div>
     </div>
   </div>

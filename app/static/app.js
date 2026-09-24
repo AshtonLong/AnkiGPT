@@ -1,4 +1,4 @@
-/* AnkiGPT: form feedback, HTMX card editing, live progress, and source controls. */
+/* AnkiSpark: form feedback, HTMX card editing, live progress, and source controls. */
 (function () {
   'use strict';
 
@@ -452,8 +452,8 @@
       var num = $('[data-progress-num]', root);
       if (num) tween(num, 0, target, 900);
     }
-    if (state === 'ready') doc.title = 'Deck ready · AnkiGPT';
-    else if (state === 'failed') doc.title = 'Generation failed · AnkiGPT';
+    if (state === 'ready') doc.title = 'Deck ready · AnkiSpark';
+    else if (state === 'failed') doc.title = 'Generation failed · AnkiSpark';
     if (state !== 'processing') return;
 
     var url = root.getAttribute('data-progress-url');
@@ -478,7 +478,7 @@
           if (num) tween(num, lastPct, data.pct, 700);
           lastPct = data.pct;
         }
-        doc.title = Math.round(data.pct) + '% · Generating · AnkiGPT';
+        doc.title = Math.round(data.pct) + '% · Generating · AnkiSpark';
         renderTrace(root, data);
         setTimeout(poll, 1500);
       }).catch(function () {

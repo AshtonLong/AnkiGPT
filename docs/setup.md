@@ -79,12 +79,12 @@ database; the Flask app continues running wherever you deploy its container.
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` when serving over HTTPS. |
 | `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy URL. |
 | `OPENROUTER_API_KEY` | | Required for AI operations. |
-| `OPENROUTER_MODEL` | `openai/gpt-5.6-luna` | Default model for every role. |
+| `OPENROUTER_MODEL` | `openai/gpt-6-luna` | Default model for every role. |
 | `OPENROUTER_MODEL_{MAPPER,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). |
 | `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
 | `OPENROUTER_REASONING_{PLANNER,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role; empty omits the parameter. |
 | `OPENROUTER_TEMPERATURE` | | Unset by default — reasoning models reject it. |
-| `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | empty / `AnkiGPT` | Optional provider attribution headers. |
+| `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | empty / `AnkiSpark` | Optional provider attribution headers. |
 | `OPENROUTER_MAX_TOKENS` | `16000` | Output cap per call (billing is per token used). |
 | `OPENROUTER_TIMEOUT_SECONDS` / `_MAX_RETRIES` / `_RETRY_BACKOFF_SECONDS` | `180` / `2` / `1.5` | HTTP behaviour. |
 | `PIPELINE_MAX_WORKERS` | `6` | Concurrent model calls. |
@@ -96,10 +96,38 @@ database; the Flask app continues running wherever you deploy its container.
 | `PIPELINE_DEDUPE_THRESHOLD` | `0.90` | Cosine threshold for a duplicate cluster. |
 | `PIPELINE_CACHE_ENABLED` | `true` | Content-addressed result cache. |
 | `PIPELINE_FIGURES_ENABLED` / `PIPELINE_MAX_FIGURES` | `true` / `24` | Figure extraction from PDFs. |
-| `MAX_SOURCE_CHARS` | `400000` | Longer sources are truncated with a warning (`0` disables). |
+| `MAX_SOURCE_CHARS` | `400000` | Longer sources are truncated with a warning (`0` disables). With billing on, the plan's per-deck size applies below this. |
+| `BILLING_ENABLED` | `false` | Enforce monthly page allowances and turn on Stripe subscriptions. |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | | Stripe API key and webhook signing secret. |
+| `STRIPE_PORTAL_CONFIGURATION` | | Customer Portal configuration from `scripts/stripe_setup.py` (empty uses the account default). |
+| `STRIPE_AUTOMATIC_TAX` | `false` | Collect sales tax/VAT with Stripe Tax at checkout. |
+| `PROXY_FIX_HOPS` | `0` | Trust this many reverse-proxy hops of `X-Forwarded-*` headers (production compose sets `1`). |
+| `MAIL_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD`, `MAIL_FROM` | / `465` | SMTP for password-reset email. Unset, links are logged instead. |
+| `LEGAL_NAME` / `SUPPORT_EMAIL` / `LEGAL_JURISDICTION` | `AnkiSpark` / / `Canada` | Shown on the legal pages and footer. |
 | `UPLOAD_MAX_MB` / `UPLOAD_FOLDER` | `50` / `instance/uploads` | Uploads. |
 | `GENERATION_IN_THREAD` | `true` | Run generation on a background thread (tests set `false` to run inline). |
 
+
+### Billing (Stripe)
+
+Billing is off by default, so a self-hosted install is unmetered. To sell plans:
+
+1. Put a **test-mode** secret key in `.env` as `STRIPE_SECRET_KEY`, then run
+   `python -m scripts.stripe_setup`. It creates the Pro and Max products, monthly and
+   yearly prices (found later by lookup keys such as `ankigpt_pro_monthly`), and a
+   Customer Portal configuration that allows plan switches and cancel-at-period-end.
+   It is safe to rerun.
+2. Forward webhooks while developing: `stripe listen --forward-to localhost:5000/billing/webhook`,
+   and copy the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`. In production, pass
+   `--webhook-url https://your.domain/billing/webhook` to the setup script instead.
+3. Set `BILLING_ENABLED=true` and restart. Test with card `4242 4242 4242 4242`.
+4. Repeat with the live key when you launch.
+
+Plans, prices and allowances live in `app/services/billing.py` (`PLANS`). Usage is
+metered in pages of 4,000 extracted characters when a deck's generation starts; a
+deck's next two reruns are free, and deleting a deck does not refund its pages.
+Allowances reset on the 1st of each month (UTC). Changing a price in code needs
+`python -m scripts.stripe_setup --reprice`.
 
 ## Deployment and data
 

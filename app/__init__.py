@@ -5,6 +5,7 @@ import sqlite3
 from flask import Flask, request
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import Config, DEV_SECRET_KEY
 from .database import database_url, engine_options
@@ -37,35 +38,54 @@ def _under_instance(instance_path, path):
     return os.path.join(instance_path, path)
 
 
-def _ensure_columns(app):
+def _ensure_columns(app, conn):
     """Add columns that exist on the models but not in an older database.
 
     `create_all()` only creates missing *tables*. Rather than force a migration step
     on every schema change in a single-user app, add missing columns in place
     (nullable, so the statement is valid on SQLite and Postgres alike).
     """
-    engine = db.engine
-    inspector = inspect(engine)
+    inspector = inspect(conn)
     existing_tables = set(inspector.get_table_names())
     added = []
-    with engine.begin() as conn:
-        for table in db.metadata.sorted_tables:
-            if table.name not in existing_tables:
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        present = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in present:
                 continue
-            present = {c["name"] for c in inspector.get_columns(table.name)}
-            for column in table.columns:
-                if column.name in present:
-                    continue
-                col_type = column.type.compile(dialect=engine.dialect)
-                conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))
-                added.append(f"{table.name}.{column.name}")
+            col_type = column.type.compile(dialect=conn.dialect)
+            conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))
+            added.append(f"{table.name}.{column.name}")
     if added:
         app.logger.info("Added missing columns: %s", ", ".join(added))
+
+
+# Arbitrary constant naming the startup-schema advisory lock.
+SCHEMA_LOCK_KEY = 7_261_451
+
+
+def _ensure_schema(app):
+    """Create missing tables and columns in one transaction.
+
+    Gunicorn boots its workers at the same moment; on Postgres a transaction-scoped
+    advisory lock makes them take turns, so two workers never race to create the same
+    new table. (Transaction-scoped so it also holds through Neon's pooled connections.)
+    """
+    with db.engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": SCHEMA_LOCK_KEY})
+        db.metadata.create_all(bind=conn)
+        _ensure_columns(app, conn)
 
 
 def create_app(config_object=Config):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
+    hops = app.config.get("PROXY_FIX_HOPS") or 0
+    if hops:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -101,9 +121,13 @@ def create_app(config_object=Config):
 
     from .routes.main import bp as main_bp
     from .routes.auth import bp as auth_bp
+    from .routes.billing import bp as billing_bp
+    from .routes.legal import bp as legal_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(billing_bp)
+    app.register_blueprint(legal_bp)
 
     @app.after_request
     def private_responses(response):
@@ -115,8 +139,7 @@ def create_app(config_object=Config):
         return response
 
     with app.app_context():
-        db.create_all()
-        _ensure_columns(app)
+        _ensure_schema(app)
 
     return app
 

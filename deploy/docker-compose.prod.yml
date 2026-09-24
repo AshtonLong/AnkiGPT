@@ -1,0 +1,50 @@
+# Production: the app behind Caddy (HTTPS). Run from the repo root on the server:
+#   docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d --build
+# deploy/push.sh does this for you after syncing the code.
+
+services:
+  web:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      # Caddy is exactly one proxy hop in front of the app.
+      PROXY_FIX_HOPS: "1"
+      SESSION_COOKIE_SECURE: "true"
+    expose:
+      - "8000"
+    volumes:
+      - ankigpt-data:/app/instance
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN=yourdomain.com in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  ankigpt-data:
+  caddy-data:
+  caddy-config:

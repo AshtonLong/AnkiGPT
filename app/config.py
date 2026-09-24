@@ -15,9 +15,9 @@ def _env_int(name, default):
 # Sentinel default secret. The app refuses to start in production if this is still in use.
 DEV_SECRET_KEY = "dev-secret"
 
-# GPT-5.6 Luna: 1M context, structured outputs, tools, vision, cheap. Every pipeline
+# GPT-6 Luna: 1M context, structured outputs, tools, vision, cheap. Every pipeline
 # role defaults to it; override a single role with OPENROUTER_MODEL_<ROLE>.
-DEFAULT_MODEL = "openai/gpt-5.6-luna"
+DEFAULT_MODEL = "openai/gpt-6-luna"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 
 
@@ -48,7 +48,7 @@ class Config:
     # Optional sampling temperature. Left unset by default: reasoning models reject it.
     OPENROUTER_TEMPERATURE = os.getenv("OPENROUTER_TEMPERATURE", "")
     OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "")
-    OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "AnkiGPT")
+    OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "AnkiSpark")
     OPENROUTER_TIMEOUT_SECONDS = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "180"))
     OPENROUTER_MAX_RETRIES = _env_int("OPENROUTER_MAX_RETRIES", 2)
     OPENROUTER_RETRY_BACKOFF_SECONDS = float(os.getenv("OPENROUTER_RETRY_BACKOFF_SECONDS", "1.5"))
@@ -78,9 +78,40 @@ class Config:
     # Guard against pasting an entire book: bounds LLM cost/time. 0 disables the cap.
     MAX_SOURCE_CHARS = _env_int("MAX_SOURCE_CHARS", 400000)
 
+    # Billing. Off by default so self-hosted and development installs stay unmetered.
+    # When on, monthly page allowances are enforced per plan and Stripe Checkout, the
+    # Customer Portal and the webhook go live. Plans and prices live in services/billing.py.
+    BILLING_ENABLED = _env_bool("BILLING_ENABLED", False)
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    # Optional portal configuration id (bpc_...) from scripts/stripe_setup.py; empty
+    # uses the account's default portal configuration.
+    STRIPE_PORTAL_CONFIGURATION = os.getenv("STRIPE_PORTAL_CONFIGURATION", "")
+    # Collect sales tax/VAT with Stripe Tax. Requires Stripe Tax to be set up first.
+    STRIPE_AUTOMATIC_TAX = _env_bool("STRIPE_AUTOMATIC_TAX", False)
+
     # Generation runs on a background thread inside the web process so the live trace
     # is visible while it builds. Tests turn this off to run inline.
     GENERATION_IN_THREAD = _env_bool("GENERATION_IN_THREAD", True)
+
+    # Behind a reverse proxy (Caddy in deploy/), trust this many hops of X-Forwarded-*
+    # headers so external URLs (Stripe redirects, reset links) use https and the real
+    # host. Leave 0 when the app is reachable directly, or clients could spoof them.
+    PROXY_FIX_HOPS = _env_int("PROXY_FIX_HOPS", 0)
+
+    # Transactional email (password resets) over SMTP. Any provider works; for Resend:
+    # host smtp.resend.com, port 465, username "resend", password = the API key.
+    # Unconfigured, reset links are written to the server log instead of sent.
+    MAIL_SMTP_HOST = os.getenv("MAIL_SMTP_HOST", "")
+    MAIL_SMTP_PORT = _env_int("MAIL_SMTP_PORT", 465)
+    MAIL_SMTP_USERNAME = os.getenv("MAIL_SMTP_USERNAME", "")
+    MAIL_SMTP_PASSWORD = os.getenv("MAIL_SMTP_PASSWORD", "")
+    MAIL_FROM = os.getenv("MAIL_FROM", "")
+
+    # Shown on the legal pages and site footer. Stripe expects contact details on the site.
+    LEGAL_NAME = os.getenv("LEGAL_NAME", "AnkiSpark")
+    SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "")
+    LEGAL_JURISDICTION = os.getenv("LEGAL_JURISDICTION", "Canada")
 
     # Session/cookie hardening. SECURE is opt-in so local HTTP development still works;
     # set SESSION_COOKIE_SECURE=true behind HTTPS in production.

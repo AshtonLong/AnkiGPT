@@ -21,6 +21,17 @@ from werkzeug.utils import secure_filename
 
 from ..extensions import db, login_manager
 from ..models import Card, Deck, Figure, LLMRun, PipelineTask, Source
+from ..services.billing import (
+    CHARS_PER_PAGE,
+    FREE_RERUNS,
+    QuotaExceeded,
+    allowance,
+    billing_enabled,
+    deck_char_limit,
+    meter_generation,
+    plan_for,
+    run_charge,
+)
 from ..services.deckgen import improve_card, regenerate_source
 from ..services.export import export_deck as export_deck_file
 from ..services.pdf import extract_pdf_text
@@ -172,16 +183,25 @@ def new_deck():
                 "No text could be extracted. If this is a scanned PDF, it has no "
                 "selectable text (OCR is not supported). Choose a text-based PDF or paste your notes.",
             )
-        max_source_chars = current_app.config["MAX_SOURCE_CHARS"]
+        user = get_actor()
+        max_source_chars = deck_char_limit(user)
         if max_source_chars and len(source_text) > max_source_chars:
             source_text = source_text[:max_source_chars]
             page_offsets = [po for po in page_offsets if po[1] < max_source_chars]
-            flash(
-                f"Source was truncated to {max_source_chars:,} characters to keep "
-                "generation fast and affordable.",
-                "info",
-            )
-        user = get_actor()
+            plan = plan_for(user)
+            if billing_enabled() and max_source_chars == plan.max_deck_chars and plan.key != "max":
+                flash(
+                    f"Your {plan.name} plan covers decks up to {plan.pages_per_deck} pages "
+                    f"({max_source_chars:,} characters), so the source was trimmed to fit. "
+                    "Pick a page range, or upgrade under Plan & billing for longer decks.",
+                    "info",
+                )
+            else:
+                flash(
+                    f"Source was truncated to {max_source_chars:,} characters to keep "
+                    "generation fast and affordable.",
+                    "info",
+                )
         deck = Deck(
             user_id=user.id,
             title=title,
@@ -224,11 +244,30 @@ def _read_settings_form(deck):
     return settings
 
 
+def _meter_or_refuse(deck):
+    """Charge this run to the monthly allowance. On QuotaExceeded, flash why and return
+    False; the caller commits either way so the user's form settings are kept."""
+    try:
+        meter_generation(get_actor(), deck)
+    except QuotaExceeded as exc:
+        a = exc.allowance
+        flash(
+            f"This run needs {exc.needed} pages and your {a.plan.name} plan has {a.remaining} "
+            f"left this month. Upgrade under Plan & billing, or wait for your pages to reset on {a.reset_label}.",
+            "error",
+        )
+        return False
+    return True
+
+
 @bp.route("/decks/<int:deck_id>/preview", methods=["GET", "POST"])
 def preview_deck(deck_id):
     deck = get_owned_deck(deck_id)
     if request.method == "POST":
         deck.settings_json = _read_settings_form(deck)
+        if not _meter_or_refuse(deck):
+            db.session.commit()
+            return redirect(url_for("main.preview_deck", deck_id=deck.id))
         deck.status = "processing"
         deck.run_json = {}
         db.session.commit()
@@ -236,7 +275,10 @@ def preview_deck(deck_id):
         return redirect(url_for("main.status", deck_id=deck.id))
     figure_count = Figure.query.filter_by(deck_id=deck.id).count()
     figures = Figure.query.filter_by(deck_id=deck.id).order_by(Figure.page, Figure.id).limit(6).all()
-    return render_template("deck_preview.html", deck=deck, figure_count=figure_count, figures=figures)
+    return render_template(
+        "deck_preview.html", deck=deck, figure_count=figure_count, figures=figures,
+        run_pages=run_charge(deck), allowance=allowance(get_actor()), chars_per_page=CHARS_PER_PAGE, free_reruns=FREE_RERUNS,
+    )
 
 
 def _status_payload(deck):
@@ -295,6 +337,8 @@ def plan_deck(deck_id):
     if request.method == "POST":
         action = request.form.get("action", "run")
         if action == "replan":
+            if not _meter_or_refuse(deck):
+                return redirect(url_for("main.plan_deck", deck_id=deck.id))
             settings = dict(deck.settings_json or {})
             settings["review_plan"] = True
             deck.settings_json = settings
