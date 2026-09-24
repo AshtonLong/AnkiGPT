@@ -19,6 +19,17 @@ class User(UserMixin, db.Model):
     display_name = db.Column(db.String(80))
     bio = db.Column(db.String(280))
     avatar_color = db.Column(db.String(20))
+    # Subscription state, mirrored from Stripe by the billing webhook. `plan` only
+    # counts while `subscription_status` is live; see services.billing.plan_for.
+    plan = db.Column(db.String(20))
+    stripe_customer_id = db.Column(db.String(64), index=True)
+    stripe_subscription_id = db.Column(db.String(64))
+    subscription_status = db.Column(db.String(30))
+    billing_interval = db.Column(db.String(10))
+    current_period_end = db.Column(db.DateTime)
+    cancel_at_period_end = db.Column(db.Boolean)
+    # Throttles reset emails so the form can't be used to spam an inbox.
+    reset_requested_at = db.Column(db.DateTime)
 
     @property
     def profile_name(self):
@@ -35,6 +46,9 @@ class User(UserMixin, db.Model):
 
     decks = db.relationship(
         "Deck", backref="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    usage_records = db.relationship(
+        "UsageRecord", backref="user", cascade="all, delete-orphan", passive_deletes=True
     )
 
     def set_password(self, password):
@@ -255,6 +269,28 @@ class LLMRun(db.Model):
     parsed_json = db.Column(db.JSON)
     error = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utcnow)
+
+
+class UsageRecord(db.Model):
+    """One generation run metered against a user's monthly page allowance.
+
+    `deck_id` is nulled rather than cascaded when the deck is deleted, so deleting a deck
+    never hands back pages that were already spent. Free reruns are recorded with 0 pages.
+    """
+
+    __tablename__ = "usage_record"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    deck_id = db.Column(
+        db.Integer, db.ForeignKey("deck.id", ondelete="SET NULL"), index=True
+    )
+    deck_title = db.Column(db.String(200))
+    pages = db.Column(db.Integer, nullable=False, default=0)
+    chars = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
 
 
 class GenerationCache(db.Model):

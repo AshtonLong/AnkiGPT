@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
 {% from "partials/ui.html" import icon %}
-{% set app_page = request.endpoint == 'auth.profile' or (request.endpoint and request.endpoint.startswith('main.') and request.endpoint != 'main.index') %}
+{% set app_page = request.endpoint in ('auth.profile', 'billing.account') or (request.endpoint and request.endpoint.startswith('main.') and request.endpoint != 'main.index') %}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="theme-color" content="#FAFBFC">
-  <title>{% block title %}{{ title or 'AnkiGPT' }}{% endblock %}</title>
+  <title>{% block title %}{{ title or 'AnkiSpark' }}{% endblock %}</title>
   <meta name="description" content="Turn your PDFs and notes into editable flashcards. Review what matters, then take your deck straight into Anki.">
   <link rel="icon" href="{{ url_for('static', filename='brand.svg') }}" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Fragment+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='profile.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='billing.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js" defer>
 </script>
   <script src="{{ url_for('static', filename='app.js') }}" defer>
@@ -28,23 +29,33 @@
 </div>
   {% if app_page %}
   <aside class="sidebar" id="app-navigation">
-    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
+    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
 <span class="logo-mark" aria-hidden="true">
 </span>
-<span class="logo-word">AnkiGPT</span>
+<span class="logo-word">AnkiSpark</span>
 </a>
     <span class="nav-caption">WORKSPACE</span>
     <nav aria-label="Workspace">
-      <a href="{{ url_for('main.decks') }}" {% if request.endpoint not in ['main.new_deck', 'auth.profile'] %}aria-current="page"{% endif %}>{{ icon('cards') }} Your decks</a>
+      <a href="{{ url_for('main.decks') }}" {% if request.endpoint not in ['main.new_deck', 'auth.profile', 'billing.account'] %}aria-current="page"{% endif %}>{{ icon('cards') }} Your decks</a>
       <a href="{{ url_for('main.new_deck') }}" {% if request.endpoint == 'main.new_deck' %}aria-current="page"{% endif %}>{{ icon('plus') }} New deck</a>
       <a href="{{ url_for('auth.profile') }}" {% if request.endpoint == 'auth.profile' %}aria-current="page"{% endif %}>{{ icon('user') }} My profile</a>
+      {% if billing_enabled %}<a href="{{ url_for('billing.account') }}" {% if request.endpoint == 'billing.account' %}aria-current="page"{% endif %}>{{ icon('coins') }} Plan &amp; billing</a>{% endif %}
     </nav>
     <div class="sidebar-bottom">
+      {% if billing_enabled and current_user.is_authenticated %}{% set usage_now = billing_allowance() %}
+      <a class="usage-card{{ ' is-low' if usage_now.pct >= 85 else '' }}" href="{{ url_for('billing.account') }}" aria-label="{{ usage_now.plan.name }} plan: {{ usage_now.used }} of {{ usage_now.limit }} pages used this month">
+        <span class="usage-card-top"><b>{{ usage_now.plan.name }} plan</b><span>{{ usage_now.remaining }} left</span></span>
+        <span class="meter" aria-hidden="true"><i style="--fill:{{ usage_now.pct }}%"></i></span>
+        <span class="usage-card-foot">{{ usage_now.used }} / {{ usage_now.limit }} pages · resets {{ usage_now.reset_label }}</span>
+        {% if usage_now.plan.key != 'max' %}<span class="usage-card-cta">{{ icon('zap', 13) }} Get more pages</span>{% endif %}
+      </a>
+      {% else %}
       <div class="sidebar-note">
 <span class="mini-mark">↗</span>
 <b>Source to recall.</b>
 <p>Your material. Your edits.<br>Your Anki routine.</p>
 </div>
+      {% endif %}
       {% if current_user.is_authenticated %}
       <a class="account" href="{{ url_for('auth.profile') }}" aria-label="Manage your profile"><span class="profile-avatar avatar-{{ current_user.profile_color }}" aria-hidden="true">{{ current_user.initials }}</span><span title="{{ current_user.email }}">{{ current_user.profile_name }}</span></a>
       <form action="{{ url_for('auth.logout') }}" method="post">
@@ -59,16 +70,16 @@
   {% endif %}
   <header class="topbar">
     <div class="wrap">
-      <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
+      <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
 <span class="logo-mark" aria-hidden="true">
 </span>
-<span class="logo-word">AnkiGPT</span>
+<span class="logo-word">AnkiSpark</span>
 </a>
       {% if app_page %}
       <div class="breadcrumbs">
 <a href="{{ url_for('main.decks') }}">Workspace</a>
 <span>/</span>
-<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor','auth.profile':'My profile'}.get(request.endpoint, 'Your decks') }}</b>
+<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor','auth.profile':'My profile','billing.account':'Plan & billing'}.get(request.endpoint, 'Your decks') }}</b>
 </div>
       <div class="topbar-actions">
       {% include 'partials/auth_control.html' %}

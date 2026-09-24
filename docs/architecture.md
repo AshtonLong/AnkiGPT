@@ -97,6 +97,7 @@ app/
       parallel.py       thread-pool fan-out
       trace.py          PipelineTask / LLMRun tracing
     llm.py              OpenRouter HTTP: chat, tools loop, embeddings, JSON repair
+    billing.py          plans, page metering, Stripe checkout/portal/webhook sync
     deckgen.py          regenerate a unit, improve a card
     pdf.py, export.py, validators.py, chunking.py, schemas.py
   routes/, templates/, static/, models.py, config.py, tasks.py
@@ -105,7 +106,7 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 
 ## Data model
 
-- `User` — credentials, display name, bio, avatar color, and deck ownership.
+- `User` — credentials, display name, bio, avatar color, deck ownership, and plan.
 - `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
   totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
 - `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).
@@ -115,6 +116,8 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 - `LLMRun` — every model call, attached to its task.
 - `Figure` — images pulled from a PDF plus the vision analysis.
 - `GenerationCache` — content-addressed results.
+- `UsageRecord` — one metered generation run (pages charged). Kept when its deck is
+  deleted. The user's Stripe subscription state is mirrored onto `User` by the webhook.
 
 
 ## Runtime and failure handling

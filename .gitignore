@@ -156,3 +156,6 @@ instance/exports/
 .vscode/
 .idea/
 
+
+# Cloudflare Tunnel credentials for self-hosting (secret)
+deploy/cloudflared/

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% from "partials/plans.html" import plan_grid, interval_toggle with context %}
+{% block title %}Pricing · AnkiSpark{% endblock %}
+{% block body_class %}pricing-page{% endblock %}
+{% block nav %}
+<a href="{{ url_for('main.index') }}#how">How it works</a>
+<a href="#page-math">What's a page?</a>
+<a href="#pricing-faq">FAQs</a>
+{% if current_user.is_authenticated %}<a class="btn sm" href="{{ url_for('main.decks') }}">Your decks {{ icon('arrow-right',14) }}</a>{% else %}
+<a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started {{ icon('arrow-right',14) }}</a>{% endif %}
+{% endblock %}
+{% block main %}
+<section class="pricing-hero wrap">
+  <span class="hero-chip" data-reveal><i class="dot"></i> Simple plans. Priced by the page.</span>
+  <h1 data-reveal>Pay for what you study.<br><span>Nothing you don't.</span></h1>
+  <p data-reveal>Every plan runs the full pipeline: planning, figure reading, the card coach and .apkg export. Plans differ in one thing: how much source you can turn into cards each month.</p>
+  <div data-reveal>{{ interval_toggle() }}</div>
+</section>
+
+<section class="wrap pricing-plans" aria-label="Plans">
+  {{ plan_grid(plans, current_plan, subscribed) }}
+  <div class="shared-features" data-reveal>
+    <span class="mono">EVERY PLAN INCLUDES</span>
+    <ul>{% for feature in shared_features %}<li>{{ icon('check', 14) }} {{ feature }}</li>{% endfor %}</ul>
+  </div>
+</section>
+
+<section class="wrap page-math" id="page-math" aria-labelledby="page-math-title">
+  <div class="page-math-copy" data-reveal>
+    <span class="eyebrow">WHAT'S A PAGE?</span>
+    <h2 id="page-math-title">A page is {{ '{:,}'.format(chars_per_page) }} characters of your source.</h2>
+    <p>That's about one dense textbook page. We count the text we extract, not the PDF's page numbers, so lecture slides and sparse handouts use far fewer pages than they look.</p>
+    <dl class="page-examples">
+      <div><dt>{{ icon('file-text', 16) }} 30-slide lecture</dt><dd>≈ 4 pages</dd></div>
+      <div><dt>{{ icon('book', 16) }} Textbook chapter</dt><dd>≈ 20–35 pages</dd></div>
+      <div><dt>{{ icon('edit', 16) }} A week of typed notes</dt><dd>≈ 5–10 pages</dd></div>
+    </dl>
+  </div>
+  <div class="estimator panel" data-estimator data-reveal style="--d:120">
+    <span class="mono">FIND YOUR PLAN</span>
+    <label for="weekly-pages"><b>How much do you turn into cards each week?</b></label>
+    <div class="estimator-read"><output data-est-weekly>12</output><span>pages a week</span></div>
+    <input type="range" id="weekly-pages" min="1" max="200" value="12" data-est-input>
+    <div class="estimator-scale" aria-hidden="true"><span>A lecture</span><span>A course</span><span>Exam cram</span></div>
+    <div class="estimator-result" aria-live="polite">
+      <span>≈ <b data-est-monthly>52</b> pages a month</span>
+      <strong data-est-plan>Pro fits comfortably.</strong>
+    </div>
+  </div>
+</section>
+
+<section class="section wrap faq-section" id="pricing-faq">
+  <div data-reveal>
+    <span class="eyebrow">BILLING, PLAINLY</span>
+    <h2>Questions before<br>you choose.</h2>
+  </div>
+  <div class="faq-list" data-reveal>{% for q, a in [
+    ('When are pages counted?', 'When you start generating a deck. The charge is shown before you press Plan & generate, and nothing is counted for uploading, editing, exporting or reviewing.'),
+    ('Do retries cost pages?', 'Your next ' ~ free_reruns ~ ' reruns of the same deck are free, so a failed run or a re-plan costs nothing extra. After that, each run of that deck counts again.'),
+    ('What happens if I run out?', 'Your decks, cards and exports stay available. You just can\'t start a new generation until your pages reset on the 1st of the month or you upgrade, which applies instantly.'),
+    ('Do unused pages roll over?', 'No. Your allowance resets on the 1st of each month (UTC).'),
+    ('Can I cancel or switch plans?', 'Anytime, from Plan & billing. Upgrades apply straight away with a prorated charge. If you cancel, you keep your plan until the end of the period you paid for.'),
+    ('How are payments handled?', 'Securely by Stripe. We never see or store your card number.'),
+  ] %}<details>
+    <summary>{{ q }}<span aria-hidden="true">+</span></summary>
+    <p>{{ a }}</p>
+  </details>{% endfor %}</div>
+</section>
+
+<section class="closing wrap" data-reveal>
+  <span class="logo-mark" aria-hidden="true"></span>
+  <h2>Start with 20 free pages.</h2>
+  <p>No card needed. Upgrade when your course load does.</p>
+  <a class="btn primary lg" href="{{ url_for('main.new_deck') if current_user.is_authenticated else url_for('auth.signup') }}">Create a deck {{ icon('arrow-right',16) }}</a>
+</section>
+{% include 'partials/site_footer.html' %}
+<script src="{{ url_for('static', filename='billing.js') }}" defer></script>
+{% endblock %}

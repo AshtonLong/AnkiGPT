@@ -61,9 +61,9 @@ restorable card deletion in the editor.
 
 ## 5. Bring review history back
 
-After exporting from AnkiGPT and studying in Anki, export the deck or collection from
+After exporting from AnkiSpark and studying in Anki, export the deck or collection from
 Anki with scheduling information. Upload the `.apkg` or `.colpkg` through
-**Import reviews**. Matching uses the stable note GUID assigned by AnkiGPT's export.
+**Import reviews**. Matching uses the stable note GUID assigned by AnkiSpark's export.
 Unrelated notes will not match.
 
 Cards with at least two lapses or an again-rate of at least 40% are flagged as

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}Sign in · AnkiGPT{% endblock %}
+{% block title %}Sign in · AnkiSpark{% endblock %}
 {% block body_class %}no-nav{% endblock %}
 {% block main %}
 <div class="auth">
   <aside class="auth-side">
-    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
+    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
       <span class="logo-mark" aria-hidden="true"></span>
-      <span class="logo-word"><b>Anki</b><i>GPT</i></span>
+      <span class="logo-word"><b>Anki</b><i>Spark</i></span>
     </a>
     {% include 'partials/source_illustration.html' %}
     <div class="quote">
@@ -30,7 +30,7 @@
           </div>
         </div>
         <div class="field">
-          <label for="password">Password</label>
+          <div class="label-row"><label for="password">Password</label><a class="hint forgot-link" href="{{ url_for('auth.forgot_password') }}">Forgot password?</a></div>
           <div class="with-icon has-trail">
             {{ icon('lock') }}
             <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">

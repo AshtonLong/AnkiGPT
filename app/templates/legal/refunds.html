@@ -1,0 +1,24 @@
+{% extends "legal/base.html" %}
+{% block title %}Refunds & cancellation · AnkiSpark{% endblock %}
+{% block eyebrow %}Refunds &amp; cancellation{% endblock %}
+{% block heading %}Cancel anytime. Here's how refunds work.{% endblock %}
+{% block doc %}
+<h2>Cancelling</h2>
+<p>You can cancel a paid plan at any time from <b>Plan &amp; billing → Manage billing</b>. Your plan stays active until the end of the period you've already paid for, and then your account moves to the Free plan. You keep all your decks and cards, and exporting to Anki keeps working.</p>
+
+<h2>Refunds</h2>
+<ul>
+  <li>Payments cover a billing period of access and a page allowance, so we don't refund partial months or years after you cancel, or pages you didn't use.</li>
+  <li>If you were charged by mistake, charged after cancelling, or couldn't use the service because of a problem on our side, email us within 14 days of the charge and we'll refund it.</li>
+  <li>If you signed up for a yearly plan and change your mind, email us within 14 days of the first yearly charge and we'll refund it in full, provided you've used no more than one month's page allowance.</li>
+  <li>Approved refunds go back to your original payment method through Stripe and usually arrive within 5–10 business days.</li>
+</ul>
+
+<h2>Changing plans</h2>
+<p>Upgrades apply immediately. Stripe charges the prorated difference for the rest of your current period. Downgrades take effect the same way, with any unused amount credited toward your future invoices rather than refunded.</p>
+
+<h2>Failed payments</h2>
+<p>If a renewal payment fails, Stripe retries it over the following days and your plan stays active meanwhile. If it keeps failing, the subscription is cancelled and your account moves to the Free plan.</p>
+
+<p>This policy doesn't limit any rights you have under the consumer protection laws that apply to you.</p>
+{% endblock %}

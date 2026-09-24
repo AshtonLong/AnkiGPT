@@ -1,0 +1,46 @@
+{% extends "legal/base.html" %}
+{% block title %}Privacy Policy · AnkiSpark{% endblock %}
+{% block eyebrow %}Privacy Policy{% endblock %}
+{% block heading %}What we collect, and why.{% endblock %}
+{% block doc %}
+<p>This policy explains how {{ legal.name }} handles personal information in AnkiSpark. Short version: we collect what's needed to turn your material into cards and to bill paid plans. We don't sell your data, show ads, or use your content to train AI models.</p>
+
+<h2>What we collect</h2>
+<ul>
+  <li><b>Account details:</b> your email address, a securely hashed password (never the password itself), and anything you add to your profile, such as a display name, bio and avatar colour.</li>
+  <li><b>Your study material:</b> text extracted from PDFs you upload or notes you paste, images extracted from those PDFs, and your generation settings. Uploaded PDF files are deleted after extraction; the extracted text and images are kept with your deck.</li>
+  <li><b>Your decks:</b> generated cards, your edits, and Anki review statistics you choose to import.</li>
+  <li><b>Generation records:</b> logs of the requests and responses exchanged with AI models for each deck, kept so you can see how your deck was built and so we can fix problems.</li>
+  <li><b>Usage and billing:</b> how many pages each generation used, your plan, and Stripe customer and subscription identifiers. Card details are collected and stored by Stripe, not by us.</li>
+  <li><b>Technical data:</b> a sign-in cookie, and server logs that include IP addresses and request details, kept for security and troubleshooting.</li>
+</ul>
+
+<h2>How we use it</h2>
+<p>To run the service (generate, store and export your decks), to enforce plan limits and handle billing, to send account emails such as password resets, to keep the service secure, and to respond when you contact us. We don't send marketing email.</p>
+
+<h2>Who processes it for us</h2>
+<p>We share data only with the providers that run parts of the service, and only what each one needs:</p>
+<ul>
+  <li><b>OpenRouter</b> and the AI model providers it routes requests to (currently OpenAI) receive your source text and extracted images to generate and review cards.</li>
+  <li><b>Stripe</b> processes payments and stores payment details.</li>
+  <li><b>Neon</b> hosts our database.</li>
+  <li><b>Cloudflare</b> carries traffic between your browser and our server and provides HTTPS.</li>
+  <li><b>Resend</b> delivers account emails.</li>
+</ul>
+<p>These providers may process data outside your country, including in the United States, where it may be accessible to authorities under local law. We may also disclose information where the law requires it.</p>
+
+<h2>Cookies</h2>
+<p>We use one essential cookie to keep you signed in, plus the cookies Stripe sets on its own checkout pages. No analytics or advertising cookies.</p>
+
+<h2>How long we keep it</h2>
+<p>We keep your data while your account is open. Deleting a deck removes its source, figures, cards and generation records; a record of the pages it used stays for billing. When you ask us to delete your account, we remove your data within 30 days, except billing records we must keep by law, and backups that expire on their own schedule.</p>
+
+<h2>Your choices and rights</h2>
+<p>You can view and edit your profile and decks at any time, and export your decks. You can ask us for a copy of your personal information, to correct it, or to delete your account by emailing us. We'll respond within 30 days. If you're not satisfied with our answer, you can complain to your local privacy regulator; in Canada, that's the Office of the Privacy Commissioner.</p>
+
+<h2>Security</h2>
+<p>Traffic is encrypted with HTTPS, passwords are hashed, and your workspace is private to your account. No system is perfectly secure; if a breach affects your information, we'll notify you as the law requires.</p>
+
+<h2>Children</h2>
+<p>AnkiSpark isn't directed at children under 13, and we don't knowingly collect their information.</p>
+{% endblock %}

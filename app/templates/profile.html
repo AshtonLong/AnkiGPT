@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}My profile · AnkiGPT{% endblock %}
+{% block title %}My profile · AnkiSpark{% endblock %}
 {% block body_class %}profile-page{% endblock %}
 {% macro field_error(name) %}{% if errors.get(name) %}<p class="profile-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
 {% macro error_attrs(name) %}{% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}

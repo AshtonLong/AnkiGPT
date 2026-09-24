@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}AnkiGPT · From source material to study-ready{% endblock %}
+{% block title %}AnkiSpark · From source material to study-ready{% endblock %}
 {% block body_class %}landing{% endblock %}
 {% block nav %}
 <a href="#how">How it works</a>
 <a href="#coach">Coach</a>
 <a href="#faq">FAQs</a>
+{% if billing_enabled %}<a href="{{ url_for('billing.pricing') }}">Pricing</a>{% endif %}
 {% if current_user.is_authenticated %}<a class="btn sm" href="{{ url_for('main.decks') }}">Your decks {{ icon('arrow-right',14) }}</a>{% else %}
 <a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started {{ icon('arrow-right',14) }}</a>{% endif %}
 {% endblock %}
@@ -206,17 +207,5 @@
 <p>Make room for the part that matters: learning.</p>
 <a class="btn primary lg" href="{{ url_for('main.new_deck') }}">Create a deck {{ icon('arrow-right',16) }}</a>
 </section>
-<footer class="site">
-<div class="wrap">
-<a class="logo" href="#">
-<span class="logo-mark small" aria-hidden="true">
-</span>AnkiGPT</a>
-<span>Source to recall.</span>
-<nav aria-label="Footer">
-<a href="{{ url_for('main.decks') }}">Your decks</a>
-<a href="#how">How it works</a>
-<a href="#faq">FAQs</a>
-</nav>
-</div>
-</footer>
+{% include 'partials/site_footer.html' %}
 {% endblock %}

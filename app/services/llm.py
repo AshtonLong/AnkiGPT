@@ -251,7 +251,7 @@ def openrouter_chat(
     seed=None,
 ):
     """One chat-completions call. `temperature` is only sent when given — reasoning
-    models (including GPT-5.6 Luna) reject it."""
+    models (including GPT-6 Luna) reject it."""
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
     payload = {

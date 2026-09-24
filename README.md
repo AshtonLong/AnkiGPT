@@ -1,4 +1,4 @@
-# AnkiGPT
+# AnkiSpark
 
 ### Your material. Your edits. Your Anki routine.
 
@@ -7,7 +7,7 @@ refine the cards, and export a deck you can study in Anki.
 
 [Get started](#get-started) · [User guide](docs/user-guide.md) · [Configuration](docs/setup.md) · [How it works](docs/architecture.md)
 
-![AnkiGPT card editor showing a source-grounded question, editable answer and tags, card filters, and export controls](docs/images/editor.png)
+![AnkiSpark card editor showing a source-grounded question, editable answer and tags, card filters, and export controls](docs/images/editor.png)
 
 *The real card editor with synthetic study material. All screenshots show the current
 interface with sample data, not results from a live AI run.*
@@ -90,9 +90,13 @@ is supported through `DATABASE_URL`.
 
 - **Input:** text and text-based PDFs; no OCR workflow. Defaults: 50 MB upload limit
   and 400,000 source characters. Longer sources are truncated with a warning.
-- **Models:** the configured default is `openai/gpt-5.6-luna`, with per-role overrides.
+- **Models:** the configured default is `openai/gpt-6-luna`, with per-role overrides.
   Model access and billing depend on your OpenRouter account. Repeated tasks can use
   cached results, but a rerun is not guaranteed to be free.
+- **Plans:** optional Stripe subscriptions (Free / Pro / Max) metered in pages of
+  extracted text. Off unless `BILLING_ENABLED=true`; see [setup](docs/setup.md#billing-stripe).
+- **Hosting:** [docs/self-host.md](docs/self-host.md) runs production on your own machine
+  through a Cloudflare Tunnel; [docs/deploy.md](docs/deploy.md) covers a budget VPS instead.
 - **Runtime:** generation runs in background threads inside the web process. You can
   close the page while it works; restarting the server interrupts the run.
 - **Data:** workspace routes enforce account ownership. AI operations send source
@@ -107,6 +111,8 @@ is supported through `DATABASE_URL`.
 |---|---|
 | [User guide](docs/user-guide.md) | Source → brief → plan → editor → export, Coach, profiles, troubleshooting |
 | [Setup and configuration](docs/setup.md) | Local/Docker setup, environment variables, Neon migration, deployment and storage |
+| [Self-hosting](docs/self-host.md) | Production on your own PC or laptop via Cloudflare Tunnel |
+| [Deploying to a VPS](docs/deploy.md) | Budget server, Caddy HTTPS, email, Stripe go-live |
 | [Architecture](docs/architecture.md) | Pipeline phases, strategies, caching, data model, failure handling |
 | [Development](docs/development.md) | Stack, tests, routes, and reproducible screenshot capture |
 

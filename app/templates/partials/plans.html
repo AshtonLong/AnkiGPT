@@ -1,0 +1,61 @@
+{% from "partials/ui.html" import icon %}
+
+{% macro money(cents) %}{{ '%g'|format(cents / 100) if cents % 100 == 0 else '%.2f'|format(cents / 100) }}{% endmacro %}
+
+{% macro interval_toggle() %}
+<div class="interval-toggle" role="radiogroup" aria-label="Billing period" data-interval-toggle>
+  <label><input type="radio" name="billing_interval" value="month" checked><span>Monthly</span></label>
+  <label><input type="radio" name="billing_interval" value="year"><span>Yearly <em>2 months free</em></span></label>
+  <i class="interval-thumb" aria-hidden="true"></i>
+</div>
+{% endmacro %}
+
+{% macro plan_cta(plan, current_plan, subscribed) %}
+{% set is_current = current_plan and current_plan.key == plan.key %}
+{% if not current_user.is_authenticated %}
+  <a class="btn {{ 'primary' if plan.key == 'pro' else '' }} block lg" href="{{ url_for('auth.signup') }}">{{ 'Start free' if not plan.paid else 'Choose ' ~ plan.name }} {{ icon('arrow-right', 15) }}</a>
+{% elif is_current and not plan.paid %}
+  <span class="btn block lg is-static">{{ icon('check', 15) }} Your current plan</span>
+{% elif is_current or (not plan.paid and subscribed) %}
+  <form method="post" action="{{ url_for('billing.portal') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn block lg" type="submit">{% if is_current %}{{ icon('check', 15) }} Current · Manage{% else %}Downgrade in portal{% endif %}</button>
+  </form>
+{% else %}
+  {% set upgrade = (current_plan.pages_per_month if current_plan else 0) < plan.pages_per_month %}
+  <form method="post" action="{{ url_for('billing.checkout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="plan" value="{{ plan.key }}">
+    <input type="hidden" name="interval" value="month" data-interval-input>
+    <button class="btn {{ 'primary' if plan.key == 'pro' or upgrade else '' }} block lg" type="submit">{{ ('Upgrade to ' if upgrade else 'Switch to ') ~ plan.name }} {{ icon('arrow-right', 15) }}</button>
+  </form>
+{% endif %}
+{% endmacro %}
+
+{% macro plan_grid(plans, current_plan=None, subscribed=False) %}
+<div class="plan-grid" data-plan-grid>
+  {% for plan in plans %}
+  {% set is_current = current_plan and current_plan.key == plan.key %}
+  <article class="plan-card plan-{{ plan.key }}{{ ' is-featured' if plan.key == 'pro' else '' }}{{ ' is-current' if is_current else '' }}" data-plan="{{ plan.key }}" data-pages="{{ plan.pages_per_month }}" data-reveal style="--d:{{ loop.index0 * 90 }}">
+    {% if is_current %}<span class="plan-ribbon current">{{ icon('check', 12) }} Your plan</span>{% elif plan.key == 'pro' %}<span class="plan-ribbon">Most popular</span>{% endif %}
+    <span class="plan-ribbon fit" data-fit-ribbon hidden>{{ icon('target', 12) }} Fits you</span>
+    <header>
+      <h3>{{ plan.name }}</h3>
+      <p>{{ plan.tagline }}</p>
+    </header>
+    <div class="plan-price">
+      <span class="plan-currency">$</span><b data-price data-month="{{ money(plan.monthly_cents) }}" data-year="{{ money((plan.yearly_cents / 12)|round|int) }}">{{ money(plan.monthly_cents) }}</b><span class="plan-per">/ month</span>
+    </div>
+    <p class="plan-billed" data-billed data-month="{{ 'Free forever. No card needed.' if not plan.paid else 'Billed monthly. Cancel anytime.' }}" data-year="{{ 'Free forever. No card needed.' if not plan.paid else '$' ~ money(plan.yearly_cents) ~ ' billed once a year.' }}">{{ 'Free forever. No card needed.' if not plan.paid else 'Billed monthly. Cancel anytime.' }}</p>
+    <div class="plan-pages">
+      <div class="sheets sheets-{{ plan.key }}" aria-hidden="true">{% for _ in range({'free': 2, 'pro': 5, 'max': 9}[plan.key]) %}<i style="--i:{{ loop.index0 }}"></i>{% endfor %}</div>
+      <div><b>{{ plan.pages_per_month }}</b><span>pages a month</span></div>
+    </div>
+    <ul class="plan-features">
+      {% for feature in plan.features %}<li>{{ icon('check', 15) }} {{ feature }}</li>{% endfor %}
+    </ul>
+    <div class="plan-cta">{{ plan_cta(plan, current_plan, subscribed) }}</div>
+  </article>
+  {% endfor %}
+</div>
+{% endmacro %}

@@ -1,0 +1,64 @@
+# Self-hosting on your own machine (Windows, macOS or Linux with Docker).
+# Cloudflare Tunnel carries public HTTPS traffic to the app over an outbound
+# connection: no router port forwarding, and your home IP stays hidden.
+#
+# From the repo root:
+#   Temporary public URL (random *.trycloudflare.com, changes on every restart):
+#     docker compose -p ankigpt-home -f deploy/docker-compose.home.yml --profile quick up -d --build
+#   Your own domain (after deploy/tunnel-setup.sh has created deploy/cloudflared/):
+#     docker compose -p ankigpt-home -f deploy/docker-compose.home.yml --profile named up -d --build
+#
+# Run the tunnel on only one machine at a time: two machines running the same named
+# tunnel would split visitors between them.
+
+services:
+  web:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      # cloudflared is one proxy hop; Cloudflare's edge sets X-Forwarded-Proto: https.
+      PROXY_FIX_HOPS: "1"
+      SESSION_COOKIE_SECURE: "true"
+    ports:
+      # Local-only access for you on this machine: http://localhost:5050
+      - "127.0.0.1:5050:8000"
+    volumes:
+      - ankigpt-data:/app/instance
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # Temporary public URL, no Cloudflare account needed. Find it with:
+  #   docker compose -p ankigpt-home -f deploy/docker-compose.home.yml logs quick-tunnel
+  quick-tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["quick"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://web:8000
+    depends_on:
+      - web
+
+  # Permanent tunnel for your domain; config and credentials live in deploy/cloudflared/
+  # (gitignored — it contains the tunnel's secret).
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["named"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - web
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  ankigpt-data:

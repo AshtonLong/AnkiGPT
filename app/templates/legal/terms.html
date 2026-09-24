@@ -1,0 +1,45 @@
+{% extends "legal/base.html" %}
+{% block title %}Terms of Service · AnkiSpark{% endblock %}
+{% block eyebrow %}Terms of Service{% endblock %}
+{% block heading %}The agreement for using AnkiSpark.{% endblock %}
+{% block doc %}
+<p>These terms are an agreement between you and {{ legal.name }} ("we", "us") about your use of AnkiSpark, a service that turns study material you provide into editable flashcards. By creating an account or using the service, you agree to these terms.</p>
+
+<h2>Your account</h2>
+<ul>
+  <li>You must be at least 13 years old, and old enough to form a binding contract where you live, or have a parent or guardian's permission.</li>
+  <li>Give us an email address you control, keep your password private, and tell us if you think your account has been accessed without permission.</li>
+  <li>An account is for one person. Don't create extra accounts to get around plan limits.</li>
+</ul>
+
+<h2>Your content</h2>
+<p>You keep ownership of the material you upload or paste, and of the cards generated from it. You give us permission to store, process and transmit that content only as needed to run the service for you, including sending it to the AI providers described in our <a href="{{ url_for('legal.privacy') }}">Privacy Policy</a>. We don't use your content to train AI models.</p>
+<p>Only upload material you have the right to use. You're responsible for making sure your use of it, including turning it into flashcards, doesn't infringe anyone else's rights.</p>
+
+<h2>AI-generated cards</h2>
+<p>Cards are written by AI models and can contain mistakes, omissions or statements that aren't supported by your source. Review cards against your material before relying on them. AnkiSpark is a study aid, not a substitute for professional, medical, legal or academic advice.</p>
+
+<h2>Acceptable use</h2>
+<p>Don't use the service to break the law, upload malware, attack or overload our systems, scrape the service, resell it, or process content that is illegal or that you aren't allowed to share. We may suspend accounts that do.</p>
+
+<h2>Plans, billing and renewal</h2>
+<ul>
+  <li>The Free plan costs nothing. Paid plans ({% for plan in plans if plan.paid %}{{ plan.name }}{{ ', ' if not loop.last else '' }}{% endfor %}) are subscriptions billed in US dollars, monthly or yearly, through our payment processor, Stripe. Applicable taxes may be added.</li>
+  <li><b>Subscriptions renew automatically</b> at the end of each billing period at the then-current price until you cancel. You can cancel anytime from Plan &amp; billing.</li>
+  <li>Each plan includes a monthly allowance of pages. A page is {{ '{:,}'.format(chars_per_page) }} characters of extracted source text, counted when a deck's generation starts; the next {{ free_reruns }} reruns of the same deck are free. Allowances reset on the 1st of each month (UTC) and unused pages don't carry over.</li>
+  <li>If we change prices, we'll tell you in advance, and the change applies from your next billing period.</li>
+  <li>Refunds and cancellations are covered by our <a href="{{ url_for('legal.refunds') }}">Refunds &amp; cancellation policy</a>.</li>
+</ul>
+
+<h2>Changes and availability</h2>
+<p>We're a small service and we improve it often. Features, AI models and limits may change. We aim to keep AnkiSpark available but don't guarantee it will be uninterrupted or error-free. Keep your own copies of decks you care about; exporting to Anki is always available on every plan.</p>
+
+<h2>Ending your use</h2>
+<p>You can stop using AnkiSpark at any time and ask us to delete your account. We may suspend or end accounts that break these terms. If we discontinue the service, we'll give reasonable notice so you can export your decks, and refund any prepaid period that we can no longer provide.</p>
+
+<h2>Disclaimers and liability</h2>
+<p>To the extent the law allows, the service is provided "as is" without warranties of any kind, and our total liability for any claim relating to the service is limited to the amount you paid us in the 12 months before the claim. Nothing in these terms limits rights you have under consumer protection law that can't be waived.</p>
+
+<h2>Governing law</h2>
+<p>These terms are governed by the laws of {{ legal.jurisdiction }}. If we change them in a meaningful way, we'll update the date above and let you know by email or in the app.</p>
+{% endblock %}

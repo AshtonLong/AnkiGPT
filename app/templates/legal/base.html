@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% block body_class %}legal-page{% endblock %}
+{% block main %}
+{% set contact %}{% if legal.email %}<a href="mailto:{{ legal.email }}">{{ legal.email }}</a>{% else %}the contact address on this site{% endif %}{% endset %}
+<div class="wrap legal-wrap">
+  <nav class="legal-nav" aria-label="Policies">
+    <span class="mono">POLICIES</span>
+    {% for endpoint, label in [('legal.terms', 'Terms of Service'), ('legal.privacy', 'Privacy Policy'), ('legal.refunds', 'Refunds & cancellation')] %}
+    <a href="{{ url_for(endpoint) }}" {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <article class="legal-doc">
+    <span class="eyebrow ember">{% block eyebrow %}{% endblock %}</span>
+    <h1>{% block heading %}{% endblock %}</h1>
+    <p class="legal-updated">Last updated {{ legal.updated }}</p>
+    {% block doc %}{% endblock %}
+    <h2>Contact</h2>
+    <p>Questions about this page? Email {{ contact }}.</p>
+  </article>
+</div>
+{% include 'partials/site_footer.html' %}
+{% endblock %}

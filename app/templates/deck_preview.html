@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon, stepper %}
-{% block title %}Configure · {{ deck.title }} · AnkiGPT{% endblock %}
+{% block title %}Configure · {{ deck.title }} · AnkiSpark{% endblock %}
 {% block content %}
 {% set s = deck.settings_json or {} %}
 {% set n = deck.source_text|length %}
@@ -92,7 +92,19 @@
       {% endif %}
     </div>
 
-    <button type="submit" class="btn primary lg block">{{ icon('zap') }} Plan &amp; generate</button>
+    {% set short = billing_enabled and run_pages > allowance.remaining %}
+    {% if billing_enabled %}
+    <div class="run-cost{{ ' is-short' if short else '' }}">
+      <div class="run-cost-row">
+        <span>{{ icon('coins', 15) }} {% if run_pages %}This run uses <b>{{ run_pages }} {{ 'page' if run_pages == 1 else 'pages' }}</b>{% else %}<b>Free rerun</b> of this deck{% endif %}</span>
+        <span class="hint">{{ allowance.remaining }} of {{ allowance.limit }} left</span>
+      </div>
+      <span class="meter split" aria-hidden="true"><i style="--fill:{{ allowance.pct }}%"></i><em style="--from:{{ allowance.pct }}%;--fill:{{ [100 - allowance.pct, (100 * run_pages / allowance.limit)|round|int]|min if allowance.limit else 0 }}%"></em></span>
+      {% if short %}<p>Not enough pages left on {{ allowance.plan.name }} this month. <a class="text-link" href="{{ url_for('billing.account') }}">Get more pages {{ icon('arrow-right', 13) }}</a> or pick a shorter page range.</p>
+      {% elif run_pages %}<p class="hint">{{ '{:,}'.format(chars_per_page) }} characters = 1 page. The next {{ free_reruns }} reruns of this deck are free.</p>{% endif %}
+    </div>
+    {% endif %}
+    <button type="submit" class="btn primary lg block" {% if short %}disabled aria-disabled="true"{% endif %}>{{ icon('zap') }} Plan &amp; generate</button>
     <p class="note">{{ icon('clock', 14) }} You can leave the next page while your deck builds.</p>
   </form>
 </div>
