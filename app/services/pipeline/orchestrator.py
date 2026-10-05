@@ -18,6 +18,7 @@ from flask import current_app
 from ...extensions import db
 from ...models import Card, Deck, Figure, LLMRun, Source
 from ..chunking import clean_text, hash_text
+from ..credentials import openrouter_key_for
 from ..llm import OpenRouterError, TERMINAL_ERROR_MARKERS, is_terminal_error
 from ..validators import is_math_valid, is_valid_cloze
 from . import cheatsheet as cheatsheet_mod
@@ -62,17 +63,18 @@ def format_generation_error(exc):
         detail = (exc.response_body or "").lower()
         if status == 429:
             if any(marker in detail for marker in TERMINAL_ERROR_MARKERS):
-                return "OpenRouter credits/quota were exhausted while processing this deck."
+                return (
+                    "Your OpenRouter credits ran out while processing this deck. "
+                    "Top up at openrouter.ai, then retry."
+                )
             return "OpenRouter rate limit was hit while processing this deck. Wait a minute and try again."
         if status in (401, 403):
-            return "OpenRouter authentication failed. Check your API key and model access."
+            return "OpenRouter authentication failed. Check the API key under My profile and its model access."
         if status == 400:
             return f"OpenRouter rejected a request: {exc.response_body or exc}"
         if status and status >= 500:
             return "OpenRouter is temporarily unavailable. Please try again shortly."
         return str(exc)
-    if isinstance(exc, RuntimeError) and "OPENROUTER_API_KEY" in str(exc):
-        return "OpenRouter API key is not configured. Set OPENROUTER_API_KEY and retry."
     return str(exc)
 
 
@@ -116,7 +118,7 @@ def _build_context(deck):
     cfg = current_app.config
     settings = dict(deck.settings_json or {})
     settings.setdefault("card_style", deck.card_style)
-    client = LLMClient(cfg)
+    client = LLMClient(cfg, openrouter_key_for(deck.user))
     cache = DBCache(enabled=bool(cfg.get("PIPELINE_CACHE_ENABLED", True)))
     if not cfg.get("PIPELINE_CACHE_ENABLED", True):
         cache = NullCache()

@@ -6,7 +6,6 @@
 <a href="#how">How it works</a>
 <a href="#coach">Coach</a>
 <a href="#faq">FAQs</a>
-{% if billing_enabled %}<a href="{{ url_for('billing.pricing') }}">Pricing</a>{% endif %}
 {% if current_user.is_authenticated %}<a class="btn sm" href="{{ url_for('main.decks') }}">Your decks {{ icon('arrow-right',14) }}</a>{% else %}
 <a class="btn primary sm" href="{{ url_for('auth.signup') }}">Get started {{ icon('arrow-right',14) }}</a>{% endif %}
 {% endblock %}
@@ -194,7 +193,7 @@
 <span class="eyebrow">A FEW GOOD QUESTIONS</span>
 <h2>Before you<br>make your first deck.</h2>
 </div>
-<div class="faq-list" data-reveal>{% for q,a in [('What can I upload?','Upload a text-based PDF or paste your notes directly. You can choose a PDF page range. Scanned PDFs need OCR before uploading.'),('Can I edit the generated cards?','Yes. Edit prompts, answers, cloze text, and tags. Review source quotes, restore dropped cards, and ask AI to improve individual cards.'),('How do I get the deck into Anki?','Download the .apkg from your deck editor, then use File → Import in Anki desktop. Your package includes card formatting, tags, and any card images.'),('Should I review the AI output?','Yes. AI can make mistakes. Check the cards against your source and make any edits before studying. You can also review the generation plan before the cards are written.')] %}<details>
+<div class="faq-list" data-reveal>{% for q,a in [('Is AnkiSpark free?','Yes. There are no plans or subscriptions. You add your own OpenRouter API key in your profile, and OpenRouter charges you directly for the AI that writes your cards.'),('What can I upload?','Upload a text-based PDF or paste your notes directly. You can choose a PDF page range. Scanned PDFs need OCR before uploading.'),('Can I edit the generated cards?','Yes. Edit prompts, answers, cloze text, and tags. Review source quotes, restore dropped cards, and ask AI to improve individual cards.'),('How do I get the deck into Anki?','Download the .apkg from your deck editor, then use File → Import in Anki desktop. Your package includes card formatting, tags, and any card images.'),('Should I review the AI output?','Yes. AI can make mistakes. Check the cards against your source and make any edits before studying. You can also review the generation plan before the cards are written.')] %}<details>
 <summary>{{ q }}<span aria-hidden="true">+</span>
 </summary>
 <p>{{ a }}</p>

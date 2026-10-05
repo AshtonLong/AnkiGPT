@@ -105,6 +105,7 @@ def test_unchecked_figure_toggle_is_respected(client, app, monkeypatch):
     from werkzeug.datastructures import MultiDict
     deck_id, _ = make_deck(client, app)
     monkeypatch.setattr(main, 'dispatch_generation', lambda _: None)
+    app.config['OPENROUTER_API_KEY'] = 'test-only'
     client.post(f'/decks/{deck_id}/preview', data={'use_figures': 'off'})
     with app.app_context():
         assert db.session.get(Deck, deck_id).settings_json['use_figures'] is False
@@ -123,6 +124,7 @@ def test_cheat_sheet_toggle_is_opt_in_and_sticks(client, app, monkeypatch):
     from app.routes import main
     deck_id, _ = make_deck(client, app)
     monkeypatch.setattr(main, 'dispatch_generation', lambda _: None)
+    app.config['OPENROUTER_API_KEY'] = 'test-only'
 
     def phases():
         return [p['key'] for p in client.get(f'/decks/{deck_id}/progress.json').json['phases']]

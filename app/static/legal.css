@@ -1,0 +1,141 @@
+/* Sign-in extras and the legal pages. Builds on the tokens in style.css. */
+
+/* ---------------------------------------------------------------- auth extras */
+.forgot-link {
+  font-weight:500
+}
+
+.forgot-link:hover,.auth-legal a:hover {
+  color:var(--accent)
+}
+
+.auth-legal {
+  margin-top:16px;
+  font-size:12px;
+  color:var(--muted);
+  text-align:center
+}
+
+.auth-legal a {
+  text-decoration:underline;
+  text-underline-offset:2px
+}
+
+.auth-sent-icon {
+  display:grid;
+  place-items:center;
+  width:52px;
+  height:52px;
+  margin-bottom:18px;
+  border-radius:14px;
+  background:var(--accent-soft);
+  color:var(--accent);
+  animation:pop-in 500ms cubic-bezier(.3,1.6,.5,1)
+}
+
+@keyframes pop-in {
+  from { transform:scale(.6); opacity:0 }
+}
+
+.auth-card .hint+.btn {
+  margin-top:20px
+}
+
+/* ---------------------------------------------------------------- legal pages */
+.legal-wrap {
+  display:grid;
+  grid-template-columns:220px minmax(0,720px);
+  gap:64px;
+  padding:64px 0 96px
+}
+
+.legal-nav {
+  position:sticky;
+  top:96px;
+  align-self:start;
+  display:grid;
+  gap:4px
+}
+
+.legal-nav .mono {
+  margin-bottom:10px
+}
+
+.legal-nav a {
+  padding:9px 12px;
+  border-radius:8px;
+  font-size:14px;
+  color:var(--muted);
+  transition:background 200ms,color 200ms
+}
+
+.legal-nav a:hover {
+  color:var(--ink);
+  background:var(--soft)
+}
+
+.legal-nav a[aria-current=page] {
+  color:var(--accent);
+  background:var(--accent-soft);
+  font-weight:600
+}
+
+.legal-doc h1 {
+  font-size:clamp(30px,4vw,44px);
+  line-height:1.12;
+  letter-spacing:-.045em
+}
+
+.legal-updated {
+  margin:14px 0 36px;
+  font:11px var(--mono);
+  color:var(--muted)
+}
+
+.legal-doc h2 {
+  margin:40px 0 12px;
+  font-size:19px;
+  letter-spacing:-.02em
+}
+
+.legal-doc p,.legal-doc li {
+  font-size:15px;
+  line-height:1.75;
+  color:#34455A
+}
+
+.legal-doc p+p {
+  margin-top:12px
+}
+
+.legal-doc ul {
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding-left:20px
+}
+
+.legal-doc a {
+  color:var(--accent);
+  text-decoration:underline;
+  text-underline-offset:2px
+}
+
+@media(max-width:860px) {
+  .legal-wrap {
+    grid-template-columns:1fr;
+    gap:28px;
+    padding-top:32px
+  }
+
+  .legal-nav {
+    position:static;
+    display:flex;
+    flex-wrap:wrap
+  }
+
+  .legal-nav .mono {
+    width:100%;
+    margin-bottom:0
+  }
+}

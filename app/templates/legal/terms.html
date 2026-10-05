@@ -9,7 +9,7 @@
 <ul>
   <li>You must be at least 13 years old, and old enough to form a binding contract where you live, or have a parent or guardian's permission.</li>
   <li>Give us an email address you control, keep your password private, and tell us if you think your account has been accessed without permission.</li>
-  <li>An account is for one person. Don't create extra accounts to get around plan limits.</li>
+  <li>An account is for one person.</li>
 </ul>
 
 <h2>Your content</h2>
@@ -22,20 +22,18 @@
 <h2>Acceptable use</h2>
 <p>Don't use the service to break the law, upload malware, attack or overload our systems, scrape the service, resell it, or process content that is illegal or that you aren't allowed to share. We may suspend accounts that do.</p>
 
-<h2>Plans, billing and renewal</h2>
+<h2>Price and your OpenRouter key</h2>
 <ul>
-  <li>The Free plan costs nothing. Paid plans ({% for plan in plans if plan.paid %}{{ plan.name }}{{ ', ' if not loop.last else '' }}{% endfor %}) are subscriptions billed in US dollars, monthly or yearly, through our payment processor, Stripe. Applicable taxes may be added.</li>
-  <li><b>Subscriptions renew automatically</b> at the end of each billing period at the then-current price until you cancel. You can cancel anytime from Plan &amp; billing.</li>
-  <li>Each plan includes a monthly allowance of pages. A page is {{ '{:,}'.format(chars_per_page) }} characters of extracted source text, counted when a deck's generation starts; the next {{ free_reruns }} reruns of the same deck are free. Allowances reset on the 1st of each month (UTC) and unused pages don't carry over.</li>
-  <li>If we change prices, we'll tell you in advance, and the change applies from your next billing period.</li>
-  <li>Refunds and cancellations are covered by our <a href="{{ url_for('legal.refunds') }}">Refunds &amp; cancellation policy</a>.</li>
+  <li>AnkiSpark is free. We don't sell plans or subscriptions, and we never ask for payment details.</li>
+  <li>The AI that writes your cards runs on your own <a href="https://openrouter.ai" rel="noopener noreferrer">OpenRouter</a> account. You add an OpenRouter API key to your profile, and OpenRouter charges you directly, under its own terms and prices, for the requests made with it. We don't control or receive those charges and can't refund them.</li>
+  <li>You're responsible for your key and for the usage it incurs through AnkiSpark, including failed or repeated generation runs. Set a credit limit on the key at OpenRouter if you want a spending cap. You can replace or remove the key in your profile at any time.</li>
 </ul>
 
 <h2>Changes and availability</h2>
-<p>We're a small service and we improve it often. Features, AI models and limits may change. We aim to keep AnkiSpark available but don't guarantee it will be uninterrupted or error-free. Keep your own copies of decks you care about; exporting to Anki is always available on every plan.</p>
+<p>We're a small service and we improve it often. Features, AI models and limits may change. We aim to keep AnkiSpark available but don't guarantee it will be uninterrupted or error-free. Keep your own copies of decks you care about; exporting to Anki is always available.</p>
 
 <h2>Ending your use</h2>
-<p>You can stop using AnkiSpark at any time and ask us to delete your account. We may suspend or end accounts that break these terms. If we discontinue the service, we'll give reasonable notice so you can export your decks, and refund any prepaid period that we can no longer provide.</p>
+<p>You can stop using AnkiSpark at any time and ask us to delete your account. We may suspend or end accounts that break these terms. If we discontinue the service, we'll give reasonable notice so you can export your decks.</p>
 
 <h2>Disclaimers and liability</h2>
 <p>To the extent the law allows, the service is provided "as is" without warranties of any kind, and our total liability for any claim relating to the service is limited to the amount you paid us in the 12 months before the claim. Nothing in these terms limits rights you have under consumer protection law that can't be waived.</p>

@@ -50,7 +50,8 @@ state, not a guarantee of human review or factual accuracy.
 ## Get started
 
 Use **Python 3.12** (the version used by the Docker image), an **OpenRouter API key**
-for AI operations, and **Anki** to study exported packages.
+for AI operations, and **Anki** to study exported packages. AnkiSpark is free: there
+are no plans or payments, and each account adds its own OpenRouter key.
 
 ### Local · PowerShell
 
@@ -64,17 +65,17 @@ Copy-Item example.env .env
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Edit `.env`: set `SECRET_KEY` to the generated value and add your
-`OPENROUTER_API_KEY`. If `.env` already exists, update it instead of copying over it.
-Then start the app:
+Edit `.env`: set `SECRET_KEY` to the generated value. If `.env` already exists, update
+it instead of copying over it. Then start the app:
 
 ```powershell
 python run.py
 ```
 
-Open [localhost:5000](http://127.0.0.1:5000), create an account, and choose **New deck**.
+Open [localhost:5000](http://127.0.0.1:5000), create an account, and paste your
+OpenRouter API key under **My profile**. Then choose **New deck**.
 The workspace requires sign-in; the landing page has a public illustrative sample.
-**My profile** manages your display name, bio, avatar color, email, and password.
+**My profile** also manages your display name, bio, avatar color, email, and password.
 
 ### Docker
 
@@ -85,25 +86,25 @@ docker compose up --build
 ```
 
 Open [localhost:5000](http://localhost:5000). Compose runs one web container and
-persists local SQLite data in the `ankigpt-data` volume. PostgreSQL, including Neon,
-is supported through `DATABASE_URL`.
+persists its SQLite database and uploads in the `ankigpt-data` volume.
 
 ## Practical details
 
 - **Input:** text and text-based PDFs; no OCR workflow. Defaults: 50 MB upload limit
   and 400,000 source characters. Longer sources are truncated with a warning.
 - **Models:** the configured default is `openai/gpt-6-luna`, with per-role overrides.
-  Model access and billing depend on your OpenRouter account. Repeated tasks can use
-  cached results, but a rerun is not guaranteed to be free.
-- **Plans:** optional Stripe subscriptions (Free / Pro / Max) metered in pages of
-  extracted text. Off unless `BILLING_ENABLED=true`; see [setup](docs/setup.md#billing-stripe).
+  Model access and charges depend on your OpenRouter account. Repeated tasks can use
+  cached results, but a rerun is not guaranteed to cost nothing.
+- **Cost:** AnkiSpark itself is free. Each user saves their own OpenRouter API key
+  under **My profile** (stored encrypted) and OpenRouter charges them for the AI calls
+  their decks make. See [setup](docs/setup.md#openrouter-api-keys).
 - **Hosting:** [docs/self-host.md](docs/self-host.md) runs production on your own machine
   through a Cloudflare Tunnel; [docs/deploy.md](docs/deploy.md) covers a budget VPS instead.
 - **Runtime:** generation runs in background threads inside the web process. You can
   close the page while it works; restarting the server interrupts the run.
 - **Data:** workspace routes enforce account ownership. AI operations send source
   content through OpenRouter. Extracted text, figures, cards, and traces are stored
-  in your database. The original uploaded PDF is removed after extraction.
+  in one SQLite file on the server. The original uploaded PDF is removed after extraction.
 - **Anki:** export and review import are manual file transfers. Export includes all
   `ok` cards in the deck, even when the editor is filtered.
 
@@ -112,9 +113,9 @@ is supported through `DATABASE_URL`.
 | Guide | What's inside |
 |---|---|
 | [User guide](docs/user-guide.md) | Source → brief → plan → editor → export, Coach, profiles, troubleshooting |
-| [Setup and configuration](docs/setup.md) | Local/Docker setup, environment variables, Neon migration, deployment and storage |
+| [Setup and configuration](docs/setup.md) | Local/Docker setup, environment variables, API keys, deployment and storage |
 | [Self-hosting](docs/self-host.md) | Production on your own PC or laptop via Cloudflare Tunnel |
-| [Deploying to a VPS](docs/deploy.md) | Budget server, Caddy HTTPS, email, Stripe go-live |
+| [Deploying to a VPS](docs/deploy.md) | Budget server, Caddy HTTPS, email, backups |
 | [Architecture](docs/architecture.md) | Pipeline phases, strategies, caching, data model, failure handling |
 | [Development](docs/development.md) | Stack, tests, routes, and reproducible screenshot capture |
 

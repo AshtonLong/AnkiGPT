@@ -9,12 +9,22 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from ..extensions import db
 from ..models import Card, Deck, User
+from ..services.credentials import key_problem, openrouter_key_for, set_user_key, user_key
 from ..services.mailer import send_mail
 
 RESET_MAX_AGE = 3600  # seconds a reset link stays valid
 RESET_THROTTLE = timedelta(minutes=2)
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+
+@bp.app_context_processor
+def api_key_context():
+    def needs_api_key():
+        """True while a signed-in user has no OpenRouter key to generate with."""
+        return current_user.is_authenticated and not openrouter_key_for(current_user)
+
+    return {"needs_api_key": needs_api_key}
 
 
 def _login_destination():
@@ -148,6 +158,7 @@ def logout():
 def profile():
     errors = {}
     section = request.form.get("section", "") if request.method == "POST" else ""
+    key_notice = "Your OpenRouter key is saved. You're ready to generate."
     values = {
         "display_name": current_user.display_name or "",
         "bio": current_user.bio or "",
@@ -190,6 +201,17 @@ def profile():
                 errors["confirm_password"] = "The new passwords don't match."
             if not errors:
                 current_user.set_password(password)
+        elif section == "api-key":
+            if request.form.get("action") == "remove":
+                set_user_key(current_user, "")
+                key_notice = "Your OpenRouter key is removed."
+            else:
+                key = request.form.get("openrouter_api_key", "").strip()
+                problem = key_problem(key)
+                if problem:
+                    errors["openrouter_api_key"] = problem
+                else:
+                    set_user_key(current_user, key)
         else:
             errors["form"] = "Choose a profile setting to update."
 
@@ -201,11 +223,20 @@ def profile():
                 errors["email"] = "That email address is already in use."
             else:
                 flash({"profile": "Your profile is saved.", "email": "Your sign-in email is updated.",
-                       "password": "Your password is updated."}[section], "success")
+                       "password": "Your password is updated.", "api-key": key_notice}[section], "success")
                 return redirect(url_for("auth.profile", _anchor=section), code=303)
 
     deck_count = Deck.query.filter_by(user_id=current_user.id).count()
     card_count = Card.query.join(Deck).filter(Deck.user_id == current_user.id, Card.status != "deleted").count()
+    # The key itself never goes back to the browser, only whether one is saved and its last characters.
+    key_saved = bool(user_key(current_user))
+    api_key = {
+        "saved": key_saved,
+        # Encrypted with a SECRET_KEY the server no longer uses; it has to be entered again.
+        "unreadable": bool(current_user.openrouter_key_encrypted) and not key_saved,
+        "hint": current_user.openrouter_key_hint or "",
+        "server_fallback": bool(current_app.config.get("OPENROUTER_API_KEY")),
+    }
     return render_template("profile.html", values=values, errors=errors, active_section=section,
                            avatar_colors=User.AVATAR_COLORS, deck_count=deck_count,
-                           card_count=card_count), 422 if errors else 200
+                           card_count=card_count, api_key=api_key), 422 if errors else 200

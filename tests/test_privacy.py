@@ -90,6 +90,7 @@ def test_bulk_actions_ignore_foreign_cards(client, app, accounts, monkeypatch, a
     called = []
     monkeypatch.setattr(main, 'regenerate_source', lambda *args: called.append(args))
     monkeypatch.setattr(main, 'coach_cards', lambda *args: called.append(args))
+    app.config['OPENROUTER_API_KEY'] = 'test-only'
     login(client, email=accounts[0]['email'])
     foreign = accounts[1]
     response = client.post('/cards/bulk', data={

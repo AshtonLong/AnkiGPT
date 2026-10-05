@@ -107,7 +107,7 @@ app/
       parallel.py       thread-pool fan-out
       trace.py          PipelineTask / LLMRun tracing
     llm.py              OpenRouter HTTP: chat, tools loop, embeddings, JSON repair
-    billing.py          plans, page metering, Stripe checkout/portal/webhook sync
+    credentials.py      each user's OpenRouter API key, encrypted at rest
     deckgen.py          regenerate a unit, improve a card
     pdf.py, export.py, validators.py, chunking.py, schemas.py
   routes/, templates/, static/, models.py, config.py, tasks.py
@@ -116,7 +116,8 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 
 ## Data model
 
-- `User` — credentials, display name, bio, avatar color, deck ownership, and plan.
+- `User` — credentials, display name, bio, avatar color, deck ownership, and the
+  user's encrypted OpenRouter API key.
 - `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
   totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
 - `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).
@@ -127,9 +128,8 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 - `LLMRun` — every model call, attached to its task.
 - `Figure` — images pulled from a PDF plus the vision analysis.
 - `GenerationCache` — content-addressed results.
-- `UsageRecord` — one metered generation run (pages charged). Kept when its deck is
-  deleted. The user's Stripe subscription state is mirrored onto `User` by the webhook.
 
+Everything is stored in a single SQLite database (WAL mode).
 
 ## Runtime and failure handling
 
@@ -141,4 +141,6 @@ trace before retrying. AI improvement, bulk regeneration, and coaching execute w
 their HTTP request.
 
 Missing tables and columns are created on startup. This additive helper does not
-perform arbitrary schema migrations, backfills, or constraint changes.
+perform arbitrary schema migrations, backfills, or constraint changes, and it never
+drops anything: a database created by an older version keeps its unused billing
+columns and `usage_record` table.

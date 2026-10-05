@@ -234,7 +234,7 @@
       delete requestMemo[row.id];
     }
   });
-  body.addEventListener('improveError', function () { improveFailed = true; toast('AI improve failed — the card was left unchanged.', 'error'); });
+  body.addEventListener('improveError', function (e) { improveFailed = true; toast((e.detail && e.detail.message) || 'AI improve failed — the card was left unchanged.', 'error'); });
   body.addEventListener('htmx:responseError', function () { toast('Something went wrong. Please retry.', 'error'); });
   body.addEventListener('htmx:sendError', function () { toast('Network error. Check your connection and retry.', 'error'); });
 
