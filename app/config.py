@@ -55,7 +55,7 @@ class Config:
     # Optional sampling temperature. Left unset by default: reasoning models reject it.
     OPENROUTER_TEMPERATURE = os.getenv("OPENROUTER_TEMPERATURE", "")
     OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "")
-    OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "AnkiSpark")
+    OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "AnkiGPT")
     OPENROUTER_TIMEOUT_SECONDS = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "180"))
     OPENROUTER_MAX_RETRIES = _env_int("OPENROUTER_MAX_RETRIES", 2)
     OPENROUTER_RETRY_BACKOFF_SECONDS = float(os.getenv("OPENROUTER_RETRY_BACKOFF_SECONDS", "1.5"))
@@ -104,7 +104,7 @@ class Config:
     MAIL_FROM = os.getenv("MAIL_FROM", "")
 
     # Shown on the legal pages and site footer.
-    LEGAL_NAME = os.getenv("LEGAL_NAME", "AnkiSpark")
+    LEGAL_NAME = os.getenv("LEGAL_NAME", "AnkiGPT")
     SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "")
     LEGAL_JURISDICTION = os.getenv("LEGAL_JURISDICTION", "Canada")
 

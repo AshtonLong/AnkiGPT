@@ -1,10 +1,10 @@
-# AnkiSpark Desktop — Specification
+# AnkiGPT Desktop — Specification
 
 Status: draft for review, written 2026-10-05. Nothing in this document is built yet.
 
 ## 1. Summary
 
-AnkiSpark Desktop is a Windows application that runs the existing AnkiSpark app on the
+AnkiGPT Desktop is a Windows application that runs the existing AnkiGPT app on the
 user's own computer, with no server, no account and no sign-in. It is an Electron shell
 around the existing Flask app: Electron starts the Python backend as a hidden child
 process and shows its pages in a window.
@@ -46,19 +46,19 @@ desktop-specific sits behind one switch, called **desktop mode** in this documen
 ## 2. Architecture
 
 ```text
-┌─ AnkiSpark.exe (Electron main process) ────────────────────────────────┐
+┌─ AnkiGPT.exe (Electron main process) ────────────────────────────────┐
 │  owns: window, menus, dialogs, downloads, updates, the install secret  │
 │                                                                        │
 │   spawns, hidden                        loads http://127.0.0.1:<port>  │
 │        │                                              │                │
 │        ▼                                              ▼                │
-│  ankispark-backend.exe                     BrowserWindow (sandboxed)   │
+│  ankigpt-backend.exe                     BrowserWindow (sandboxed)   │
 │  Flask app on waitress        ◀── HTTP ──  the same HTML, CSS, htmx    │
 │  generation threads                        and JS as the web app       │
 │        │                                                               │
 └────────┼───────────────────────────────────────────────────────────────┘
          ▼
-   %APPDATA%\AnkiSpark\data\ankispark.db        OpenRouter (HTTPS, user's key)
+   %APPDATA%\AnkiGPT\data\ankigpt.db        OpenRouter (HTTPS, user's key)
 ```
 
 There are two programs:
@@ -77,18 +77,18 @@ desktop UIs identical and keeps the security model simple.
 1. Electron takes the single-instance lock. If another copy is running, it focuses that
    copy's window and exits.
 2. Electron shows a small splash window (a static local HTML file with the brand mark and
-   "Starting AnkiSpark…").
+   "Starting AnkiGPT…").
 3. Electron loads the install secret (section 4.2) and generates a random launch token
    (section 6).
 4. Electron spawns the backend with `windowsHide: true` and these environment variables:
 
    | Variable | Value |
    |---|---|
-   | `ANKISPARK_DATA_DIR` | Absolute path of the data folder |
-   | `ANKISPARK_LOG_DIR` | Absolute path of the logs folder |
-   | `ANKISPARK_TOKEN` | The launch token |
+   | `ANKIGPT_DATA_DIR` | Absolute path of the data folder |
+   | `ANKIGPT_LOG_DIR` | Absolute path of the logs folder |
+   | `ANKIGPT_TOKEN` | The launch token |
    | `SECRET_KEY` | The install secret |
-   | `ANKISPARK_VERSION` | The app version from `package.json` |
+   | `ANKIGPT_VERSION` | The app version from `package.json` |
 
 5. The backend prepares the data folder, backs up the database if the version changed
    (section 4.3), creates missing tables and columns (the existing `_ensure_schema`),
@@ -144,7 +144,7 @@ desktop-app/
     splash.html
   backend/
     entry.py                 the frozen program's entry point
-    ankispark-backend.spec   PyInstaller build description
+    ankigpt-backend.spec   PyInstaller build description
     requirements.txt         waitress, pyinstaller (on top of the root requirements.txt)
     selfcheck/sample.pdf     tiny PDF used by the self-check
   resources/
@@ -166,13 +166,13 @@ gains `!desktop-app/backend/*.spec`, `desktop-app/out/`, `desktop-app/backend-di
 
 ### 4.1 Layout
 
-Everything lives under Electron's `userData` folder, `%APPDATA%\AnkiSpark`. That folder is
+Everything lives under Electron's `userData` folder, `%APPDATA%\AnkiGPT`. That folder is
 not synced by OneDrive, which matters because SQLite's WAL files must not be synced.
 
 ```text
-%APPDATA%\AnkiSpark\
+%APPDATA%\AnkiGPT\
   data\
-    ankispark.db             the one database (plus -wal and -shm files)
+    ankigpt.db             the one database (plus -wal and -shm files)
     uploads\                 PDFs while they are being read; deleted after extraction
     backups\                 automatic copies made before an upgrade
     version.txt              the app version that last opened this database
@@ -210,12 +210,12 @@ key. The user pastes the key again there.
 ### 4.3 Backups and upgrades
 
 - On start, if `version.txt` names a different version than the running app and the
-  database exists, the backend copies it to `backups\ankispark-<old version>-<date>.db`
+  database exists, the backend copies it to `backups\ankigpt-<old version>-<date>.db`
   using SQLite's backup API, then writes the new version. The three newest backups are kept.
 - Schema changes stay additive, as they are today (`_ensure_schema`).
 - Opening a database with an older app version than the one that last wrote it is not
   supported.
-- Uninstalling leaves `%APPDATA%\AnkiSpark` in place, so reinstalling brings the decks back.
+- Uninstalling leaves `%APPDATA%\AnkiGPT` in place, so reinstalling brings the decks back.
 
 ## 5. Backend: desktop mode
 
@@ -230,7 +230,7 @@ flag; nothing checks for Electron or for Windows.
 |---|---|---|
 | `DESKTOP_MODE` | `True` | |
 | `SECRET_KEY` | from the environment, required | Section 4.2. The backend refuses to start without it. |
-| `SQLALCHEMY_DATABASE_URI` | `sqlite:///<data>/ankispark.db` | |
+| `SQLALCHEMY_DATABASE_URI` | `sqlite:///<data>/ankigpt.db` | |
 | `UPLOAD_FOLDER` | `<data>/uploads` | |
 | `OPENROUTER_API_KEY` | `""` | No shared server key. The user's own key is the only key. |
 | `OPENROUTER_SITE_URL` | the project's GitHub URL | Sent to OpenRouter as the referring app |
@@ -244,7 +244,7 @@ The desktop backend never reads a `.env` file from the working directory.
 
 ### 5.2 The local user
 
-- At start, the backend looks for the user with email `local@ankispark.invalid` and
+- At start, the backend looks for the user with email `local@ankigpt.invalid` and
   creates it if missing, with a random password hash that no password matches.
 - Flask-Login gets a `request_loader` that returns this user for every request, so
   `current_user` is always signed in. No route's ownership check changes: decks belong to
@@ -255,7 +255,7 @@ The desktop backend never reads a `.env` file from the working directory.
 Before any other handling, including static files, every request must pass two checks or
 it gets a 403:
 
-1. The `X-AnkiSpark-Token` header equals the launch token (compared in constant time).
+1. The `X-AnkiGPT-Token` header equals the launch token (compared in constant time).
 2. The `Host` header equals `127.0.0.1:<port>`.
 
 Section 6 explains what these protect against. CSRF protection stays on.
@@ -287,7 +287,7 @@ mode. It has three panels:
    `openrouter.ai/keys` opens in the user's browser.
 2. **Your data.** Plain statements: decks are stored on this computer at the shown path;
    source material and cards are sent to OpenRouter under the user's key when generating,
-   improving or coaching; nothing is sent to an AnkiSpark server; the app contacts GitHub
+   improving or coaching; nothing is sent to an AnkiGPT server; the app contacts GitHub
    to check for updates.
 3. **About.** App version.
 
@@ -301,7 +301,7 @@ stays in `processing` forever. A server rarely restarts; a desktop app is closed
 
 At start, in desktop mode only:
 
-- Every deck with status `processing` becomes `failed`, with the error "AnkiSpark was
+- Every deck with status `processing` becomes `failed`, with the error "AnkiGPT was
   closed while this deck was generating. Retry to run it again."
 - Every `PipelineTask` with status `running` or `queued` becomes `failed`.
 - Decks in `planned`, `ready`, `draft` and `failed` are untouched.
@@ -390,7 +390,7 @@ The window:
   a web page.
 - All permission requests (camera, microphone, notifications, location) are denied.
 - Navigation and new windows are restricted (section 7.2).
-- DevTools are off in packaged builds unless `ANKISPARK_DEVTOOLS=1` is set.
+- DevTools are off in packaged builds unless `ANKIGPT_DEVTOOLS=1` is set.
 
 The OpenRouter key is never written to a log.
 
@@ -443,7 +443,7 @@ inputs and drag-and-drop. Nothing changes.
 | File | New deck (Ctrl+N) · Your decks · Settings (Ctrl+,) · Open data folder · Quit (Ctrl+Q) |
 | Edit | Undo · Redo · Cut · Copy · Paste · Select all |
 | View | Reload (Ctrl+R) · Zoom in · Zoom out · Actual size · Full screen (F11) |
-| Help | User guide · Check for updates… · Open logs folder · About AnkiSpark |
+| Help | User guide · Check for updates… · Open logs folder · About AnkiGPT |
 
 Electron has no right-click menu by default. The shell adds one: Cut, Copy and Paste in
 text fields, Copy on selected text, and spelling suggestions. The card editor needs this.
@@ -471,8 +471,8 @@ still turn off.
 
 | Situation | What the user sees |
 |---|---|
-| Backend not ready in 30 s, or exits before ready | "AnkiSpark couldn't start" with **Open logs** and **Quit** |
-| Backend exits while the app is open | "AnkiSpark stopped working" with **Restart** and **Quit** |
+| Backend not ready in 30 s, or exits before ready | "AnkiGPT couldn't start" with **Open logs** and **Quit** |
+| Backend exits while the app is open | "AnkiGPT stopped working" with **Restart** and **Quit** |
 | No internet | The app opens; browsing, editing and export work; generation fails with the message from section 5.8 |
 | Update check or download fails | Nothing. It is logged and retried at the next check. |
 
@@ -503,12 +503,12 @@ that.
 ### 8.2 The installer (electron-builder)
 
 - NSIS installer, x64, one click, per user. It installs to
-  `%LOCALAPPDATA%\Programs\AnkiSpark` without an administrator prompt, which also lets
+  `%LOCALAPPDATA%\Programs\AnkiGPT` without an administrator prompt, which also lets
   updates install without one.
 - The frozen backend folder ships as an extra resource at `resources\backend\`.
 - Start-menu shortcut; desktop shortcut.
 - App data is kept on uninstall.
-- Output: `AnkiSpark-Setup-<version>.exe`, `latest.yml` and a `.blockmap` file.
+- Output: `AnkiGPT-Setup-<version>.exe`, `latest.yml` and a `.blockmap` file.
 
 ### 8.3 Size
 
@@ -585,7 +585,7 @@ The existing tests must pass unmodified. They are the proof the web app did not 
 
 ### 10.2 The frozen backend
 
-`ankispark-backend.exe --self-check` runs inside the frozen program, prints a JSON report
+`ankigpt-backend.exe --self-check` runs inside the frozen program, prints a JSON report
 and exits non-zero on any failure:
 
 - `pymupdf.layout`, `pymupdf4llm` and `onnxruntime` import.
@@ -602,7 +602,7 @@ closing.
 
 ### 10.3 Manual release checklist
 
-On a Windows account that has never had AnkiSpark installed:
+On a Windows account that has never had AnkiGPT installed:
 
 1. Install. Note any SmartScreen or antivirus prompt.
 2. First launch shows the decks page with no sign-in.
@@ -640,7 +640,7 @@ Each step ends in something that can be checked.
    differences, interrupted-run cleanup, bundled assets, with tests. Checked in a browser
    using `--dev`.
 3. **Electron shell in development.** Spawn the unfrozen backend, window, navigation
-   rules, downloads, menus, quit warning. Uses a separate `AnkiSpark Dev` data folder so
+   rules, downloads, menus, quit warning. Uses a separate `AnkiGPT Dev` data folder so
    real data is never touched.
 4. **Installer.** Frozen backend inside an NSIS installer, tested on a clean account.
 5. **Updates and release workflow.** Publish two versions and watch one update to the next.
@@ -648,19 +648,17 @@ Each step ends in something that can be checked.
 
 ## 13. Open decisions and assumptions
 
-Decisions needed from Ashton:
+Decision needed from Ashton:
 
-1. **Code signing.** Ship unsigned at first, or pay for signing before other people
-   install it? Recommendation: build and test unsigned, and sign before the first public
-   release, because SmartScreen and antivirus warnings are the first thing a new user sees.
-   Cost and eligibility of the signing options need checking at that point.
-2. **Where releases live.** This spec assumes GitHub Releases on `AshtonLong/AnkiGPT`.
-   The repository is named AnkiGPT and the product AnkiSpark; a rename or a separate
-   releases repository changes the update address baked into every installed copy, so it
-   should be settled before the first public release.
+- **Code signing.** Ship unsigned at first, or pay for signing before other people
+  install it? Recommendation: build and test unsigned, and sign before the first public
+  release, because SmartScreen and antivirus warnings are the first thing a new user sees.
+  Cost and eligibility of the signing options need checking at that point.
 
 Assumptions made here that are cheap to change before building:
 
+- Releases are published as GitHub Releases on `AshtonLong/AnkiGPT`. That address is
+  baked into every installed copy, so moving it after the first public release is costly.
 - The desktop Settings page drops display name, bio and avatar colour.
 - The upload limit rises to 200 MB on desktop.
 - Model selection stays in `settings.env` for version 1, with no UI.

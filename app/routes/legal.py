@@ -10,7 +10,7 @@ LEGAL_UPDATED = "October 5, 2026"
 def legal_context():
     config = current_app.config
     return {"legal": {
-        "name": config.get("LEGAL_NAME") or "AnkiSpark",
+        "name": config.get("LEGAL_NAME") or "AnkiGPT",
         "email": config.get("SUPPORT_EMAIL") or "",
         "jurisdiction": config.get("LEGAL_JURISDICTION") or "Canada",
         "updated": LEGAL_UPDATED,

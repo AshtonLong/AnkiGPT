@@ -1,6 +1,6 @@
 # Self-hosting on your own machine
 
-Run production AnkiSpark on a PC or laptop you already own. Cloudflare Tunnel carries
+Run production AnkiGPT on a PC or laptop you already own. Cloudflare Tunnel carries
 public HTTPS traffic to it over an outbound connection, so there is no router port
 forwarding, your home IP address stays hidden, and HTTPS certificates are handled for
 you. Fixed cost: a domain (~$11/year). Everything else is free.

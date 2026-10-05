@@ -115,7 +115,7 @@ def test_external_urls_use_forwarded_https_behind_proxy(tmp_path, monkeypatch):
     register(client)
     logout(client)
     client.post("/auth/forgot", data={"email": "a@example.com"},
-                headers={"X-Forwarded-Proto": "https", "X-Forwarded-Host": "ankispark.example", "X-Forwarded-For": "1.2.3.4"})
-    assert "https://ankispark.example/auth/reset/" in sent[0]
+                headers={"X-Forwarded-Proto": "https", "X-Forwarded-Host": "ankigpt.example", "X-Forwarded-For": "1.2.3.4"})
+    assert "https://ankigpt.example/auth/reset/" in sent[0]
     with proxied.app_context():
         _db.drop_all()

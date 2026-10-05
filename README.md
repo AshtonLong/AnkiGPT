@@ -1,4 +1,4 @@
-# AnkiSpark
+# AnkiGPT
 
 ### Your material. Your edits. Your Anki routine.
 
@@ -7,7 +7,7 @@ refine the cards, and export a deck you can study in Anki.
 
 [Get started](#get-started) · [User guide](docs/user-guide.md) · [Configuration](docs/setup.md) · [How it works](docs/architecture.md)
 
-![AnkiSpark card editor showing a source-grounded question, editable answer and tags, card filters, and export controls](docs/images/editor.png)
+![AnkiGPT card editor showing a source-grounded question, editable answer and tags, card filters, and export controls](docs/images/editor.png)
 
 *The real card editor with synthetic study material. All screenshots show the current
 interface with sample data, not results from a live AI run.*
@@ -50,7 +50,7 @@ state, not a guarantee of human review or factual accuracy.
 ## Get started
 
 Use **Python 3.12** (the version used by the Docker image), an **OpenRouter API key**
-for AI operations, and **Anki** to study exported packages. AnkiSpark is free: there
+for AI operations, and **Anki** to study exported packages. AnkiGPT is free: there
 are no plans or payments, and each account adds its own OpenRouter key.
 
 ### Local · PowerShell
@@ -95,7 +95,7 @@ persists its SQLite database and uploads in the `ankigpt-data` volume.
 - **Models:** the configured default is `openai/gpt-6-luna`, with per-role overrides.
   Model access and charges depend on your OpenRouter account. Repeated tasks can use
   cached results, but a rerun is not guaranteed to cost nothing.
-- **Cost:** AnkiSpark itself is free. Each user saves their own OpenRouter API key
+- **Cost:** AnkiGPT itself is free. Each user saves their own OpenRouter API key
   under **My profile** (stored encrypted) and OpenRouter charges them for the AI calls
   their decks make. See [setup](docs/setup.md#openrouter-api-keys).
 - **Hosting:** [docs/self-host.md](docs/self-host.md) runs production on your own machine

@@ -113,7 +113,7 @@ def forgot_password():
             link = url_for("auth.reset_password", token=make_reset_token(user), _external=True)
             send_mail(
                 user.email,
-                "Reset your AnkiSpark password",
+                "Reset your AnkiGPT password",
                 render_template("email/password_reset.txt", link=link, user=user),
                 render_template("email/password_reset.html", link=link, user=user),
             )

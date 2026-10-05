@@ -9,7 +9,7 @@
 # private: it holds the tunnel's credentials. Copy it to move hosting to another machine.
 set -euo pipefail
 DOMAIN="${1:?usage: deploy/tunnel-setup.sh yourdomain.com}"
-NAME="${TUNNEL_NAME:-ankispark}"
+NAME="${TUNNEL_NAME:-ankigpt}"
 DIR="deploy/cloudflared"
 mkdir -p "$DIR"
 

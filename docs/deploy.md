@@ -1,10 +1,10 @@
-# Deploying AnkiSpark cheaply
+# Deploying AnkiGPT cheaply
 
 A production setup for about $22/year in fixed costs: a budget VPS (RackNerd's 1 GB
 plan, ~$11/year) running the Docker image behind Caddy (automatic HTTPS), a domain
 (~$11/year), and Resend's free tier for password-reset email. Everything here can be
 paid with PayPal; no credit card is needed. There are no variable costs for you:
-AnkiSpark is free, and each user's AI calls run on their own OpenRouter key.
+AnkiGPT is free, and each user's AI calls run on their own OpenRouter key.
 
 ```text
 browser ──HTTPS──> Caddy (:443, Let's Encrypt) ──> gunicorn app (:8000) ──> SQLite file
@@ -64,7 +64,7 @@ MAIL_SMTP_HOST=smtp.resend.com
 MAIL_SMTP_PORT=465
 MAIL_SMTP_USERNAME=resend
 MAIL_SMTP_PASSWORD=re_...
-MAIL_FROM=AnkiSpark <no-reply@yourdomain.com>
+MAIL_FROM=AnkiGPT <no-reply@yourdomain.com>
 
 LEGAL_NAME=<your name or business name>
 SUPPORT_EMAIL=support@yourdomain.com

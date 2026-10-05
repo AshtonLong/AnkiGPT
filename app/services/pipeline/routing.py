@@ -54,7 +54,7 @@ class LLMClient:
         get = config.get if hasattr(config, "get") else (lambda k, d=None: getattr(config, k, d))
         self.api_key = api_key
         self.site_url = get("OPENROUTER_SITE_URL", "")
-        self.app_name = get("OPENROUTER_APP_NAME", "AnkiSpark")
+        self.app_name = get("OPENROUTER_APP_NAME", "AnkiGPT")
         self.default_model = get("OPENROUTER_MODEL", "openai/gpt-6-luna")
         self.embedding_model = get("OPENROUTER_EMBEDDING_MODEL", "openai/text-embedding-3-small")
         self.max_retries = int(get("OPENROUTER_MAX_RETRIES", 2))
