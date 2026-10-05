@@ -12,7 +12,7 @@ from .. import llm as llm_module
 
 logger = logging.getLogger(__name__)
 
-ROLES = ("mapper", "planner", "worker", "critic", "reconcile", "vision")
+ROLES = ("mapper", "cheatsheet", "planner", "worker", "critic", "reconcile", "vision")
 
 
 @dataclass

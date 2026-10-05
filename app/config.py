@@ -28,9 +28,10 @@ class Config:
 
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
-    # Per-role overrides. Empty -> OPENROUTER_MODEL. Roles: mapper, planner, worker,
-    # critic, reconcile, vision. The planner benefits most from a stronger model.
+    # Per-role overrides. Empty -> OPENROUTER_MODEL. Roles: mapper, cheatsheet, planner,
+    # worker, critic, reconcile, vision. The planner benefits most from a stronger model.
     OPENROUTER_MODEL_MAPPER = os.getenv("OPENROUTER_MODEL_MAPPER", "")
+    OPENROUTER_MODEL_CHEATSHEET = os.getenv("OPENROUTER_MODEL_CHEATSHEET", "")
     OPENROUTER_MODEL_PLANNER = os.getenv("OPENROUTER_MODEL_PLANNER", "")
     OPENROUTER_MODEL_WORKER = os.getenv("OPENROUTER_MODEL_WORKER", "")
     OPENROUTER_MODEL_CRITIC = os.getenv("OPENROUTER_MODEL_CRITIC", "")
@@ -41,6 +42,8 @@ class Config:
     # Empty disables the parameter for models that don't support it.
     OPENROUTER_REASONING_PLANNER = os.getenv("OPENROUTER_REASONING_PLANNER", "medium")
     OPENROUTER_REASONING_MAPPER = os.getenv("OPENROUTER_REASONING_MAPPER", "low")
+    # The cheat sheet decides what reaches the deck at all, so it gets more thought.
+    OPENROUTER_REASONING_CHEATSHEET = os.getenv("OPENROUTER_REASONING_CHEATSHEET", "medium")
     OPENROUTER_REASONING_WORKER = os.getenv("OPENROUTER_REASONING_WORKER", "low")
     OPENROUTER_REASONING_CRITIC = os.getenv("OPENROUTER_REASONING_CRITIC", "low")
     OPENROUTER_REASONING_RECONCILE = os.getenv("OPENROUTER_REASONING_RECONCILE", "low")

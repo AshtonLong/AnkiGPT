@@ -18,6 +18,8 @@ interface with sample data, not results from a live AI run.*
    page range. Pick basic, cloze, or mixed cards.
 2. **Set the direction.** Review the extracted source and tell the planner your exam
    context, focus areas, exclusions, must-include terms, and approximate deck size.
+   When the full source would be overload, switch on **Make a cheat sheet first** to
+   write cards only from what you would bring into the exam.
 3. **Review the plan.** Optionally pause before writing to change strategies, adjust
    card budgets, edit worker notes, or skip tasks.
 4. **Make the cards yours.** Search, filter, edit, tag, restore, or AI-improve cards.
