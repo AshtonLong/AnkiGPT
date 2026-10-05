@@ -1,0 +1,83 @@
+{
+  "name": "ankigpt-desktop",
+  "productName": "AnkiGPT",
+  "version": "0.1.0",
+  "description": "Turn PDFs and notes into editable Anki flashcards, on your own computer.",
+  "author": "AshtonLong",
+  "homepage": "https://github.com/AshtonLong/AnkiGPT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AshtonLong/AnkiGPT.git",
+    "directory": "desktop-app"
+  },
+  "private": true,
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "start": "electron .",
+    "make-assets": "python scripts/make-assets.py",
+    "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-backend.ps1",
+    "smoke:backend": "node scripts/smoke-backend.js",
+    "pack": "electron-builder --win --x64 --dir",
+    "dist": "electron-builder --win --x64 --publish never",
+    "release": "electron-builder --win --x64 --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.ashtonlong.ankigpt",
+    "productName": "AnkiGPT",
+    "copyright": "Copyright © 2026 AshtonLong",
+    "directories": {
+      "output": "out",
+      "buildResources": "resources"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend-dist/ankigpt-backend",
+        "to": "backend"
+      }
+    ],
+    "beforePack": "./scripts/before-pack.js",
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AnkiGPT",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "AnkiGPT-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AshtonLong",
+        "repo": "AnkiGPT",
+        "releaseType": "draft"
+      }
+    ]
+  }
+}

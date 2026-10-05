@@ -1,6 +1,10 @@
 # AnkiGPT Desktop — Specification
 
-Status: draft for review, written 2026-10-05. Nothing in this document is built yet.
+Status: written 2026-10-05 and built the same day as version 0.1.0. Not yet released: the
+installer has not been run on a clean Windows account, no release has been published, so
+one version has not been watched updating to the next, and the manual checklist (section
+10.3) has not been run with a real OpenRouter key. The code-signing decision in section 13
+is still open. [docs/desktop.md](../docs/desktop.md) is the page for users and developers.
 
 ## 1. Summary
 
@@ -134,6 +138,7 @@ the database.
 desktop-app/
   SPEC.md                    this document
   package.json               Electron app, scripts, electron-builder config
+  package-lock.json          exact npm versions (section 8.4)
   src/
     main.js                  lifecycle: lock, splash, spawn, window, quit
     backend.js               spawn, read stdout messages, shut down, kill tree
@@ -146,11 +151,15 @@ desktop-app/
     entry.py                 the frozen program's entry point
     ankigpt-backend.spec   PyInstaller build description
     requirements.txt         waitress, pyinstaller (on top of the root requirements.txt)
+    constraints.txt          exact Python versions the backend is built with (section 8.4)
     selfcheck/sample.pdf     tiny PDF used by the self-check
   resources/
     icon.ico                 generated from app/static/brand.svg
   scripts/
-    build-backend.ps1        clean venv -> pip install -> pyinstaller -> self-check
+    build-backend.ps1        clean venv -> pip install -> pyinstaller -> self-check -> smoke test
+    smoke-backend.js         starts the frozen backend for real (the second script in section 10.2)
+    before-pack.js           stops the installer build if the frozen backend is missing
+    make-assets.py           regenerates icon.ico and selfcheck/sample.pdf
 app/
   desktop.py                 everything desktop mode adds to the Flask app
   config.py                  gains DesktopConfig
@@ -513,9 +522,9 @@ that.
 ### 8.3 Size
 
 Measured in the development venv: `pymupdf` 105 MB (including the 49 MB of layout models),
-`onnxruntime` 45 MB, `numpy` 55 MB. Estimates, to be replaced by measurements at the first
-build: backend about 250–300 MB on disk, Electron about 250 MB on disk, installer about
-150–200 MB. Target: installer under 250 MB.
+`onnxruntime` 45 MB, `numpy` 55 MB. Measured at the first build (0.1.0): the frozen backend
+is 203 MB on disk, the installed app 574 MB including it, and the installer 198 MB.
+Target: installer under 250 MB.
 
 ### 8.4 Tool versions
 

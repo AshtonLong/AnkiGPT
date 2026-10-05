@@ -11,6 +11,8 @@ import time
 
 import requests
 
+from ..desktop import settings_page_name
+
 logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -30,11 +32,17 @@ class OpenRouterError(RuntimeError):
         self.response_body = response_body
 
 
+class OpenRouterConnectionError(OpenRouterError):
+    """The request got no answer from OpenRouter: offline, DNS failure, dropped connection."""
+
+
 class MissingAPIKeyError(RuntimeError):
     """No OpenRouter key to call with: the user hasn't saved one and the server has none."""
 
-    def __init__(self):
-        super().__init__("No OpenRouter API key. Add yours under My profile, then try again.")
+    def __str__(self):
+        # Worded when it is shown, not when it is raised: calls run on pool threads that
+        # have no app context, and only the app knows what it calls the page.
+        return f"No OpenRouter API key. Add yours under {settings_page_name()}, then try again."
 
 
 def is_terminal_error(exc):
@@ -194,7 +202,9 @@ def _post_with_retries(url, payload, headers, max_retries, backoff_seconds, time
             if attempt < attempts - 1:
                 time.sleep(_retry_delay_seconds(attempt, backoff_seconds, None))
                 continue
-            raise OpenRouterError(f"OpenRouter request failed: {exc}") from exc
+            unreachable = isinstance(exc, requests.ConnectionError)
+            error_type = OpenRouterConnectionError if unreachable else OpenRouterError
+            raise error_type(f"OpenRouter request failed: {exc}") from exc
         except requests.RequestException as exc:
             raise OpenRouterError(f"OpenRouter request failed: {exc}") from exc
 

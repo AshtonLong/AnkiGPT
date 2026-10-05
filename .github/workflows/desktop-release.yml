@@ -1,0 +1,77 @@
+# Builds the Windows desktop app and uploads it to a DRAFT GitHub Release.
+#
+# Triggered by pushing a tag such as v0.1.0, which must match the version in
+# desktop-app/package.json. Nothing reaches users from here: installed copies only
+# update once a person has run the manual checklist in docs/desktop.md against the
+# draft and published it. See desktop-app/SPEC.md section 9.4.
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the draft release and upload the installer to it
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and draft the release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the app version
+        shell: pwsh
+        run: |
+          $version = (Get-Content desktop-app/package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} does not match desktop-app/package.json version $version."
+          }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop-app/package-lock.json
+
+      # 1. The existing test suite, on the same package versions the app ships with.
+      - name: Run the tests
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-dev.txt -c desktop-app/backend/constraints.txt
+          python -m pytest tests/ -q
+
+      # 2. Freeze the backend in a clean venv; the script runs the self-check and the smoke test.
+      - name: Build the backend
+        shell: pwsh
+        run: ./desktop-app/scripts/build-backend.ps1 -Python python
+
+      # 3. Build the installer and upload it, with latest.yml and the blockmap, to a draft release.
+      - name: Build the installer and draft the release
+        working-directory: desktop-app
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm ci
+          npm run release
+
+      - name: Keep the installer as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnkiGPT-Setup-${{ github.ref_name }}
+          path: |
+            desktop-app/out/AnkiGPT-Setup-*.exe
+            desktop-app/out/AnkiGPT-Setup-*.exe.blockmap
+            desktop-app/out/latest.yml
+          if-no-files-found: error
