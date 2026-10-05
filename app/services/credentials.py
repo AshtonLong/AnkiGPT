@@ -1,6 +1,6 @@
 """Per-user OpenRouter API keys.
 
-AnkiSpark is free: every account brings its own OpenRouter key and pays OpenRouter
+AnkiGPT is free: every account brings its own OpenRouter key and pays OpenRouter
 directly for what it generates. A key is encrypted with a key derived from SECRET_KEY
 before it reaches the database, so a copy of the database alone does not expose it.
 Changing SECRET_KEY makes stored keys unreadable, and users then enter theirs again.

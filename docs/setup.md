@@ -44,12 +44,12 @@ docker compose exec web sh -c "pip install -q -r requirements-dev.txt && python 
 
 ### OpenRouter API keys
 
-AnkiSpark is free and has no billing. Each user pays OpenRouter directly for the AI
+AnkiGPT is free and has no billing. Each user pays OpenRouter directly for the AI
 calls their own decks make:
 
 1. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys) and add credit to
    the OpenRouter account. A credit limit on the key caps what it can spend.
-2. In AnkiSpark, open **My profile → OpenRouter API key**, paste the key and save.
+2. In AnkiGPT, open **My profile → OpenRouter API key**, paste the key and save.
 
 The key is encrypted with a key derived from `SECRET_KEY` before it is written to the
 database, and only its last four characters are ever shown again. Every generation
@@ -94,7 +94,7 @@ volume, which is a different file from `instance/ankigpt.db` in a local checkout
 | `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
 | `OPENROUTER_REASONING_{PLANNER,CHEATSHEET,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role (planner and cheat sheet default to `medium`); empty omits the parameter. |
 | `OPENROUTER_TEMPERATURE` | | Unset by default — reasoning models reject it. |
-| `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | empty / `AnkiSpark` | Optional provider attribution headers. |
+| `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | empty / `AnkiGPT` | Optional provider attribution headers. |
 | `OPENROUTER_MAX_TOKENS` | `16000` | Output cap per call (OpenRouter charges per token used). |
 | `OPENROUTER_TIMEOUT_SECONDS` / `_MAX_RETRIES` / `_RETRY_BACKOFF_SECONDS` | `180` / `2` / `1.5` | HTTP behaviour. |
 | `PIPELINE_MAX_WORKERS` | `6` | Concurrent model calls. |
@@ -109,7 +109,7 @@ volume, which is a different file from `instance/ankigpt.db` in a local checkout
 | `MAX_SOURCE_CHARS` | `400000` | Longer sources are truncated with a warning (`0` disables). |
 | `PROXY_FIX_HOPS` | `0` | Trust this many reverse-proxy hops of `X-Forwarded-*` headers (production compose sets `1`). |
 | `MAIL_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD`, `MAIL_FROM` | / `465` | SMTP for password-reset email. Unset, links are logged instead. |
-| `LEGAL_NAME` / `SUPPORT_EMAIL` / `LEGAL_JURISDICTION` | `AnkiSpark` / / `Canada` | Shown on the legal pages and footer. |
+| `LEGAL_NAME` / `SUPPORT_EMAIL` / `LEGAL_JURISDICTION` | `AnkiGPT` / / `Canada` | Shown on the legal pages and footer. |
 | `UPLOAD_MAX_MB` / `UPLOAD_FOLDER` | `50` / `instance/uploads` | Uploads. |
 | `GENERATION_IN_THREAD` | `true` | Run generation on a background thread (tests set `false` to run inline). |
 

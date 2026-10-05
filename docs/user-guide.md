@@ -68,9 +68,9 @@ restorable card deletion in the editor.
 
 ## 5. Bring review history back
 
-After exporting from AnkiSpark and studying in Anki, export the deck or collection from
+After exporting from AnkiGPT and studying in Anki, export the deck or collection from
 Anki with scheduling information. Upload the `.apkg` or `.colpkg` through
-**Import reviews**. Matching uses the stable note GUID assigned by AnkiSpark's export.
+**Import reviews**. Matching uses the stable note GUID assigned by AnkiGPT's export.
 Unrelated notes will not match.
 
 Cards with at least two lapses or an again-rate of at least 40% are flagged as
@@ -86,7 +86,7 @@ belong to your account. Sign out from the sidebar when finished.
 
 ### Your OpenRouter API key
 
-AnkiSpark is free, and the AI that writes your cards runs on your own OpenRouter
+AnkiGPT is free, and the AI that writes your cards runs on your own OpenRouter
 account. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys), add credit
 there, then paste the key under **My profile → OpenRouter API key** and save. You need
 to do this once, before your first deck. The key is stored encrypted and is never shown

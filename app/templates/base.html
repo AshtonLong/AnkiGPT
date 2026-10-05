@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="theme-color" content="#FAFBFC">
-  <title>{% block title %}{{ title or 'AnkiSpark' }}{% endblock %}</title>
+  <title>{% block title %}{{ title or 'AnkiGPT' }}{% endblock %}</title>
   <meta name="description" content="Turn your PDFs and notes into editable flashcards. Review what matters, then take your deck straight into Anki.">
   <link rel="icon" href="{{ url_for('static', filename='brand.svg') }}" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,10 +29,10 @@
 </div>
   {% if app_page %}
   <aside class="sidebar" id="app-navigation">
-    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
+    <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
 <span class="logo-mark" aria-hidden="true">
 </span>
-<span class="logo-word">AnkiSpark</span>
+<span class="logo-word">AnkiGPT</span>
 </a>
     <span class="nav-caption">WORKSPACE</span>
     <nav aria-label="Workspace">
@@ -45,7 +45,7 @@
       <a class="sidebar-note key-note" href="{{ url_for('auth.profile', _anchor='api-key') }}">
 <span class="mini-mark">{{ icon('key', 22) }}</span>
 <b>Add your OpenRouter key.</b>
-<p>AnkiSpark is free. Your own key powers the AI that writes your cards.</p>
+<p>AnkiGPT is free. Your own key powers the AI that writes your cards.</p>
 <span class="key-note-cta">Add it in My profile {{ icon('arrow-right', 13) }}</span>
 </a>
       {% else %}
@@ -69,10 +69,10 @@
   {% endif %}
   <header class="topbar">
     <div class="wrap">
-      <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiSpark home">
+      <a href="{{ url_for('main.index') }}" class="logo" aria-label="AnkiGPT home">
 <span class="logo-mark" aria-hidden="true">
 </span>
-<span class="logo-word">AnkiSpark</span>
+<span class="logo-word">AnkiGPT</span>
 </a>
       {% if app_page %}
       <div class="breadcrumbs">

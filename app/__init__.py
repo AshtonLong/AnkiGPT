@@ -71,7 +71,7 @@ def _sqlite_url(app, value):
     if url is None or url.get_backend_name() != "sqlite":
         raise RuntimeError(
             "DATABASE_URL must be a SQLite URL such as sqlite:///instance/ankigpt.db. "
-            "AnkiSpark stores its data in one SQLite file; other databases are not supported."
+            "AnkiGPT stores its data in one SQLite file; other databases are not supported."
         )
     if url.database and url.database != ":memory:" and not os.path.isabs(url.database):
         url = url.set(database=_under_instance(app.instance_path, url.database))

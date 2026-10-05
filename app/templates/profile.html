@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
-{% block title %}My profile · AnkiSpark{% endblock %}
+{% block title %}My profile · AnkiGPT{% endblock %}
 {% block body_class %}profile-page{% endblock %}
 {% macro field_error(name) %}{% if errors.get(name) %}<p class="profile-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
 {% macro error_attrs(name) %}{% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}
@@ -63,7 +63,7 @@
       </section>
 
       <section class="profile-panel" id="api-key" aria-labelledby="api-key-title">
-        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('key', 21) }}</span><div><h2 id="api-key-title">OpenRouter API key</h2><p>AnkiSpark is free. Your own key powers the AI that writes your cards.</p></div><span class="profile-section-number">02</span></div>
+        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('key', 21) }}</span><div><h2 id="api-key-title">OpenRouter API key</h2><p>AnkiGPT is free. Your own key powers the AI that writes your cards.</p></div><span class="profile-section-number">02</span></div>
         <form method="post" action="{{ url_for('auth.profile', _anchor='api-key') }}" data-profile-form autocomplete="off">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="api-key">
           <div class="profile-fields">
