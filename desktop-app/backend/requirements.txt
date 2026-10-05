@@ -1,0 +1,4 @@
+# What the desktop backend needs on top of the root requirements.txt.
+# Exact versions for a release build are pinned in constraints.txt.
+waitress>=3.0.2,<4
+pyinstaller>=6.22.3,<7

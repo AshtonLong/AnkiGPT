@@ -20,6 +20,7 @@ from flask_login import current_user
 from sqlalchemy import func
 from werkzeug.utils import secure_filename
 
+from ..desktop import settings_page_name
 from ..extensions import db, login_manager
 from ..models import Card, Deck, Figure, LLMRun, PipelineTask, Source
 from ..services.credentials import openrouter_key_for
@@ -236,7 +237,7 @@ def _require_api_key():
     """Flash where to add a key and return False when the actor has none to generate with."""
     if _has_api_key():
         return True
-    flash("Add your OpenRouter API key under My profile before generating.", "error")
+    flash(f"Add your OpenRouter API key under {settings_page_name()} before generating.", "error")
     return False
 
 
@@ -537,7 +538,8 @@ def bulk_cards():
 def improve(card_id):
     card = get_owned_card(card_id)
     if not _has_api_key():
-        trigger = {"improveError": {"message": "Add your OpenRouter API key under My profile to use AI improve."}}
+        message = f"Add your OpenRouter API key under {settings_page_name()} to use AI improve."
+        trigger = {"improveError": {"message": message}}
         return render_template("partials/card_row.html", card=card), 200, {"HX-Trigger": json.dumps(trigger)}
     try:
         improve_card(card_id)

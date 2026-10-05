@@ -147,3 +147,26 @@
   .profile-signout { align-items:start; }
   .profile-signout p { max-width:175px; }
 }
+/* Desktop Settings page: the same panels, with no account to show. */
+.settings-trigger { padding:8px 13px; }
+.settings-mark { background:white; }
+.settings-mark .logo-mark { width:38px; height:40px; }
+#your-data .profile-section-icon,#about .profile-section-icon { background:#F3F8F4; border-color:#CFE0D5; color:var(--green); }
+.settings-facts { list-style:none; margin:0; padding:6px 28px 10px; }
+.settings-facts li { display:flex; align-items:start; gap:14px; padding:18px 0; }
+.settings-facts li+li { border-top:1px solid #EDF0F4; }
+.settings-facts li>svg { margin-top:2px; color:var(--green); }
+.settings-facts li>div { min-width:0; }
+.settings-facts b { display:block; font-size:13px; font-weight:600; }
+.settings-facts p { margin-top:4px; font-size:12px; line-height:1.6; }
+.settings-path { display:block; margin-top:10px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:11px/1.6 var(--mono); overflow-wrap:anywhere; user-select:all; }
+.settings-about { display:flex; align-items:center; gap:14px; padding:24px 28px 27px; }
+.settings-about b { display:block; font-size:15px; letter-spacing:-.02em; }
+.settings-about p { margin-top:3px; font-size:12px; }
+.settings-version { font:11px var(--mono); color:var(--ink); }
+.settings-about .text-link { margin-left:auto; font-size:12px; gap:6px; }
+@media(max-width:760px) {
+  .settings-facts { padding-inline:20px; }
+  .settings-about { padding:22px 20px; flex-wrap:wrap; }
+  .settings-about .text-link { margin-left:0; flex-basis:100%; }
+}

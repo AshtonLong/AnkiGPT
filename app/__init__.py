@@ -8,6 +8,7 @@ from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.exc import ArgumentError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from . import desktop
 from .config import Config, DEV_SECRET_KEY
 from .extensions import csrf, db, login_manager, migrate
 from .models import User
@@ -92,12 +93,17 @@ def _ensure_schema(app):
         conn.commit()
 
 
-def create_app(config_object=Config):
-    app = Flask(__name__, instance_relative_config=True)
+def create_app(config_object=Config, instance_path=None):
+    """Build the app. `instance_path` moves the instance folder (database, uploads) out of
+    the code tree; the desktop app needs that because its install folder is read-only."""
+    app = Flask(__name__, instance_relative_config=True, instance_path=instance_path)
     app.config.from_object(config_object)
     hops = app.config.get("PROXY_FIX_HOPS") or 0
     if hops:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+    desktop_mode = bool(app.config.get("DESKTOP_MODE"))
+    if desktop_mode:
+        desktop.init_app(app)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -130,6 +136,7 @@ def create_app(config_object=Config):
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(legal_bp)
+    app.context_processor(desktop.template_context)
 
     @app.after_request
     def private_responses(response):
@@ -142,6 +149,8 @@ def create_app(config_object=Config):
 
     with app.app_context():
         _ensure_schema(app)
+        if desktop_mode:
+            desktop.prepare_database(app)
 
     return app
 

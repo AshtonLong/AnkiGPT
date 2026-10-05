@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+  <title>AnkiGPT</title>
+  <style>
+    /* The app's own palette (app/static/style.css). Fonts fall back to the system's:
+       this window is gone before a font file would matter. */
+    :root { color-scheme:light; --bg:#FAFBFC; --ink:#172535; --muted:#667587; --line:#DFE5EC; --accent:#D14A2D; }
+    * { box-sizing:border-box; }
+    html,body { height:100%; }
+    body { margin:0; display:grid; place-items:center; background:var(--bg); color:var(--ink); font:15px/1.55 "Figtree","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; user-select:none; -webkit-app-region:drag; overflow:hidden; }
+    main { display:grid; justify-items:center; }
+    .logo { display:flex; align-items:center; gap:11px; font-size:27px; font-weight:700; letter-spacing:-.045em; }
+    .logo svg { width:44px; height:44px; }
+    p { margin:22px 0 0; color:var(--muted); font-size:13px; }
+    .bar { width:168px; height:3px; margin-top:18px; border-radius:3px; background:var(--line); overflow:hidden; }
+    .bar i { display:block; width:40%; height:100%; border-radius:3px; background:var(--accent); animation:slide 1.3s ease-in-out infinite; }
+    @keyframes slide { from { transform:translateX(-100%); } to { transform:translateX(250%); } }
+    @media (prefers-reduced-motion:reduce) { .bar i { animation:none; width:100%; opacity:.5; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="3" width="27" height="31" rx="6" fill="#F1B9A8"/><rect x="10" y="9" width="27" height="28" rx="6" fill="#D14A2D"/><path d="M17 19h13M17 25h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+      <span>AnkiGPT</span>
+    </div>
+    <p role="status">Starting AnkiGPT…</p>
+    <div class="bar" aria-hidden="true"><i></i></div>
+  </main>
+</body>
+</html>

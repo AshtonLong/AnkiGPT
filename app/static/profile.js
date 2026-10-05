@@ -2,15 +2,16 @@
 (function () {
   'use strict';
   var forms = Array.from(document.querySelectorAll('[data-profile-form]'));
+  // The desktop Settings page has the key form but no profile editor to preview.
   var editor = document.querySelector('[data-profile-editor]');
-  if (!editor) return;
+  if (!forms.length) return;
   var avatar = document.querySelector('[data-profile-avatar]');
   var name = document.querySelector('[data-profile-name]');
   var bio = document.querySelector('[data-profile-bio]');
-  var originalName = name.textContent;
-  var originalBio = bio.textContent;
-  var originalAvatar = avatar.className;
-  var originalInitials = avatar.textContent;
+  var originalName = editor && name.textContent;
+  var originalBio = editor && bio.textContent;
+  var originalAvatar = editor && avatar.className;
+  var originalInitials = editor && avatar.textContent;
   var submitting = false;
   function snapshot(form) { return JSON.stringify(Array.from(new FormData(form).entries())); }
   function preview() {

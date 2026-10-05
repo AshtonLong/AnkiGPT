@@ -1,6 +1,9 @@
 # User guide
 
-[README](../README.md) · [Setup](setup.md) · [Architecture](architecture.md)
+[README](../README.md) · [Setup](setup.md) · [Architecture](architecture.md) · [Desktop app](desktop.md)
+
+Using the Windows desktop app? There is no account to create, and **My profile** is
+called **Settings**. [Desktop app](desktop.md) lists the other differences.
 
 ## 1. Add your material
 

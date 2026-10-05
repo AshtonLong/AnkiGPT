@@ -7,6 +7,7 @@ from flask_login import login_required, login_user, logout_user, current_user
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from ..desktop import is_desktop
 from ..extensions import db
 from ..models import Card, Deck, User
 from ..services.credentials import key_problem, openrouter_key_for, set_user_key, user_key
@@ -159,6 +160,8 @@ def profile():
     errors = {}
     section = request.form.get("section", "") if request.method == "POST" else ""
     key_notice = "Your OpenRouter key is saved. You're ready to generate."
+    # Desktop has no account to edit: this URL is its Settings page, and the key is the only form.
+    desktop = is_desktop()
     values = {
         "display_name": current_user.display_name or "",
         "bio": current_user.bio or "",
@@ -166,7 +169,9 @@ def profile():
         "email": current_user.email,
     }
     if request.method == "POST":
-        if section == "profile":
+        if desktop and section != "api-key":
+            errors["form"] = "Choose a setting to update."
+        elif section == "profile":
             values.update({key: request.form.get(key, "").strip()
                            for key in ("display_name", "bio", "avatar_color")})
             if len(values["display_name"]) > 80:
@@ -237,6 +242,10 @@ def profile():
         "hint": current_user.openrouter_key_hint or "",
         "server_fallback": bool(current_app.config.get("OPENROUTER_API_KEY")),
     }
+    if desktop:
+        return render_template("settings.html", errors=errors, deck_count=deck_count, card_count=card_count,
+                               api_key=api_key, data_dir=current_app.config["DESKTOP_DATA_DIR"],
+                               app_version=current_app.config["APP_VERSION"]), 422 if errors else 200
     return render_template("profile.html", values=values, errors=errors, active_section=section,
                            avatar_colors=User.AVATAR_COLORS, deck_count=deck_count,
                            card_count=card_count, api_key=api_key), 422 if errors else 200

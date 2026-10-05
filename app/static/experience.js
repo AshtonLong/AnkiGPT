@@ -128,7 +128,7 @@
       var blob = await response.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
       a.href = url; a.download = exportForm.dataset.filename.replace(/[<>:"/\\|?*]/g, '_'); document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-      result.className = 'download-state'; result.textContent = 'Your package is ready. Check your downloads, then import it into Anki.';
+      result.className = 'download-state'; result.textContent = exportForm.dataset.readyMessage || 'Your package is ready. Check your downloads, then import it into Anki.';
     } catch (error) { result.className = 'form-error'; result.textContent = error.message; }
     finally { button.disabled = false; button.classList.remove('is-loading'); }
   });
