@@ -10,13 +10,11 @@
   <title>{% block title %}{{ title or 'AnkiGPT' }}{% endblock %}</title>
   <meta name="description" content="Turn your PDFs and notes into editable flashcards. Review what matters, then take your deck straight into Anki.">
   <link rel="icon" href="{{ url_for('static', filename='brand.svg') }}" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Fragment+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='profile.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='legal.css') }}">
-  <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js" defer>
+  <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer>
 </script>
   <script src="{{ url_for('static', filename='app.js') }}" defer>
 </script>
@@ -38,7 +36,7 @@
     <nav aria-label="Workspace">
       <a href="{{ url_for('main.decks') }}" {% if request.endpoint not in ['main.new_deck', 'auth.profile'] %}aria-current="page"{% endif %}>{{ icon('cards') }} Your decks</a>
       <a href="{{ url_for('main.new_deck') }}" {% if request.endpoint == 'main.new_deck' %}aria-current="page"{% endif %}>{{ icon('plus') }} New deck</a>
-      <a href="{{ url_for('auth.profile') }}" {% if request.endpoint == 'auth.profile' %}aria-current="page"{% endif %}>{{ icon('user') }} My profile</a>
+      <a href="{{ url_for('auth.profile') }}" {% if request.endpoint == 'auth.profile' %}aria-current="page"{% endif %}>{{ icon('settings' if desktop_mode else 'user') }} {{ settings_page }}</a>
     </nav>
     <div class="sidebar-bottom">
       {% if needs_api_key() %}
@@ -46,7 +44,7 @@
 <span class="mini-mark">{{ icon('key', 22) }}</span>
 <b>Add your OpenRouter key.</b>
 <p>AnkiGPT is free. Your own key powers the AI that writes your cards.</p>
-<span class="key-note-cta">Add it in My profile {{ icon('arrow-right', 13) }}</span>
+<span class="key-note-cta">Add it in {{ settings_page }} {{ icon('arrow-right', 13) }}</span>
 </a>
       {% else %}
       <div class="sidebar-note">
@@ -55,7 +53,7 @@
 <p>Your material. Your edits.<br>Your Anki routine.</p>
 </div>
       {% endif %}
-      {% if current_user.is_authenticated %}
+      {% if current_user.is_authenticated and not desktop_mode %}
       <a class="account" href="{{ url_for('auth.profile') }}" aria-label="Manage your profile"><span class="profile-avatar avatar-{{ current_user.profile_color }}" aria-hidden="true">{{ current_user.initials }}</span><span title="{{ current_user.email }}">{{ current_user.profile_name }}</span></a>
       <form action="{{ url_for('auth.logout') }}" method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -78,7 +76,7 @@
       <div class="breadcrumbs">
 <a href="{{ url_for('main.decks') }}">Workspace</a>
 <span>/</span>
-<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor','auth.profile':'My profile'}.get(request.endpoint, 'Your decks') }}</b>
+<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor','auth.profile':settings_page}.get(request.endpoint, 'Your decks') }}</b>
 </div>
       <div class="topbar-actions">
       {% include 'partials/auth_control.html' %}

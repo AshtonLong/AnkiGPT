@@ -111,6 +111,8 @@ app/
     deckgen.py          regenerate a unit, improve a card
     pdf.py, export.py, validators.py, chunking.py, schemas.py
   routes/, templates/, static/, models.py, config.py, tasks.py
+  desktop.py            everything desktop mode adds (see docs/desktop.md)
+desktop-app/            the Windows app: Electron shell, backend entry point, build scripts
 tests/                  unit, route, privacy, database, and scripted pipeline tests
 ```
 

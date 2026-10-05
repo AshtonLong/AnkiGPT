@@ -118,3 +118,59 @@ class Config:
     WTF_CSRF_TIME_LIMIT = None
 
     DEFAULT_CARD_STYLE = "basic"
+
+
+class DesktopConfig(Config):
+    """AnkiGPT Desktop: one local user, no sign-in, everything in one data folder.
+
+    This is the only place DESKTOP_MODE is set. The values below are fixed rather than
+    read from the environment; `for_launch` adds the ones that differ per computer and
+    per launch. See desktop-app/SPEC.md section 5.1.
+    """
+
+    DESKTOP_MODE = True
+    # The install secret from the Electron shell. Required: `for_launch` refuses to
+    # build a config without it, so the development default can never ship.
+    SECRET_KEY = None
+    # No shared server key. The user's own key is the only key.
+    OPENROUTER_API_KEY = ""
+    # Sent to OpenRouter as the referring app.
+    OPENROUTER_SITE_URL = "https://github.com/AshtonLong/AnkiGPT"
+    # The 50 MB web limit guards a shared server's disk. MAX_SOURCE_CHARS still bounds cost.
+    UPLOAD_MAX_MB = 200
+    MAX_CONTENT_LENGTH = UPLOAD_MAX_MB * 1024 * 1024
+    PROXY_FIX_HOPS = 0
+    # Plain HTTP on loopback.
+    SESSION_COOKIE_SECURE = False
+    MAIL_SMTP_HOST = ""
+    MAIL_SMTP_USERNAME = ""
+    MAIL_SMTP_PASSWORD = ""
+    MAIL_FROM = ""
+    GENERATION_IN_THREAD = True
+
+    # Filled in by `for_launch`.
+    DESKTOP_DATA_DIR = ""
+    DESKTOP_TOKEN = ""
+    DESKTOP_CHECK_TOKEN = True
+    APP_VERSION = ""
+
+    @classmethod
+    def for_launch(cls, data_dir, secret_key, token="", version="", check_token=True, settings=None):
+        """A config bound to one data folder and one launch of the app.
+
+        `settings` holds the overrides read from settings.env (see app.desktop).
+        """
+        if not secret_key:
+            raise RuntimeError("AnkiGPT Desktop needs SECRET_KEY (the install secret) and will not start without it.")
+        data_dir = os.path.abspath(data_dir)
+        values = dict(settings or {})
+        values.update(
+            SECRET_KEY=secret_key,
+            DESKTOP_DATA_DIR=data_dir,
+            DESKTOP_TOKEN=token,
+            DESKTOP_CHECK_TOKEN=check_token,
+            APP_VERSION=version,
+            SQLALCHEMY_DATABASE_URI="sqlite:///" + os.path.join(data_dir, "ankigpt.db").replace("\\", "/"),
+            UPLOAD_FOLDER=os.path.join(data_dir, "uploads"),
+        )
+        return type(cls.__name__, (cls,), values)

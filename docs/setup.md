@@ -132,5 +132,5 @@ review stats, and cached results remain in the SQLite database. Uploaded PDF fil
 are deleted after extraction on a best-effort basis; extracted content remains.
 Deleting a deck cascades through its related records; the shared cache is separate.
 
-The page loads fonts and HTMX from external CDNs. Python dependencies must also be
-installed before an offline test run.
+Fonts and HTMX are served by the app itself, so its pages load nothing from other
+hosts. Python dependencies must be installed before an offline test run.

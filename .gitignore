@@ -159,3 +159,11 @@ instance/exports/
 
 # Cloudflare Tunnel credentials for self-hosting (secret)
 deploy/cloudflared/
+
+# Desktop app (desktop-app/SPEC.md section 3). The patterns above ignore build/, dist/,
+# lib/ and *.spec, so the desktop app keeps its PyInstaller spec with an exception and
+# builds into out/ and backend-dist/ instead.
+!desktop-app/backend/*.spec
+desktop-app/out/
+desktop-app/backend-dist/
+desktop-app/node_modules/

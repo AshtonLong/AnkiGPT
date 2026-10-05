@@ -40,7 +40,7 @@
 <li>{{ icon('check',15) }} Images attached to your cards</li>
 </ul>
   <p class="dialog-help">In Anki desktop, choose <b>File → Import</b> and select the downloaded .apkg. Review AI-generated cards against your source before studying.</p>
-  <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post" data-export-form data-filename="{{ deck.title }}.apkg">
+  <form action="{{ url_for('main.export_deck', deck_id=deck.id) }}" method="post" data-export-form data-filename="{{ deck.title }}.apkg"{% if desktop_mode %} data-ready-message="Choose where to save your package, then open it in Anki."{% endif %}>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div data-export-result role="status" hidden>
 </div>

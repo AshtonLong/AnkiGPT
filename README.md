@@ -5,7 +5,7 @@
 Turn PDFs and notes into editable flashcards. Brief the planner, review its work,
 refine the cards, and export a deck you can study in Anki.
 
-[Get started](#get-started) · [User guide](docs/user-guide.md) · [Configuration](docs/setup.md) · [How it works](docs/architecture.md)
+[Get started](#get-started) · [User guide](docs/user-guide.md) · [Configuration](docs/setup.md) · [How it works](docs/architecture.md) · [Desktop app](docs/desktop.md)
 
 ![AnkiGPT card editor showing a source-grounded question, editable answer and tags, card filters, and export controls](docs/images/editor.png)
 
@@ -48,6 +48,10 @@ filter) export. Deleted and Needs review cards are excluded. The label is a work
 state, not a guarantee of human review or factual accuracy.
 
 ## Get started
+
+On Windows, [AnkiGPT Desktop](docs/desktop.md) runs the same app on your own computer
+with no server, no account and no setup beyond pasting your OpenRouter key. The rest
+of this section is for running the web app yourself.
 
 Use **Python 3.12** (the version used by the Docker image), an **OpenRouter API key**
 for AI operations, and **Anki** to study exported packages. AnkiGPT is free: there
@@ -117,6 +121,7 @@ persists its SQLite database and uploads in the `ankigpt-data` volume.
 | [Self-hosting](docs/self-host.md) | Production on your own PC or laptop via Cloudflare Tunnel |
 | [Deploying to a VPS](docs/deploy.md) | Budget server, Caddy HTTPS, email, backups |
 | [Architecture](docs/architecture.md) | Pipeline phases, strategies, caching, data model, failure handling |
+| [Desktop app](docs/desktop.md) | The Windows app: where data lives, advanced settings, building and releasing |
 | [Development](docs/development.md) | Stack, tests, routes, and reproducible screenshot capture |
 
 ## Development checks

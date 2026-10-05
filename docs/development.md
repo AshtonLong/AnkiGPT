@@ -1,6 +1,6 @@
 # Development
 
-[README](../README.md) · [User guide](user-guide.md) · [Setup](setup.md) · [Architecture](architecture.md)
+[README](../README.md) · [User guide](user-guide.md) · [Setup](setup.md) · [Architecture](architecture.md) · [Desktop app](desktop.md)
 
 ## Stack
 
@@ -9,7 +9,12 @@ with CSS, JavaScript, and HTMX. OpenRouter supplies chat, tool calls, vision, an
 embeddings. Pydantic validates outputs; NumPy supports clustering; genanki writes
 packages. PDF extraction uses pymupdf4llm with optional layout analysis and a pypdf
 fallback; PyMuPDF renders figures. Data is stored in SQLite, and `cryptography` encrypts
-each user's saved OpenRouter key.
+each user's saved OpenRouter key. Fonts (Figtree, Fragment Mono) and HTMX are served
+from `app/static/`, with their licences beside them, so pages need no other host.
+
+The Windows desktop app wraps this same app in an Electron shell. Everything it changes
+sits behind the `DESKTOP_MODE` config flag, which only `DesktopConfig` sets; see
+[Desktop app](desktop.md#developing).
 
 ## Testing
 
@@ -20,7 +25,9 @@ python -m pytest tests/ -q
 
 The suite includes a scripted model (`tests/conftest.py::FakeLLM`) that drives the whole
 pipeline — planner tool calls, workers, critic verdicts, duplicate resolution, coverage
-audit, and the coach — without network access.
+audit, and the coach — without network access. `tests/test_desktop.py` covers desktop
+mode: no sign-in, the request guard, the local user, interrupted runs, backups and
+`settings.env`.
 
 ## Routes
 
@@ -49,6 +56,9 @@ audit, and the coach — without network access.
 
 These are browser-oriented routes, not a versioned public API. State-changing
 requests require CSRF tokens and workspace routes require an authenticated session.
+In desktop mode every request runs as the one local user, `/` and the sign-in routes
+redirect to `/decks`, `/terms` and `/privacy` return 404, and `/auth/profile` is the
+Settings page.
 
 ## Refresh README screenshots
 
@@ -62,7 +72,7 @@ The optional capture tool starts the real Flask app on a temporary loopback port
 uses a disposable SQLite database and synthetic account/source/cards/plan, and saves
 three PNGs to `docs/images/`. It does not load `.env` or call an AI provider. It shuts
 down its server and removes its temporary database afterward. Playwright is a docs
-tool and is not required to run the app. Fonts and HTMX still use the page's CDNs.
+tool and is not required to run the app.
 
 Review every screenshot for readable text, complete controls, and current styling
 before committing it. These images demonstrate the interface, not a measured AI run.

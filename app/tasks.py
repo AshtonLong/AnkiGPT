@@ -11,7 +11,21 @@ import threading
 
 from flask import current_app
 
+from . import desktop
+
 logger = logging.getLogger(__name__)
+
+_active_lock = threading.Lock()
+_active_runs = 0
+
+
+def _run_changed(app, delta):
+    """Count live generation threads. The desktop shell is told whenever the count changes."""
+    global _active_runs
+    with _active_lock:
+        _active_runs += delta
+        if app.config.get("DESKTOP_MODE"):
+            desktop.report_activity(_active_runs)
 
 
 def dispatch_generation(deck_id, resume_from_plan=False):
@@ -25,10 +39,19 @@ def dispatch_generation(deck_id, resume_from_plan=False):
         return
 
     def run():
-        with app.app_context():
-            try:
-                generate_deck(deck_id, resume_from_plan=resume_from_plan)
-            except Exception:  # generate_deck already marks the deck failed
-                logger.exception("Background generation crashed for deck %s", deck_id)
+        try:
+            with app.app_context():
+                try:
+                    generate_deck(deck_id, resume_from_plan=resume_from_plan)
+                except Exception:  # generate_deck already marks the deck failed
+                    logger.exception("Background generation crashed for deck %s", deck_id)
+        finally:
+            _run_changed(app, -1)
 
-    threading.Thread(target=run, name=f"ankigpt-gen-{deck_id}", daemon=True).start()
+    # Counted from here, not from inside the thread, so the run is live the moment it is asked for.
+    _run_changed(app, +1)
+    try:
+        threading.Thread(target=run, name=f"ankigpt-gen-{deck_id}", daemon=True).start()
+    except Exception:
+        _run_changed(app, -1)  # it never ran, so it must not count as live forever
+        raise

@@ -15,11 +15,12 @@ from dataclasses import dataclass, field
 
 from flask import current_app
 
+from ...desktop import settings_page_name
 from ...extensions import db
 from ...models import Card, Deck, Figure, LLMRun, Source
 from ..chunking import clean_text, hash_text
 from ..credentials import openrouter_key_for
-from ..llm import OpenRouterError, TERMINAL_ERROR_MARKERS, is_terminal_error
+from ..llm import OpenRouterConnectionError, OpenRouterError, TERMINAL_ERROR_MARKERS, is_terminal_error
 from ..validators import is_math_valid, is_valid_cloze
 from . import cheatsheet as cheatsheet_mod
 from . import critic as critic_mod
@@ -58,6 +59,8 @@ def generate_deck(deck_id, resume_from_plan=False):
 
 
 def format_generation_error(exc):
+    if isinstance(exc, OpenRouterConnectionError):
+        return "Couldn't reach OpenRouter. Check your internet connection, then retry."
     if isinstance(exc, OpenRouterError):
         status = exc.status_code
         detail = (exc.response_body or "").lower()
@@ -69,7 +72,10 @@ def format_generation_error(exc):
                 )
             return "OpenRouter rate limit was hit while processing this deck. Wait a minute and try again."
         if status in (401, 403):
-            return "OpenRouter authentication failed. Check the API key under My profile and its model access."
+            return (
+                f"OpenRouter authentication failed. Check the API key under {settings_page_name()} "
+                "and its model access."
+            )
         if status == 400:
             return f"OpenRouter rejected a request: {exc.response_body or exc}"
         if status and status >= 500:
@@ -622,6 +628,7 @@ def _run_write_tasks(ctx, phase, tasks, origin_tag=None):
         node, task = entry["node"], entry["task"]
         if not res.ok:
             logger.warning("Worker task %s failed: %s", node.id, res.error)
+            entry["error"] = res.error
             tracer.log_call(node, "worker", None, messages=entry["messages"], error=res.error,
                             prompt_version=workers_mod.WORKER_PROMPT_VERSION)
             tracer.finish(node, status="failed", error=format_generation_error(res.error))
@@ -657,6 +664,10 @@ def _phase_write(ctx):
     failed = sum(1 for e in written.values() if e["node"].status == "failed")
     tracer.end_phase("write", result={"tasks": len(tasks), "cards": made, "failed_tasks": failed})
     if made == 0:
+        # Offline, every task fails the same way. Say so rather than blame the source.
+        for entry in written.values():
+            if isinstance(entry.get("error"), OpenRouterConnectionError):
+                raise entry["error"]
         raise OpenRouterError("No cards could be generated from this source.")
     return written
 
