@@ -78,6 +78,25 @@
 .profile-field-grid .field { margin-bottom:0; }
 .profile-security-note { display:flex; align-items:start; gap:8px; font-size:11px; line-height:1.7; }
 .profile-security-note svg { color:var(--green); margin-top:2px; }
+.profile-security-note svg,.profile-key-status svg { flex-shrink:0; }
+#api-key .profile-section-icon { background:#FFF4ED; border-color:#F2E1D7; color:#BA6347; }
+.profile-key-status { display:flex; align-items:start; gap:9px; margin:0 0 21px; padding:12px 14px; border:1px solid var(--line); border-radius:9px; background:var(--bg); color:var(--ink); font-size:12px; line-height:1.6; }
+.profile-key-status svg { margin-top:2px; color:var(--muted); }
+.profile-key-status code { font:11px var(--mono); padding:1px 5px; border-radius:4px; background:white; border:1px solid var(--line); }
+.profile-key-status.is-saved { border-color:#CFE0D5; background:#F3F8F4; }
+.profile-key-status.is-saved svg { color:var(--green); }
+.profile-key-status.is-missing { border-color:#EDC8BC; background:#FFF4F0; color:#A13A2A; }
+.profile-key-status.is-missing svg { color:#A13A2A; }
+.profile-fields .hint .text-link { font-size:inherit; }
+/* Prompts to add a key: the sidebar card and the note above "Plan & generate". */
+.key-note { display:block; transition:border-color 200ms,box-shadow 200ms; }
+.key-note:hover { border-color:#E8B9A9; box-shadow:0 6px 20px #D14A2D14; }
+.key-note .mini-mark { display:flex; }
+.key-note-cta { display:inline-flex; align-items:center; gap:6px; margin-top:10px; color:var(--accent); font-size:12px; font-weight:600; }
+.key-needed { display:flex; align-items:start; gap:10px; padding:14px 16px; margin:4px 0 16px; border:1px solid #EDC8BC; border-radius:9px; background:#FFF4F0; color:#A13A2A; font-size:13px; line-height:1.55; }
+.key-needed svg { flex-shrink:0; margin-top:2px; }
+.key-needed p { margin:0; color:inherit; font-size:inherit; }
+.key-needed .text-link { font-size:inherit; gap:4px; }
 .profile-signout { padding:7px 2px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
 .profile-signout h3 { font-size:14px; margin-bottom:5px; }
 .profile-signout p { font-size:12px; }

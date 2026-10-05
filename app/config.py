@@ -23,9 +23,13 @@ DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", DEV_SECRET_KEY)
+    # SQLite only. A relative path is resolved inside the instance folder.
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///instance/ankigpt.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Each user adds their own OpenRouter key under My profile. This optional server
+    # key is the fallback for accounts without one: handy for a private install, but on
+    # a public server it means every such account spends your credits. Leave it empty there.
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
     # Per-role overrides. Empty -> OPENROUTER_MODEL. Roles: mapper, cheatsheet, planner,
@@ -56,7 +60,7 @@ class Config:
     OPENROUTER_MAX_RETRIES = _env_int("OPENROUTER_MAX_RETRIES", 2)
     OPENROUTER_RETRY_BACKOFF_SECONDS = float(os.getenv("OPENROUTER_RETRY_BACKOFF_SECONDS", "1.5"))
     # Output cap per call. Luna allows 128k completion tokens; a dense unit can need
-    # 10k+ tokens of cards, and billing is per token used, so a high cap is free.
+    # 10k+ tokens of cards, and OpenRouter charges per token used, so a high cap is free.
     OPENROUTER_MAX_TOKENS = _env_int("OPENROUTER_MAX_TOKENS", 16000)
 
     # Pipeline knobs.
@@ -81,24 +85,12 @@ class Config:
     # Guard against pasting an entire book: bounds LLM cost/time. 0 disables the cap.
     MAX_SOURCE_CHARS = _env_int("MAX_SOURCE_CHARS", 400000)
 
-    # Billing. Off by default so self-hosted and development installs stay unmetered.
-    # When on, monthly page allowances are enforced per plan and Stripe Checkout, the
-    # Customer Portal and the webhook go live. Plans and prices live in services/billing.py.
-    BILLING_ENABLED = _env_bool("BILLING_ENABLED", False)
-    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-    # Optional portal configuration id (bpc_...) from scripts/stripe_setup.py; empty
-    # uses the account's default portal configuration.
-    STRIPE_PORTAL_CONFIGURATION = os.getenv("STRIPE_PORTAL_CONFIGURATION", "")
-    # Collect sales tax/VAT with Stripe Tax. Requires Stripe Tax to be set up first.
-    STRIPE_AUTOMATIC_TAX = _env_bool("STRIPE_AUTOMATIC_TAX", False)
-
     # Generation runs on a background thread inside the web process so the live trace
     # is visible while it builds. Tests turn this off to run inline.
     GENERATION_IN_THREAD = _env_bool("GENERATION_IN_THREAD", True)
 
     # Behind a reverse proxy (Caddy in deploy/), trust this many hops of X-Forwarded-*
-    # headers so external URLs (Stripe redirects, reset links) use https and the real
+    # headers so external URLs (password-reset links) use https and the real
     # host. Leave 0 when the app is reachable directly, or clients could spoof them.
     PROXY_FIX_HOPS = _env_int("PROXY_FIX_HOPS", 0)
 
@@ -111,7 +103,7 @@ class Config:
     MAIL_SMTP_PASSWORD = os.getenv("MAIL_SMTP_PASSWORD", "")
     MAIL_FROM = os.getenv("MAIL_FROM", "")
 
-    # Shown on the legal pages and site footer. Stripe expects contact details on the site.
+    # Shown on the legal pages and site footer.
     LEGAL_NAME = os.getenv("LEGAL_NAME", "AnkiSpark")
     SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "")
     LEGAL_JURISDICTION = os.getenv("LEGAL_JURISDICTION", "Canada")

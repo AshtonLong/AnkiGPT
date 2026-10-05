@@ -2,14 +2,14 @@
 
 A production setup for about $22/year in fixed costs: a budget VPS (RackNerd's 1 GB
 plan, ~$11/year) running the Docker image behind Caddy (automatic HTTPS), a domain
-(~$11/year), the Neon free Postgres plan, and Resend's free tier for password-reset
-email. Everything here can be paid with PayPal; no credit card is needed. Variable
-costs are the OpenRouter bill and Stripe's per-payment fee.
+(~$11/year), and Resend's free tier for password-reset email. Everything here can be
+paid with PayPal; no credit card is needed. There are no variable costs for you:
+AnkiSpark is free, and each user's AI calls run on their own OpenRouter key.
 
 ```text
-browser ──HTTPS──> Caddy (:443, Let's Encrypt) ──> gunicorn app (:8000) ──> Neon Postgres
-                                                         │
-                                          OpenRouter · Stripe · Resend (SMTP)
+browser ──HTTPS──> Caddy (:443, Let's Encrypt) ──> gunicorn app (:8000) ──> SQLite file
+                                                         │                  (Docker volume)
+                                    OpenRouter (each user's key) · Resend (SMTP)
 ```
 
 The app idles at ~180 MB for both gunicorn workers, so 1 GB of RAM plus the 2 GB swap
@@ -23,7 +23,6 @@ Hetzner, DigitalOcean); only the price changes.
 | RackNerd | Buy the 1 GB KVM VPS from racknerd.com/specials (pay with PayPal). Choose **Ubuntu 24.04** and a location near your users. The root password arrives by email. |
 | Domain | Buy one at Porkbun or Namecheap (both take PayPal, ~$11/yr for .com). |
 | Resend | Sign up, add your domain, add the DNS records it shows, create an API key. |
-| Stripe | Activate payments (identity + bank). Set the statement descriptor under Settings → Public details. |
 
 ## 2. Install your SSH key on the server
 
@@ -59,14 +58,7 @@ Create `~/ankigpt/.env` on the server (never commit it). Start from `example.env
 ```ini
 DOMAIN=yourdomain.com
 SECRET_KEY=<python -c "import secrets; print(secrets.token_urlsafe(48))">
-DATABASE_URL=<Neon pooled URL for the production branch>
-OPENROUTER_API_KEY=...
 OPENROUTER_SITE_URL=https://yourdomain.com
-
-BILLING_ENABLED=true
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=   # printed by the setup script in step 7
-STRIPE_PORTAL_CONFIGURATION=   # printed by the setup script in step 7
 
 MAIL_SMTP_HOST=smtp.resend.com
 MAIL_SMTP_PORT=465
@@ -80,8 +72,13 @@ LEGAL_JURISDICTION=<Province>, Canada
 ```
 
 `PROXY_FIX_HOPS=1` and `SESSION_COOKIE_SECURE=true` are set by the production compose
-file. Use a separate Neon branch for local development so test data never touches
-production.
+file. Leave `DATABASE_URL` at its default: the SQLite file lives in the `ankigpt-data`
+volume. Leave `OPENROUTER_API_KEY` empty so every user has to save their own key under
+**My profile**; a server key would be spent by any account that has none.
+
+Choose `SECRET_KEY` once and keep it. It signs sessions and encrypts the OpenRouter
+keys users save, so changing it later signs everyone out and makes them enter their
+keys again.
 
 ## 6. Deploy
 
@@ -95,30 +92,29 @@ It copies the working tree (never `.env`, `.venv` or `instance/`), then builds a
 restarts the stack on the server. Caddy fetches the HTTPS certificate on first start.
 Run the same command to ship every update.
 
-## 7. Go live with Stripe
+## 7. Check it end to end
 
-On the server, after the first deploy:
-
-```bash
-cd ~/ankigpt
-docker compose --env-file .env -f deploy/docker-compose.prod.yml exec web \
-  python -m scripts.stripe_setup --webhook-url https://yourdomain.com/billing/webhook
-# paste the printed STRIPE_PORTAL_CONFIGURATION and STRIPE_WEBHOOK_SECRET into .env
-docker compose --env-file .env -f deploy/docker-compose.prod.yml exec web \
-  python -m scripts.reset_billing_ids --yes     # clear test-mode customer ids
-docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d
-```
-
-Then buy a plan with a real card (or PayPal-linked card), confirm Plan & billing shows it, cancel in the
-portal, confirm the webhook moves it to "Cancels at period end", and refund yourself
-from the Stripe dashboard.
+Open `https://yourdomain.com`, create an account, save an OpenRouter API key under
+**My profile**, and generate a small deck. Then request a password reset to confirm
+email delivery.
 
 ## Operations
 
 - **Logs:** `docker compose --env-file .env -f deploy/docker-compose.prod.yml logs -f web`
 - **Restarts:** containers restart automatically after crashes and reboots.
-- **Database:** Neon keeps point-in-time history on its own. The free plan has 0.5 GB of
-  storage (roughly 300 decks at current sizes); upgrade Neon or move Postgres onto a
-  bigger VPS when it fills.
+- **Database and backups:** all data is one SQLite file, `/app/instance/ankigpt.db`, in
+  the `ankigpt-data` volume. Nothing backs it up for you, so copy it off the server on a
+  schedule. Take the copy with SQLite's backup API so recent writes in the WAL are
+  included:
+
+  ```bash
+  cd ~/ankigpt
+  docker compose --env-file .env -f deploy/docker-compose.prod.yml exec web python -c \
+    "import sqlite3; s = sqlite3.connect('/app/instance/ankigpt.db'); d = sqlite3.connect('/app/instance/backup.db'); s.backup(d); d.close(); s.close()"
+  docker compose --env-file .env -f deploy/docker-compose.prod.yml cp web:/app/instance/backup.db ./ankigpt-backup.db
+  ```
+
+  Then download `ankigpt-backup.db` to your PC with `scp`. About 300 decks fit in 0.5 GB at current sizes, so
+  watch the server's disk (`df -h`) as the library grows.
 - **Generation during deploys:** a deploy restarts the app and interrupts decks that are
-  mid-generation. Their retries are free for users, but deploy at quiet times.
+  mid-generation. Users can retry them, but deploy at quiet times.

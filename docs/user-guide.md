@@ -84,12 +84,24 @@ Open **My profile** to change your display name, bio, or avatar color. Email and
 password changes require your current password. Deck and card totals on this page
 belong to your account. Sign out from the sidebar when finished.
 
+### Your OpenRouter API key
+
+AnkiSpark is free, and the AI that writes your cards runs on your own OpenRouter
+account. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys), add credit
+there, then paste the key under **My profile → OpenRouter API key** and save. You need
+to do this once, before your first deck. The key is stored encrypted and is never shown
+again; the page only tells you which key is saved by its last four characters. Paste a
+new key to replace it, or choose **Remove key**. OpenRouter charges you for what your
+decks use, and the run trace shows the recorded cost of each run.
+
 ## Troubleshooting
 
 - **No extracted text:** use a PDF with selectable text or paste notes directly.
-- **Generation failed:** check the run trace and server logs. Confirm the server's API
-  key, available credit, and model access. Previous cards survive failures during
-  mapping/planning; later failures can leave a partial new run.
+- **"Add your OpenRouter API key":** save a key under **My profile** first; see
+  [Your OpenRouter API key](#your-openrouter-api-key).
+- **Generation failed:** check the run trace. Confirm that your OpenRouter key is
+  valid, has credit, and can use the configured model. Previous cards survive failures
+  during mapping/planning; later failures can leave a partial new run.
 - **Too few cards:** inspect Deleted and Needs review, check the plan's coverage, and
   confirm the source wasn't truncated. The requested deck size is approximate. If
   **Make a cheat sheet first** was on, turn it off to write from the full source.

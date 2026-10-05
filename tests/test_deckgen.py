@@ -164,6 +164,7 @@ def test_terminal_auth_error_fails_fast(app, monkeypatch):
 
 
 def test_missing_api_key_marks_failed(app, monkeypatch):
+    # Reached when a user removes their key after a run was queued.
     deck_id = _make_deck(app)
     with app.app_context():
         app.config["OPENROUTER_API_KEY"] = ""
@@ -171,7 +172,7 @@ def test_missing_api_key_marks_failed(app, monkeypatch):
         assert deckgen.generate_deck(deck_id) is None
         deck = _db.session.get(Deck, deck_id)
         assert deck.status == "failed"
-        assert "OPENROUTER_API_KEY" in deck.run_json["last_error"]
+        assert "Add yours under My profile" in deck.run_json["last_error"]
 
 
 def test_improve_card_uses_structured_output(app, monkeypatch):

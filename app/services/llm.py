@@ -30,6 +30,13 @@ class OpenRouterError(RuntimeError):
         self.response_body = response_body
 
 
+class MissingAPIKeyError(RuntimeError):
+    """No OpenRouter key to call with: the user hasn't saved one and the server has none."""
+
+    def __init__(self):
+        super().__init__("No OpenRouter API key. Add yours under My profile, then try again.")
+
+
 def is_terminal_error(exc):
     """A failure that will recur on every call, so there's no point continuing."""
     if isinstance(exc, OpenRouterError):
@@ -38,9 +45,7 @@ def is_terminal_error(exc):
         detail = (exc.response_body or "").lower()
         if exc.status_code == 429 and any(m in detail for m in TERMINAL_ERROR_MARKERS):
             return True
-    if isinstance(exc, RuntimeError) and "OPENROUTER_API_KEY" in str(exc):
-        return True
-    return False
+    return isinstance(exc, MissingAPIKeyError)
 
 
 def json_schema_format(name, schema):
@@ -253,7 +258,7 @@ def openrouter_chat(
     """One chat-completions call. `temperature` is only sent when given — reasoning
     models (including GPT-6 Luna) reject it."""
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set")
+        raise MissingAPIKeyError()
     payload = {
         "model": model,
         "messages": messages,
@@ -290,7 +295,7 @@ def openrouter_embeddings(
 ):
     """Embed a list of strings. Returns a list of float vectors in input order."""
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set")
+        raise MissingAPIKeyError()
     if not texts:
         return []
     payload = {"model": model, "input": list(texts)}
