@@ -1,5 +1,5 @@
-"""The generation run: map -> plan -> (figures) -> write -> critique -> reconcile ->
-coverage -> finish.
+"""The generation run: map -> (cheat sheet) -> plan -> (figures) -> write -> critique ->
+reconcile -> coverage -> finish.
 
 Everything model-facing is a pure job run through `parallel.run_jobs`; this module owns
 the DB side: units, tasks, cards, the trace, and the deck's status transitions.
@@ -20,6 +20,7 @@ from ...models import Card, Deck, Figure, LLMRun, Source
 from ..chunking import clean_text, hash_text
 from ..llm import OpenRouterError, TERMINAL_ERROR_MARKERS, is_terminal_error
 from ..validators import is_math_valid, is_valid_cloze
+from . import cheatsheet as cheatsheet_mod
 from . import critic as critic_mod
 from . import document_map as map_mod
 from . import figures as figures_mod
@@ -28,14 +29,15 @@ from . import reconcile as reconcile_mod
 from . import workers as workers_mod
 from .cache import DBCache, NullCache, make_key
 from .parallel import Job, run_jobs
-from .routing import LLMClient
+from .routing import ChatResult, LLMClient
 from .strategies import DEFAULT_STRATEGY, PROMPT_VERSION
-from .trace import Tracer
+from .trace import Tracer, phases_for
 
 logger = logging.getLogger(__name__)
 
 PHASE_WEIGHTS = {
-    "map": 5, "plan": 10, "figures": 5, "write": 42, "critique": 20, "reconcile": 5, "coverage": 10, "finish": 3,
+    "map": 5, "cheatsheet": 8, "plan": 10, "figures": 5, "write": 42, "critique": 20, "reconcile": 5, "coverage": 10,
+    "finish": 3,
 }
 
 
@@ -151,10 +153,12 @@ def _run(deck, resume_from_plan=False):
     else:
         tracer.clear()
         tracer.set_run(
-            phase="map", last_error=None, plan=None, summary=None, started=True,
+            phase="map", last_error=None, plan=None, summary=None, cheat_sheet=None, started=True,
             prompt_version=PROMPT_VERSION, model=ctx.client.default_model,
         )
         _phase_map(ctx)
+        if ctx.settings.get("cheat_sheet"):
+            _phase_cheatsheet(ctx)
         _phase_plan(ctx)
         if ctx.settings.get("review_plan"):
             deck.status = "planned"
@@ -202,6 +206,84 @@ def _phase_map(ctx):
         usage=(result.usage if result is not None else None),
     )
     tracer.end_phase("map", result={"units": [u.to_dict() for u in units], **meta})
+
+
+# ---------------------------------------------------------------- cheat sheet
+def _phase_cheatsheet(ctx):
+    """Swap every live unit's text for its exam cheat-sheet section. Runs before the plan
+    (and before anything is persisted), so each later phase works from the cheat sheet
+    alone and `_restore_plan` / regenerate pick it up from the Source rows for free."""
+    tracer = ctx.tracer
+    tracer.phase("cheatsheet")
+    model = ctx.client.model_for("cheatsheet")
+    live = [u for u in ctx.units if not u.skipped]
+    nodes = {}
+    jobs = []
+    for u in live:
+        messages = cheatsheet_mod.build_messages(u, ctx.units, ctx.settings, ctx.doc_meta)
+        node = tracer.task("cheatsheet", (u.title or f"Unit {u.idx + 1}")[:150], unit_ids=[u.idx], model=model)
+        nodes[node.id] = {"node": node, "unit": u, "messages": messages}
+        jobs.append(Job(
+            id=node.id,
+            fn=(lambda m=messages: cheatsheet_mod.write_cheat_sheet(ctx.client, m)),
+            cache_key=make_key("cheatsheet", model, cheatsheet_mod.CHEATSHEET_PROMPT_VERSION, messages),
+            meta={"role": "cheatsheet", "model": model},
+        ))
+
+    stats = {"units": len(live), "condensed": 0, "emptied": 0, "failed": 0, "chars_in": 0, "chars_out": 0}
+
+    def on_start(job):
+        tracer.start(nodes[job.id]["node"])
+
+    def on_done(res):
+        entry = nodes[res.job.id]
+        node, unit = entry["node"], entry["unit"]
+        if not res.ok:
+            # A unit that could not be condensed keeps its full text rather than being lost.
+            logger.warning("Deck %s cheat sheet for unit %s failed: %s", ctx.deck.id, unit.idx, res.error)
+            stats["failed"] += 1
+            tracer.log_call(node, "cheatsheet", None, messages=entry["messages"], error=res.error,
+                            prompt_version=cheatsheet_mod.CHEATSHEET_PROMPT_VERSION)
+            tracer.finish(node, status="failed", error=format_generation_error(res.error))
+            return
+        value = res.value or {}
+        sheet = value.get("cheat_sheet") or ""
+        before = unit.chars
+        cr = ChatResult(content=value.get("content") or "", message={}, usage=res.usage or {},
+                        model=value.get("model") or node.model)
+        tracer.log_call(node, "cheatsheet", cr, messages=entry["messages"],
+                        prompt_version=cheatsheet_mod.CHEATSHEET_PROMPT_VERSION, parsed={"cheat_sheet": sheet},
+                        cached=res.cached)
+        if sheet:
+            unit.text = sheet
+            unit.density = max(int(unit.density or 3), cheatsheet_mod.CHEATSHEET_DENSITY)
+            stats["condensed"] += 1
+            stats["chars_in"] += before
+            stats["chars_out"] += len(sheet)
+            node.label = f"{node.label} · {before:,} → {len(sheet):,} chars"
+        else:
+            unit.skipped = True
+            unit.skip_reason = "Nothing exam-critical to put on the cheat sheet."
+            stats["emptied"] += 1
+            node.label = f"{node.label} · nothing exam-critical, skipped"
+        tracer.finish(node, status="cached" if res.cached else "done",
+                      result={"chars_in": before, "chars_out": len(sheet)})
+
+    results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
+                       abort_on=_abort_on)
+    _raise_if_terminal(results)
+    failed = stats["failed"]
+    error = f"{failed} of {len(live)} units could not be condensed and were kept in full." if failed else None
+    tracer.set_run(cheat_sheet=stats)
+    tracer.end_phase("cheatsheet", status="failed" if failed else "done", error=error, result=stats)
+    logger.info("Deck %s cheat sheet: %s units, %s -> %s chars, %s emptied, %s failed", ctx.deck.id, len(live),
+                stats["chars_in"], stats["chars_out"], stats["emptied"], failed)
+    if live and not any(not u.skipped for u in ctx.units):
+        # Nothing has been wiped yet, so failing here keeps any previous deck intact.
+        raise OpenRouterError(
+            "The cheat sheet came back empty: nothing in this source looked exam-critical. "
+            "Turn off the cheat sheet, or loosen the focus, and try again."
+        )
 
 
 # ----------------------------------------------------------------------- plan
@@ -547,8 +629,6 @@ def _run_write_tasks(ctx, phase, tasks, origin_tag=None):
         entry["cards"] = rows
         result = {"truncated": value.get("truncated"), "attempts": value.get("attempts"), "auto_deleted": auto_deleted}
         # Log the call under the node (cache hits are logged too, flagged cached, zero cost).
-        from .routing import ChatResult
-
         cr = ChatResult(content=value.get("content") or "", message={}, usage=res.usage or {},
                         model=value.get("model") or node.model)
         tracer.log_call(node, "worker", cr, messages=entry["messages"], prompt_version=workers_mod.WORKER_PROMPT_VERSION,
@@ -875,9 +955,10 @@ def progress_for(deck):
             phases[t.phase]["total"] += 1
             if t.status in ("done", "cached", "failed", "skipped"):
                 phases[t.phase]["done"] += 1
-    total_weight = sum(PHASE_WEIGHTS.values())
+    weights = {key: PHASE_WEIGHTS[key] for key, _label in phases_for(deck.settings_json)}
+    total_weight = sum(weights.values())
     score = 0.0
-    for phase, weight in PHASE_WEIGHTS.items():
+    for phase, weight in weights.items():
         p = phases.get(phase)
         if not p:
             continue

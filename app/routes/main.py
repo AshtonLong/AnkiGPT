@@ -40,7 +40,7 @@ from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach
 from ..services.pipeline.figures import extract_figures
 from ..services.pipeline.planner import Plan
 from ..services.pipeline.strategies import STRATEGIES
-from ..services.pipeline.trace import PHASES
+from ..services.pipeline.trace import PHASES, phases_for
 from ..services.validators import is_valid_cloze
 from ..tasks import dispatch_generation
 
@@ -237,6 +237,7 @@ def _read_settings_form(deck):
             settings["target_cards"] = max(5, min(600, int(target)))
         except ValueError:
             settings["target_cards"] = None
+    settings["cheat_sheet"] = request.form.get("cheat_sheet") == "on"
     settings["review_plan"] = request.form.get("review_plan") == "on"
     settings["use_figures"] = "on" in request.form.getlist("use_figures") if "use_figures" in request.form else True
     settings["card_style"] = deck.card_style
@@ -285,7 +286,7 @@ def _status_payload(deck):
     pct, phases, tasks = progress_for(deck)
     run = deck.run_json or {}
     phase_rows = []
-    for key, label in PHASES:
+    for key, label in phases_for(deck.settings_json):
         p = phases.get(key)
         phase_rows.append({
             "key": key, "label": label,

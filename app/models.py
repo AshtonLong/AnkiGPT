@@ -98,8 +98,10 @@ class Deck(db.Model):
 class Source(db.Model):
     """One *unit* of the document map: a semantically coherent slice of the source.
 
-    Historically this held cheat-sheet sections; it now holds the planner's view of the
-    document (kind, density, prerequisites) and is what worker tasks read verbatim.
+    It holds the planner's view of the document (kind, density, prerequisites), and `text`
+    is what worker tasks read verbatim: the source slice itself, or its exam cheat-sheet
+    section when the deck's `cheat_sheet` setting is on. The char and page offsets always
+    point into the original source.
     """
 
     id = db.Column(db.Integer, primary_key=True)

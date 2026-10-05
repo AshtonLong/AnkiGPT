@@ -72,11 +72,16 @@
       </div>
       <input type="hidden" name="target_cards" id="target_cards_value" value="{{ s.get('target_cards') or 'auto' }}">
       <div class="estimate">{{ icon('target', 15) }}
-        <span><b data-estimate>—</b> cards is what the planner would size this source at on its own. Leave on Auto to let it decide.</span>
+        <span><b data-estimate>—</b> cards is what the planner would size this source at on its own. Leave on Auto to let it decide.<span data-cheat-sheet-note {% if not s.get('cheat_sheet') %}hidden{% endif %}> A cheat sheet trims the source first, so expect fewer.</span></span>
       </div>
     </div>
 
     <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" name="cheat_sheet" data-cheat-sheet {% if s.get('cheat_sheet') %}checked{% endif %}>
+        <span class="tg"></span>
+        <span class="tg-text"><b>Make a cheat sheet first</b><small>Boil the source down to what you'd bring into the exam on a cheat sheet, then write cards from that alone. Fewer, higher-yield cards; the fine detail is left out.</small></span>
+      </label>
       <label class="toggle">
         <input type="checkbox" name="review_plan" {% if s.get('review_plan') %}checked{% endif %}>
         <span class="tg"></span>

@@ -5,9 +5,10 @@ import json
 import pytest
 
 from app.services.llm import run_tool_loop, tool_spec
-from app.services.pipeline import critic, document_map, planner, reconcile
+from app.services.pipeline import cheatsheet, critic, document_map, planner, reconcile
 from app.services.pipeline.cache import make_key
 from app.services.pipeline.strategies import STRATEGIES, system_prompt
+from app.services.pipeline.trace import phases_for
 
 from conftest import fake_response, tool_call
 
@@ -235,3 +236,59 @@ def test_cache_key_is_stable_and_input_sensitive():
     b = make_key("worker", "m", "v", [{"role": "user", "content": "x"}])
     c = make_key("worker", "m", "v", [{"role": "user", "content": "y"}])
     assert a == b != c and len(a) == 64
+
+
+# ---------------------------------------------------------------- cheat sheet
+class TestCheatSheet:
+    def _units(self):
+        units = _units(3, skipped=(2,))
+        units[1].title, units[1].kind, units[1].text = "Enzyme kinetics", "formulas", "v = Vmax[S] / (Km + [S])"
+        return units
+
+    def test_prompt_is_framed_as_an_exam_cheat_sheet(self):
+        units = self._units()
+        system = cheatsheet.build_messages(units[1], units, {"focus": "kinetics"})[0]["content"]
+        assert "bring one cheat sheet into the exam room" in system
+        assert "lose marks" in system
+        # Deck settings stay out of the system prompt so it caches across decks.
+        assert system == cheatsheet.CHEATSHEET_SYSTEM
+
+    def test_user_message_carries_the_brief_and_the_section(self):
+        units = self._units()
+        settings = {"exam_context": "Biochem midterm", "focus": "kinetics", "exclude": "history", "glossary": "Km"}
+        user = cheatsheet.build_messages(units[1], units, settings, {"subject": "Biochemistry"})[1]["content"]
+        for expected in ("Biochem midterm", "kinetics", "history", "Km", "Biochemistry"):
+            assert expected in user
+        assert "- Enzyme kinetics  <- this section" in user
+        assert "- U0\n" in user and "U2" not in user  # skipped units are left off the outline
+        assert user.endswith("SECTION: Enzyme kinetics (kind: formulas)\n\nv = Vmax[S] / (Km + [S])")
+
+    def test_write_returns_the_cleaned_sheet(self):
+        raw = "\n## Kinetics  \n- Km is ...\r\n\n\n\n\n- Vmax is ...\n"
+        client = FakeClient([fake_response(json.dumps({"cheat_sheet": raw}))])
+        out = cheatsheet.write_cheat_sheet(client, [{"role": "user", "content": "x"}])
+        assert out["cheat_sheet"] == "## Kinetics\n- Km is ...\n\n\n- Vmax is ..."
+        assert out["usage"]["prompt_tokens"] == 10 and out["model"] == "m"
+
+    def test_truncated_sheet_is_rejected(self):
+        class Truncating(FakeClient):
+            def chat(self, role, messages, **kwargs):
+                result = super().chat(role, messages, **kwargs)
+                result.finish_reason = "length"
+                return result
+
+        client = Truncating([fake_response(json.dumps({"cheat_sheet": "- half a"}))])
+        with pytest.raises(Exception, match="cut off"):
+            cheatsheet.write_cheat_sheet(client, [{"role": "user", "content": "x"}])
+
+    def test_planner_is_told_only_when_the_sheet_is_on(self):
+        units = _units(2)
+        assert "exam cheat sheet" in planner._planner_user_message(units, {"cheat_sheet": True}, 10, {})
+        assert "cheat sheet" not in planner._planner_user_message(units, {}, 10, {})
+        assert "cheat sheet" not in planner._planner_user_message(units, {"cheat_sheet": False}, 10, {})
+
+    def test_phase_is_listed_only_for_decks_that_asked(self):
+        assert "cheatsheet" not in dict(phases_for({}))
+        assert "cheatsheet" not in dict(phases_for(None))
+        keys = [k for k, _ in phases_for({"cheat_sheet": True})]
+        assert keys[:3] == ["map", "cheatsheet", "plan"]

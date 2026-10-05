@@ -350,7 +350,8 @@
 
   /* --------------------------------------------------- status page: trace */
   var PHASE_VERBS = {
-    map: ['Mapping the', 'document'], plan: ['Planning the', 'work order'], figures: ['Reading', 'figures'],
+    map: ['Mapping the', 'document'], cheatsheet: ['Writing the', 'cheat sheet'],
+    plan: ['Planning the', 'work order'], figures: ['Reading', 'figures'],
     write: ['Writing', 'cards'], critique: ['Critiquing', 'every card'], reconcile: ['Resolving', 'duplicates'],
     coverage: ['Auditing', 'coverage'], finish: ['Finishing', 'up'], planned: ['Plan ready for', 'review']
   };
@@ -572,6 +573,8 @@
     var autoLabel = range.getAttribute('data-auto-label') || 'Auto';
     // Mirrors planner.heuristic_target for an average-density document (~3 cards / 1k chars).
     if (est && chars) est.textContent = fmtInt(Math.max(5, Math.round(chars / 1000 * 3)));
+    var cheat = $('[data-cheat-sheet]', form), cheatNote = $('[data-cheat-sheet-note]', form);
+    if (cheat && cheatNote) cheat.addEventListener('change', function () { cheatNote.hidden = !cheat.checked; });
     function update() {
       var v = parseInt(range.value, 10), min = parseInt(range.min, 10), max = parseInt(range.max, 10);
       range.style.setProperty('--fill', ((v - min) / (max - min) * 100) + '%');

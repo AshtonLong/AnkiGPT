@@ -161,6 +161,12 @@ def _planner_user_message(units, settings, budget, doc_meta, figure_counts=None)
     context = settings.get("exam_context") or ""
     card_style = settings.get("card_style") or "auto"
     live = [u for u in units if not u.skipped]
+    # A condensed unit reads like a recap; tell the planner it is the material itself.
+    cheat_sheet_note = [
+        "The unit texts are an exam cheat sheet already condensed from the student's material (kind and summary "
+        "describe the original). Every line was kept because it is examinable: do not skip a unit for being terse "
+        "or looking like a recap, and size each task to cover its whole unit."
+    ] if settings.get("cheat_sheet") else []
     return "\n".join(
         [
             f"Subject: {doc_meta.get('subject') or 'unknown'}",
@@ -171,6 +177,7 @@ def _planner_user_message(units, settings, budget, doc_meta, figure_counts=None)
             f"Exclude: {exclude or 'none'}",
             f"Must-include terms: {glossary or 'none'}",
             f"Suggested overall budget: about {budget} cards across {len(live)} live units.",
+            *cheat_sheet_note,
             "",
             f"Document map ({len(units)} units):",
             _unit_listing(units, figure_counts),

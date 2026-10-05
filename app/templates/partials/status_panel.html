@@ -130,6 +130,7 @@
         <input type="hidden" name="glossary" value="{{ s.get('glossary', '') }}">
         <input type="hidden" name="exam_context" value="{{ s.get('exam_context', '') }}">
         <input type="hidden" name="target_cards" value="{{ s.get('target_cards') or 'auto' }}">
+        {% if s.get('cheat_sheet') %}<input type="hidden" name="cheat_sheet" value="on">{% endif %}
         {% if s.get('review_plan') %}<input type="hidden" name="review_plan" value="on">{% endif %}
         <input type="hidden" name="use_figures" value="{{ 'on' if s.get('use_figures', True) else 'off' }}">
         <button class="btn primary" type="submit">{{ icon('refresh') }} Retry generation</button>

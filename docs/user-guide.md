@@ -21,6 +21,13 @@ stored source, subject to the source cap above. Add exam/context, focus areas,
 exclusions, and must-include terms. Leave deck size on **Auto** or set an approximate
 target. Validation, deduplication, and coverage work can change the final count.
 
+Turn on **Make a cheat sheet first** when the full source would be information
+overload. Before any cards are planned, the source is boiled down to what you would put
+on a cheat sheet you were allowed to bring into the exam, and cards are written from
+that alone. Expect fewer, higher-yield cards; detail the cheat sheet leaves out gets no
+card, and the coverage audit will not add it back. It is off by default and adds one
+model pass over the source. The run trace shows how far each unit was condensed.
+
 Enable **Review the plan before writing** to pause after planning. If extracted PDF
 figures are available, **Read figures with vision** controls whether they are analyzed
 for image-backed cards. Select **Plan & generate** to begin.
@@ -84,7 +91,8 @@ belong to your account. Sign out from the sidebar when finished.
   key, available credit, and model access. Previous cards survive failures during
   mapping/planning; later failures can leave a partial new run.
 - **Too few cards:** inspect Deleted and Needs review, check the plan's coverage, and
-  confirm the source wasn't truncated. The requested deck size is approximate.
+  confirm the source wasn't truncated. The requested deck size is approximate. If
+  **Make a cheat sheet first** was on, turn it off to write from the full source.
 - **Nothing exports:** only `ok` cards export. Review, save, or restore cards first.
 - **Review import matches nothing:** use a deck originally exported by this app and
   include scheduling when exporting it back from Anki.

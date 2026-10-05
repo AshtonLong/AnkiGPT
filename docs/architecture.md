@@ -19,6 +19,15 @@ source ──▶ MAP ──▶ PLAN ──▶ FIGURES ──▶ WRITE ──▶ 
    them into semantic *units* with a kind (definitions, formulas, procedure, comparison,
    worked example…), a density score, prerequisites, and skip verdicts for front matter,
    references, and recaps. Short sources skip the model and become one unit.
+   - **Cheat sheet** (optional, off by default) — with **Make a cheat sheet first**
+     ticked, each live unit is rewritten as the section of a cheat sheet a student could
+     bring into the exam: only what earns marks, in plain language, grounded in the
+     source. The unit's text is then *replaced* by that section, so the planner sizes,
+     workers write from, the critic judges against, and the coverage audit back-fills
+     from the cheat sheet alone; nothing later can re-inflate what it cut. One cached
+     call per unit, in parallel. A unit whose call fails keeps its full text; a unit with
+     nothing exam-critical is skipped; an entirely empty sheet fails the run before
+     anything is replaced.
 2. **Plan** — the planner is a real tool-using loop. It reads units it is unsure about,
    searches the source, and *spawns tasks*: which units, which **card strategy**, how many
    cards, and specific notes for the worker. Every live unit must end up covered
@@ -31,8 +40,8 @@ source ──▶ MAP ──▶ PLAN ──▶ FIGURES ──▶ WRITE ──▶ 
    parts, and useful ones become image-backed `figure_recall` tasks. Images ship inside
    the `.apkg`.
 4. **Write** — each task is one worker call: the strategy's grammar + the planner's notes
-   + the unit text **verbatim** (never a lossy summary) + a hint of what sibling tasks
-   cover. Tasks run concurrently (`PIPELINE_MAX_WORKERS`). Truncated outputs are retried
+   + the unit text **verbatim** (the source itself, or its cheat-sheet section when that
+   option is on) + a hint of what sibling tasks cover. Tasks run concurrently (`PIPELINE_MAX_WORKERS`). Truncated outputs are retried
    with a smaller ask. Workers are prompted to attach a verbatim `source_quote`; check the source when reviewing cards.
 5. **Critique** — two cheap calls per batch of 20 cards. A *cold pass* answers each card
    front with no source (exposes prompts that leak their answer, gives a difficulty
@@ -72,7 +81,7 @@ and cost per phase. The editor's **Run insights** panel shows the same after the
 
 ### Content-addressed cache
 
-Worker, critic, vision and coverage results are cached on a hash of
+Cheat-sheet, worker, critic, vision and coverage results are cached on a hash of
 (role, model, prompt version, inputs). A cache hit avoids a provider call for that task. Mapping, planning, embeddings,
 and changed inputs can still incur calls; a repeated deck is not guaranteed to be free.
 The cache is database-wide, not scoped to an individual user.
@@ -85,6 +94,7 @@ app/
     pipeline/
       orchestrator.py   the run: phases, persistence, status transitions
       document_map.py   phase 0 — skeleton + mapper
+      cheatsheet.py     optional — condense each unit to an exam cheat sheet
       planner.py        phase 1 — tool-using planning agent + invariants
       strategies.py     card grammars
       workers.py        phase 2 — worker prompt + call
@@ -110,6 +120,7 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 - `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
   totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
 - `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).
+  Its `text` is the cheat-sheet section when the deck was generated with that option.
 - `Card` — with `strategy`, `difficulty`, `source_quote`, `critic_json`, `order_key`,
   `guid`, `review_stats_json`, and links to its task, unit, and figure.
 - `PipelineTask` — the trace tree (phase → task), with status, model, tokens, cost.
