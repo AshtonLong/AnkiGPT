@@ -6,7 +6,7 @@ forwarding, your home IP address stays hidden, and HTTPS certificates are handle
 you. Fixed cost: a domain (~$11/year). Everything else is free.
 
 ```text
-visitor ──HTTPS──> Cloudflare ══tunnel══> cloudflared ──> gunicorn app ──> Neon Postgres
+visitor ──HTTPS──> Cloudflare ══tunnel══> cloudflared ──> gunicorn app ──> SQLite file
                                         (on your machine, in Docker)
 ```
 
@@ -37,8 +37,8 @@ docker compose -p ankigpt-home -f deploy/docker-compose.home.yml logs quick-tunn
 ```
 
 This prints a random `https://….trycloudflare.com` address that works from anywhere.
-It changes on every restart, so it's for testing only: Stripe webhooks and customers
-need a permanent address. Stop it with:
+It changes on every restart, so it's for testing only: your users need a permanent
+address. Stop it with:
 
 ```bash
 docker compose -p ankigpt-home -f deploy/docker-compose.home.yml --profile quick rm -sf quick-tunnel
@@ -72,12 +72,17 @@ You can always reach the app on this machine at http://localhost:5050.
 In `.env`, set `SECRET_KEY`, the Resend SMTP settings, `LEGAL_NAME`, `SUPPORT_EMAIL` and
 `LEGAL_JURISDICTION` as listed in [deploy.md](deploy.md#5-production-env), and set
 `OPENROUTER_SITE_URL=https://yourdomain.com`. The compose file already sets
-`PROXY_FIX_HOPS=1` and `SESSION_COOKIE_SECURE=true`. Stripe go-live is the same as
-[deploy.md step 7](deploy.md#7-go-live-with-stripe), with this compose command:
+`PROXY_FIX_HOPS=1` and `SESSION_COOKIE_SECURE=true`. Leave `DATABASE_URL` at its default
+and `OPENROUTER_API_KEY` empty, so each user saves their own key under **My profile**.
+
+All data is one SQLite file in the `ankigpt-home_ankigpt-data` Docker volume on this
+machine, so back it up yourself. Take the copy with SQLite's backup API so recent writes
+are included:
 
 ```bash
-docker compose -p ankigpt-home -f deploy/docker-compose.home.yml exec web \
-  python -m scripts.stripe_setup --webhook-url https://yourdomain.com/billing/webhook
+docker compose -p ankigpt-home -f deploy/docker-compose.home.yml exec web python -c \
+  "import sqlite3; s = sqlite3.connect('/app/instance/ankigpt.db'); d = sqlite3.connect('/app/instance/backup.db'); s.backup(d); d.close(); s.close()"
+docker compose -p ankigpt-home -f deploy/docker-compose.home.yml cp web:/app/instance/backup.db ./ankigpt-backup.db
 ```
 
 ## Updating
@@ -90,12 +95,15 @@ docker compose -p ankigpt-home -f deploy/docker-compose.home.yml --profile named
 
 ## Moving to another machine
 
-Install Docker there, copy the repo, `.env` and `deploy/cloudflared/`, then stop the
-stack on the old machine and start it on the new one. Never run the named tunnel on two
-machines at once, or Cloudflare splits visitors between them.
+Install Docker there, copy the repo, `.env`, `deploy/cloudflared/` and a backup of the
+database (above), then stop the stack on the old machine. On the new one, start the
+stack once so the volume exists, copy the backup in as `/app/instance/ankigpt.db` with
+`docker compose cp`, and restart it. Keep the same `SECRET_KEY`, or saved OpenRouter
+keys become unreadable. Never run the named tunnel on two machines at once, or
+Cloudflare splits visitors between them.
 
 ## Local development alongside
 
 The hosted app publishes only `localhost:5050`. `python run.py` still serves development
-on `localhost:5000`. Point development at a separate Neon branch so test data never
-touches production.
+on `localhost:5000` with its own database, `instance/ankigpt.db` in the checkout, so
+test data never touches the hosted app's volume.

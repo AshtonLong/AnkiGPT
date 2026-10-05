@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import uuid
 from collections import defaultdict
@@ -21,17 +22,7 @@ from werkzeug.utils import secure_filename
 
 from ..extensions import db, login_manager
 from ..models import Card, Deck, Figure, LLMRun, PipelineTask, Source
-from ..services.billing import (
-    CHARS_PER_PAGE,
-    FREE_RERUNS,
-    QuotaExceeded,
-    allowance,
-    billing_enabled,
-    deck_char_limit,
-    meter_generation,
-    plan_for,
-    run_charge,
-)
+from ..services.credentials import openrouter_key_for
 from ..services.deckgen import improve_card, regenerate_source
 from ..services.export import export_deck as export_deck_file
 from ..services.pdf import extract_pdf_text
@@ -184,24 +175,15 @@ def new_deck():
                 "selectable text (OCR is not supported). Choose a text-based PDF or paste your notes.",
             )
         user = get_actor()
-        max_source_chars = deck_char_limit(user)
+        max_source_chars = current_app.config.get("MAX_SOURCE_CHARS") or 0
         if max_source_chars and len(source_text) > max_source_chars:
             source_text = source_text[:max_source_chars]
             page_offsets = [po for po in page_offsets if po[1] < max_source_chars]
-            plan = plan_for(user)
-            if billing_enabled() and max_source_chars == plan.max_deck_chars and plan.key != "max":
-                flash(
-                    f"Your {plan.name} plan covers decks up to {plan.pages_per_deck} pages "
-                    f"({max_source_chars:,} characters), so the source was trimmed to fit. "
-                    "Pick a page range, or upgrade under Plan & billing for longer decks.",
-                    "info",
-                )
-            else:
-                flash(
-                    f"Source was truncated to {max_source_chars:,} characters to keep "
-                    "generation fast and affordable.",
-                    "info",
-                )
+            flash(
+                f"Source was truncated to {max_source_chars:,} characters to keep "
+                "generation fast and affordable.",
+                "info",
+            )
         deck = Deck(
             user_id=user.id,
             title=title,
@@ -245,20 +227,17 @@ def _read_settings_form(deck):
     return settings
 
 
-def _meter_or_refuse(deck):
-    """Charge this run to the monthly allowance. On QuotaExceeded, flash why and return
-    False; the caller commits either way so the user's form settings are kept."""
-    try:
-        meter_generation(get_actor(), deck)
-    except QuotaExceeded as exc:
-        a = exc.allowance
-        flash(
-            f"This run needs {exc.needed} pages and your {a.plan.name} plan has {a.remaining} "
-            f"left this month. Upgrade under Plan & billing, or wait for your pages to reset on {a.reset_label}.",
-            "error",
-        )
-        return False
-    return True
+def _has_api_key():
+    """Whether the actor's AI calls have a key to run on (their own, or the server's)."""
+    return bool(openrouter_key_for(get_actor()))
+
+
+def _require_api_key():
+    """Flash where to add a key and return False when the actor has none to generate with."""
+    if _has_api_key():
+        return True
+    flash("Add your OpenRouter API key under My profile before generating.", "error")
+    return False
 
 
 @bp.route("/decks/<int:deck_id>/preview", methods=["GET", "POST"])
@@ -266,7 +245,8 @@ def preview_deck(deck_id):
     deck = get_owned_deck(deck_id)
     if request.method == "POST":
         deck.settings_json = _read_settings_form(deck)
-        if not _meter_or_refuse(deck):
+        if not _require_api_key():
+            # Commit so the brief the user just typed is still there once they add a key.
             db.session.commit()
             return redirect(url_for("main.preview_deck", deck_id=deck.id))
         deck.status = "processing"
@@ -277,8 +257,7 @@ def preview_deck(deck_id):
     figure_count = Figure.query.filter_by(deck_id=deck.id).count()
     figures = Figure.query.filter_by(deck_id=deck.id).order_by(Figure.page, Figure.id).limit(6).all()
     return render_template(
-        "deck_preview.html", deck=deck, figure_count=figure_count, figures=figures,
-        run_pages=run_charge(deck), allowance=allowance(get_actor()), chars_per_page=CHARS_PER_PAGE, free_reruns=FREE_RERUNS,
+        "deck_preview.html", deck=deck, figure_count=figure_count, figures=figures, has_api_key=_has_api_key(),
     )
 
 
@@ -337,9 +316,9 @@ def plan_deck(deck_id):
     units = Source.query.filter_by(deck_id=deck.id).order_by(Source.idx).all()
     if request.method == "POST":
         action = request.form.get("action", "run")
+        if not _require_api_key():
+            return redirect(url_for("main.plan_deck", deck_id=deck.id))
         if action == "replan":
-            if not _meter_or_refuse(deck):
-                return redirect(url_for("main.plan_deck", deck_id=deck.id))
             settings = dict(deck.settings_json or {})
             settings["review_plan"] = True
             deck.settings_json = settings
@@ -507,6 +486,8 @@ def bulk_cards():
         .all()
     )
     affected = len(cards)
+    if action in ("regenerate", "coach") and not _require_api_key():
+        return redirect(request.referrer or url_for("main.decks"))
     if action == "delete":
         for card in cards:
             card.status = "deleted"
@@ -555,13 +536,16 @@ def bulk_cards():
 @bp.route("/cards/<int:card_id>/improve", methods=["POST"])
 def improve(card_id):
     card = get_owned_card(card_id)
+    if not _has_api_key():
+        trigger = {"improveError": {"message": "Add your OpenRouter API key under My profile to use AI improve."}}
+        return render_template("partials/card_row.html", card=card), 200, {"HX-Trigger": json.dumps(trigger)}
     try:
         improve_card(card_id)
     except Exception:
         current_app.logger.exception("AI improve failed for card %s", card_id)
         db.session.rollback()
         response = render_template("partials/card_row.html", card=card)
-        # Signal the client to show an error toast (handled in base.html).
+        # Signal the client to show an error toast (handled in app.js).
         return response, 200, {"HX-Trigger": "improveError"}
     db.session.refresh(card)
     return render_template("partials/card_row.html", card=card)
@@ -596,6 +580,8 @@ def import_reviews(deck_id):
 @bp.route("/decks/<int:deck_id>/coach", methods=["POST"])
 def coach(deck_id):
     deck = get_owned_deck(deck_id)
+    if not _require_api_key():
+        return redirect(url_for("main.deck_editor", deck_id=deck.id))
     try:
         result = coach_cards(deck.id) or {}
     except Exception:

@@ -45,11 +45,14 @@ class ChatResult:
 
 
 class LLMClient:
-    """Resolves roles to models and performs calls. Built once per generation run."""
+    """Resolves roles to models and performs calls. Built once per generation run.
 
-    def __init__(self, config):
+    `api_key` is the key of the user the run belongs to (see services.credentials).
+    """
+
+    def __init__(self, config, api_key=""):
         get = config.get if hasattr(config, "get") else (lambda k, d=None: getattr(config, k, d))
-        self.api_key = get("OPENROUTER_API_KEY", "")
+        self.api_key = api_key
         self.site_url = get("OPENROUTER_SITE_URL", "")
         self.app_name = get("OPENROUTER_APP_NAME", "AnkiSpark")
         self.default_model = get("OPENROUTER_MODEL", "openai/gpt-6-luna")

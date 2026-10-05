@@ -1,11 +1,9 @@
 from flask import Blueprint, current_app, render_template
 
-from ..services.billing import CHARS_PER_PAGE, FREE_RERUNS, PLANS
-
 bp = Blueprint("legal", __name__)
 
 # Bump when the text of any legal page changes.
-LEGAL_UPDATED = "September 23, 2026"
+LEGAL_UPDATED = "October 5, 2026"
 
 
 @bp.app_context_processor
@@ -19,21 +17,11 @@ def legal_context():
     }}
 
 
-def _page(template):
-    return render_template(template, plans=list(PLANS.values()), chars_per_page=CHARS_PER_PAGE,
-                           free_reruns=FREE_RERUNS)
-
-
 @bp.route("/terms")
 def terms():
-    return _page("legal/terms.html")
+    return render_template("legal/terms.html")
 
 
 @bp.route("/privacy")
 def privacy():
-    return _page("legal/privacy.html")
-
-
-@bp.route("/refunds")
-def refunds():
-    return _page("legal/refunds.html")
+    return render_template("legal/privacy.html")

@@ -76,7 +76,7 @@ def test_login_links_to_password_reset(client):
     assert b"/auth/forgot" in client.get("/auth/login").data
 
 
-@pytest.mark.parametrize("path", ["/terms", "/privacy", "/refunds"])
+@pytest.mark.parametrize("path", ["/terms", "/privacy"])
 def test_legal_pages_are_public(app, path):
     app.config["SUPPORT_EMAIL"] = "help@example.com"
     resp = app.test_client().get(path)
@@ -87,7 +87,20 @@ def test_legal_pages_are_public(app, path):
 def test_signup_and_footer_link_the_policies(client):
     assert b"/terms" in client.get("/auth/signup").data
     landing = client.get("/").data
-    assert b"/privacy" in landing and b"/refunds" in landing
+    assert b"/privacy" in landing and b"/terms" in landing
+
+
+@pytest.mark.parametrize("path", ["/pricing", "/billing", "/refunds"])
+def test_the_app_is_free_with_no_billing_pages(client, path):
+    register(client)
+    assert client.get(path).status_code == 404
+    for page in ("/", "/decks", "/auth/profile", "/terms", "/privacy"):
+        html = client.get(page).data.lower()
+        assert b"stripe" not in html and b"billing" not in html and path.encode() not in html
+
+
+def test_billing_webhook_is_gone(client):
+    assert client.post("/billing/webhook", data="{}").status_code == 404
 
 
 def test_external_urls_use_forwarded_https_behind_proxy(tmp_path, monkeypatch):

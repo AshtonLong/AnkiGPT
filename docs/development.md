@@ -8,7 +8,8 @@ Flask, Flask-Login, SQLAlchemy, Flask-Migrate, and Flask-WTF serve Jinja templat
 with CSS, JavaScript, and HTMX. OpenRouter supplies chat, tool calls, vision, and
 embeddings. Pydantic validates outputs; NumPy supports clustering; genanki writes
 packages. PDF extraction uses pymupdf4llm with optional layout analysis and a pypdf
-fallback; PyMuPDF renders figures. SQLite is the local default; PostgreSQL is supported.
+fallback; PyMuPDF renders figures. Data is stored in SQLite, and `cryptography` encrypts
+each user's saved OpenRouter key.
 
 ## Testing
 
@@ -28,7 +29,9 @@ audit, and the coach — without network access.
 | `GET` | `/` | Public landing page with illustrative sample |
 | `GET,POST` | `/auth/signup` · `/auth/login` | Register / sign in |
 | `POST` | `/auth/logout` | Sign out |
-| `GET,POST` | `/auth/profile` | Profile, email, and password settings |
+| `GET,POST` | `/auth/forgot` · `/auth/reset/<token>` | Password reset by email |
+| `GET,POST` | `/auth/profile` | Profile, OpenRouter API key, email, and password settings |
+| `GET` | `/terms` · `/privacy` | Public policy pages |
 | `POST` | `/decks/<id>/delete` | Permanently delete a deck |
 | `GET` | `/decks` | Library |
 | `GET,POST` | `/decks/new` | Create a deck from text/PDF (figures extracted here) |

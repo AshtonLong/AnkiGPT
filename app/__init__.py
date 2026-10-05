@@ -4,11 +4,11 @@ import sqlite3
 
 from flask import Flask, request
 from sqlalchemy import event, inspect, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.exc import ArgumentError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import Config, DEV_SECRET_KEY
-from .database import database_url, engine_options
 from .extensions import csrf, db, login_manager, migrate
 from .models import User
 
@@ -43,7 +43,7 @@ def _ensure_columns(app, conn):
 
     `create_all()` only creates missing *tables*. Rather than force a migration step
     on every schema change in a single-user app, add missing columns in place
-    (nullable, so the statement is valid on SQLite and Postgres alike).
+    (nullable, which is the only kind SQLite can add to a table that has rows).
     """
     inspector = inspect(conn)
     existing_tables = set(inspector.get_table_names())
@@ -62,22 +62,34 @@ def _ensure_columns(app, conn):
         app.logger.info("Added missing columns: %s", ", ".join(added))
 
 
-# Arbitrary constant naming the startup-schema advisory lock.
-SCHEMA_LOCK_KEY = 7_261_451
+def _sqlite_url(app, value):
+    """The database URL as an absolute SQLite path, or a clear error for anything else."""
+    try:
+        url = make_url(value)
+    except ArgumentError:
+        url = None
+    if url is None or url.get_backend_name() != "sqlite":
+        raise RuntimeError(
+            "DATABASE_URL must be a SQLite URL such as sqlite:///instance/ankigpt.db. "
+            "AnkiSpark stores its data in one SQLite file; other databases are not supported."
+        )
+    if url.database and url.database != ":memory:" and not os.path.isabs(url.database):
+        url = url.set(database=_under_instance(app.instance_path, url.database))
+    return url
 
 
 def _ensure_schema(app):
     """Create missing tables and columns in one transaction.
 
-    Gunicorn boots its workers at the same moment; on Postgres a transaction-scoped
-    advisory lock makes them take turns, so two workers never race to create the same
-    new table. (Transaction-scoped so it also holds through Neon's pooled connections.)
+    Gunicorn boots its workers at the same moment. BEGIN IMMEDIATE takes SQLite's write
+    lock before anything is inspected, so the workers take turns and two of them never
+    race to create the same new table.
     """
-    with db.engine.begin() as conn:
-        if conn.dialect.name == "postgresql":
-            conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": SCHEMA_LOCK_KEY})
+    with db.engine.connect() as conn:
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
         db.metadata.create_all(bind=conn)
         _ensure_columns(app, conn)
+        conn.commit()
 
 
 def create_app(config_object=Config):
@@ -98,21 +110,13 @@ def create_app(config_object=Config):
         )
 
     os.makedirs(app.instance_path, exist_ok=True)
-    db_url = app.config["SQLALCHEMY_DATABASE_URI"]
-    if db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////"):
-        rel_path = db_url.replace("sqlite:///", "", 1)
-        abs_path = _under_instance(app.instance_path, rel_path)
-        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{abs_path}"
+    app.config["SQLALCHEMY_DATABASE_URI"] = _sqlite_url(app, app.config["SQLALCHEMY_DATABASE_URI"])
     upload_folder = app.config.get("UPLOAD_FOLDER", "")
     if upload_folder:
         upload_folder = _under_instance(app.instance_path, upload_folder)
         os.makedirs(upload_folder, exist_ok=True)
     app.config["UPLOAD_FOLDER"] = upload_folder
 
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url(app.config["SQLALCHEMY_DATABASE_URI"])
-    options = engine_options(app.config["SQLALCHEMY_DATABASE_URI"])
-    options.update(app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {}))
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = options
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
@@ -121,12 +125,10 @@ def create_app(config_object=Config):
 
     from .routes.main import bp as main_bp
     from .routes.auth import bp as auth_bp
-    from .routes.billing import bp as billing_bp
     from .routes.legal import bp as legal_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(billing_bp)
     app.register_blueprint(legal_bp)
 
     @app.after_request
