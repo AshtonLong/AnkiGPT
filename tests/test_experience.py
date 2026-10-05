@@ -117,3 +117,31 @@ def test_secondary_views_render_without_run_data(client, app):
     deck_id, _ = make_deck(client, app)
     for suffix in ['?view=insights', '?view=coach', '?status=deleted', '?q=does-not-exist', '/status', '/plan', '/preview']:
         assert client.get(f'/decks/{deck_id}{suffix}').status_code == 200
+
+
+def test_cheat_sheet_toggle_is_opt_in_and_sticks(client, app, monkeypatch):
+    from app.routes import main
+    deck_id, _ = make_deck(client, app)
+    monkeypatch.setattr(main, 'dispatch_generation', lambda _: None)
+
+    def phases():
+        return [p['key'] for p in client.get(f'/decks/{deck_id}/progress.json').json['phases']]
+
+    page = client.get(f'/decks/{deck_id}/preview')
+    assert b'Make a cheat sheet first' in page.data
+    assert b'name="cheat_sheet" data-cheat-sheet >' in page.data  # rendered unchecked
+    client.post(f'/decks/{deck_id}/preview', data={'target_cards': 'auto'})
+    with app.app_context():
+        assert db.session.get(Deck, deck_id).settings_json['cheat_sheet'] is False
+    assert 'cheatsheet' not in phases()
+
+    client.post(f'/decks/{deck_id}/preview', data={'cheat_sheet': 'on'})
+    with app.app_context():
+        assert db.session.get(Deck, deck_id).settings_json['cheat_sheet'] is True
+    assert phases()[:3] == ['map', 'cheatsheet', 'plan']
+    assert b'name="cheat_sheet" data-cheat-sheet checked>' in client.get(f'/decks/{deck_id}/preview').data
+    # Retrying a failed run must not silently drop the setting.
+    with app.app_context():
+        db.session.get(Deck, deck_id).status = 'failed'
+        db.session.commit()
+    assert b'name="cheat_sheet" value="on"' in client.get(f'/decks/{deck_id}/status').data

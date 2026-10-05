@@ -80,9 +80,9 @@ database; the Flask app continues running wherever you deploy its container.
 | `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLAlchemy URL. |
 | `OPENROUTER_API_KEY` | | Required for AI operations. |
 | `OPENROUTER_MODEL` | `openai/gpt-6-luna` | Default model for every role. |
-| `OPENROUTER_MODEL_{MAPPER,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). |
+| `OPENROUTER_MODEL_{MAPPER,CHEATSHEET,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). |
 | `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
-| `OPENROUTER_REASONING_{PLANNER,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role; empty omits the parameter. |
+| `OPENROUTER_REASONING_{PLANNER,CHEATSHEET,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role (planner and cheat sheet default to `medium`); empty omits the parameter. |
 | `OPENROUTER_TEMPERATURE` | | Unset by default — reasoning models reject it. |
 | `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | empty / `AnkiSpark` | Optional provider attribution headers. |
 | `OPENROUTER_MAX_TOKENS` | `16000` | Output cap per call (billing is per token used). |

@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 PHASES = [
     ("map", "Map"),
+    ("cheatsheet", "Cheat sheet"),
     ("plan", "Plan"),
     ("figures", "Figures"),
     ("write", "Write"),
@@ -22,6 +23,13 @@ PHASES = [
     ("finish", "Finish"),
 ]
 PHASE_LABELS = dict(PHASES)
+
+
+def phases_for(settings):
+    """The phases a run with these deck settings goes through, in order. The cheat sheet
+    is opt-in, so a deck that didn't ask for it shows no trace of the phase."""
+    wants_cheat_sheet = bool((settings or {}).get("cheat_sheet"))
+    return [(key, label) for key, label in PHASES if key != "cheatsheet" or wants_cheat_sheet]
 
 
 class Tracer:

@@ -81,6 +81,7 @@ class FakeLLM:
     """Scripted stand-in for `openrouter_chat` that dispatches on the request shape.
 
     - Mapper (document_map schema) -> groups every candidate into one unit each.
+    - Cheat sheet (cheat_sheet schema) -> the section's first sentence as one bullet.
     - Planner (tools present) -> reads unit 0, spawns one task per unit, finishes.
     - Worker (anki_cards schema) -> two cards per call, one deliberately duplicated
       across tasks so the reconcile phase has something to remove.
@@ -116,6 +117,12 @@ class FakeLLM:
                 "summary": f"Covers candidate {i}.",
             })
         return fake_response(json.dumps({"subject": "Biology", "document_summary": "Cells.", "units": units}))
+
+    # --- optional cheat sheet: keeps only the first sentence of the section
+    def _cheat_sheet(self, messages):
+        section = messages[-1]["content"].split("\nSECTION: ", 1)[1].split("\n\n", 1)[1]
+        first_sentence = " ".join(section.split()).split(". ")[0].rstrip(".")
+        return fake_response(json.dumps({"cheat_sheet": f"- {first_sentence}."}))
 
     # --- phase 1
     def _planner(self, messages):
