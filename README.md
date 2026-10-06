@@ -50,8 +50,9 @@ state, not a guarantee of human review or factual accuracy.
 ## Get started
 
 On Windows, [AnkiGPT Desktop](docs/desktop.md) runs the same app on your own computer
-with no server, no account and no setup beyond pasting your OpenRouter key. The rest
-of this section is for running the web app yourself.
+with no server, no account and no setup beyond pasting your OpenRouter key:
+[download the installer](https://github.com/AshtonLong/AnkiGPT/releases/latest). The
+rest of this section is for running the web app yourself.
 
 Use **Python 3.12** (the version used by the Docker image), an **OpenRouter API key**
 for AI operations, and **Anki** to study exported packages. AnkiGPT is free: there

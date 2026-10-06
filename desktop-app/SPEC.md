@@ -1,10 +1,10 @@
 # AnkiGPT Desktop — Specification
 
-Status: written 2026-10-05 and built the same day as version 0.1.0. Not yet released: the
-installer has not been run on a clean Windows account, no release has been published, so
-one version has not been watched updating to the next, and the manual checklist (section
-10.3) has not been run with a real OpenRouter key. The code-signing decision in section 13
-is still open. [docs/desktop.md](../docs/desktop.md) is the page for users and developers.
+Status: written 2026-10-05 and built the same day as version 0.1.0, which is published,
+unsigned, on the repository's Releases page. Still not done: the installer has not been
+run on a clean Windows account, one version has not been watched updating to the next,
+and the manual checklist (section 10.3) has not been run with a real OpenRouter key. The
+code-signing decision in section 13 is still open. [docs/desktop.md](../docs/desktop.md) is the page for users and developers.
 
 ## 1. Summary
 
@@ -562,8 +562,8 @@ This is an open decision (section 13).
 
 ### 9.4 Release pipeline
 
-The repository has no CI today. Releases add `.github/workflows/desktop-release.yml`,
-triggered by a `v*` tag on a Windows runner:
+Releases come from `.github/workflows/desktop-release.yml`, the repository's only
+workflow, triggered by a `v*` tag on a Windows runner:
 
 1. Run the existing test suite.
 2. Build the backend in a clean venv and run its self-check.
