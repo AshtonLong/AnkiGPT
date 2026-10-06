@@ -56,15 +56,27 @@ jobs:
         shell: pwsh
         run: ./desktop-app/scripts/build-backend.ps1 -Python python
 
-      # 3. Build the installer and upload it, with latest.yml and the blockmap, to a draft release.
-      - name: Build the installer and draft the release
+      # 3. Build the installer, with latest.yml and the blockmap.
+      - name: Build the installer
         working-directory: desktop-app
+        shell: pwsh
+        run: |
+          npm ci
+          npm run dist
+
+      # 4. Upload the three files to one draft release. electron-builder's own publisher
+      #    uploads files in parallel and made two drafts for v0.1.0, so gh does it instead.
+      - name: Draft the release
+        working-directory: desktop-app/out
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm ci
-          npm run release
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --draft --verify-tag `
+            --title "AnkiGPT Desktop $version" --generate-notes `
+            "AnkiGPT-Setup-$version.exe" "AnkiGPT-Setup-$version.exe.blockmap" "latest.yml"
+          if ($LASTEXITCODE -ne 0) { throw "Could not draft the release." }
 
       - name: Keep the installer as a workflow artifact
         uses: actions/upload-artifact@v4

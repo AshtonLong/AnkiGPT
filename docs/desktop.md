@@ -10,6 +10,17 @@ make a deck. The design is written up in [desktop-app/SPEC.md](../desktop-app/SP
 
 *The desktop app with synthetic sample decks. No model was called to make them.*
 
+## Installing
+
+1. Download `AnkiGPT-Setup-<version>.exe` from the
+   [latest release](https://github.com/AshtonLong/AnkiGPT/releases/latest). It needs
+   64-bit Windows 10 or 11.
+2. Run it. The installer is not code-signed yet, so Windows shows "Windows protected
+   your PC": choose **More info → Run anyway**. It installs for your user account only
+   and does not ask for administrator rights.
+3. Open **Settings** (`Ctrl+,`) and paste your [OpenRouter](https://openrouter.ai/keys)
+   key.
+
 ## Using it
 
 Everything in the [user guide](user-guide.md) applies, with these differences:
@@ -168,12 +179,12 @@ The version lives in `desktop-app/package.json`. To release it:
 3. Run the checklist below against the draft's installer.
 4. Publish the release. Publishing is what makes installed copies update.
 
-Without CI, `npm run build:backend` then `npm run release` does the same from a Windows
-machine, with a GitHub token in `GH_TOKEN`.
+Without CI, `npm run build:backend` then `npm run dist` builds the same three files in
+`desktop-app\out` on a Windows machine. Upload all three to one draft release for the tag.
 
 Builds are not code-signed. That works, updates included, but Windows SmartScreen warns
-on first install and antivirus tools are more likely to flag the frozen backend. Sign
-before a public release (see section 9.3 of the spec).
+on first install and antivirus tools are more likely to flag the frozen backend. Whether
+to sign is still an open decision (see sections 9.3 and 13 of the spec).
 
 ### Release checklist
 
