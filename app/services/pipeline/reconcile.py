@@ -1,11 +1,16 @@
-"""Phase 4 — global reconciliation.
+"""Phases 4 and 5 — coverage back-fill and global reconciliation.
 
-Workers see one unit at a time, so two units that both define "activation energy"
-produce two cards. The old exact-string dedupe missed everything but verbatim repeats.
-Here every surviving card is embedded, near-duplicates are clustered by cosine
-similarity, and a model decides per cluster which to keep (or merges them). Then a
-coverage audit walks the map unit by unit asking what testable facts have no card, and
-the orchestrator spawns one bounded round of gap-filler tasks.
+A coverage audit walks the map unit by unit asking what testable facts have no card, and
+the orchestrator spawns one round of gap-filler tasks. A back-fill card is a late
+addition to a deck that is already complete in outline, so it has to pass a gate of its
+own: a reviewer that sees the unit's existing cards next to the candidates and only lets
+in the ones that test something new and worth asking.
+
+Then everything is reconciled. Workers see one unit at a time, so two units that both
+define "activation energy" produce two cards. The old exact-string dedupe missed
+everything but verbatim repeats. Here every surviving card, back-fill included, is
+embedded, near-duplicates are clustered by cosine similarity, and a model decides per
+cluster which to keep.
 """
 
 import logging
@@ -14,12 +19,13 @@ import re
 import numpy as np
 
 from ..llm import extract_json, json_schema_format
-from .critic import card_answer, card_prompt
+from .critic import card_answer, card_line, card_prompt
 
 logger = logging.getLogger(__name__)
 
 RECONCILE_PROMPT_VERSION = "reconcile-v1"
-COVERAGE_PROMPT_VERSION = "coverage-v1"
+COVERAGE_PROMPT_VERSION = "coverage-v2"
+ADDITIONS_PROMPT_VERSION = "backfill-review-v1"
 MAX_CLUSTERS_PER_CALL = 15
 COVERAGE_SOURCE_CAP = 20000
 
@@ -190,28 +196,31 @@ COVERAGE_SCHEMA = json_schema_format(
     },
 )
 
-COVERAGE_SYSTEM = """You audit flashcard coverage. You get one unit of source text and the prompts of every card written from it. List the exam-relevant, testable facts in the source that NO card covers.
+COVERAGE_SYSTEM = """You audit flashcard coverage. You get one unit of source text and every card written from it, each as "question -> answer". List the exam-relevant, testable facts in the source that NO card covers.
 
-- Be strict about "testable": definitions, formulas, mechanisms, distinctions, conditions, numbers the source emphasises. Not filler or asides.
-- importance 1-3: 3 = an examiner would very likely ask it; 1 = nice to have.
+- A fact is covered when any card tests it, in any wording or direction, or carries it in its answer. Read the answers, not only the questions. Do not list a fact that an existing card already tests, even if phrased differently.
+- Be strict about "testable": definitions, formulas, mechanisms, distinctions, conditions, numbers the source emphasises. Not filler, asides, the details of an example, or a second example of something a card already covers.
+- A line that starts with [[Figure N]] places a diagram, which is carded on its own. It is never a missing fact.
+- importance 1-3: 3 = an examiner would very likely ask it; 2 = a plausible exam question; 1 = nice to have.
 - Quote a short verbatim span for each missing fact.
-- Do not list facts that an existing card already tests, even if phrased differently.
+- A well-covered unit has nothing missing, and for it an empty list is the right answer. Do not look for something to add.
 - coverage_score 0-100: how completely the cards cover the unit's testable content.
 Return only JSON."""
 
 
-def coverage_messages(unit, card_prompts):
+def coverage_messages(unit, card_lines):
     source = unit.text if len(unit.text) <= COVERAGE_SOURCE_CAP else unit.text[:COVERAGE_SOURCE_CAP] + "\n...[truncated]"
-    prompts = "\n".join(f"- {p}" for p in card_prompts) or "(no cards)"
+    cards = "\n".join(f"- {line}" for line in card_lines) or "(no cards)"
     return [
         {"role": "system", "content": COVERAGE_SYSTEM},
-        {"role": "user", "content": f"UNIT: {unit.title}\n\nSOURCE:\n{source}\n\nEXISTING CARD PROMPTS:\n{prompts}"},
+        {"role": "user", "content": f"UNIT: {unit.title}\n\nSOURCE:\n{source}\n\nEXISTING CARDS:\n{cards}"},
     ]
 
 
-def audit_unit(client, unit, card_prompts):
-    """Pure: returns {"score": int, "missing": [...], "usage": {...}}."""
-    result = client.chat("reconcile", coverage_messages(unit, card_prompts), response_format=COVERAGE_SCHEMA, max_tokens=5000,
+def audit_unit(client, unit, card_lines):
+    """Pure: returns {"score": int, "missing": [...], "usage": {...}}. `card_lines` is
+    every card the deck has from this unit, each as "question -> answer"."""
+    result = client.chat("reconcile", coverage_messages(unit, card_lines), response_format=COVERAGE_SCHEMA, max_tokens=5000,
                          agent="coverage")
     try:
         data = extract_json(result.content)
@@ -233,3 +242,69 @@ def audit_unit(client, unit, card_prompts):
     except (TypeError, ValueError):
         score = None
     return {"score": score, "missing": missing, "usage": dict(result.usage), "model": result.model}
+
+
+# ------------------------------------------------------------ back-fill review
+ADDITIONS_SCHEMA = json_schema_format(
+    "backfill_review",
+    {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "decisions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "index": {"type": "integer"},
+                        "add": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["index", "add", "reason"],
+                },
+            }
+        },
+        "required": ["decisions"],
+    },
+)
+
+ADDITIONS_SYSTEM = """You are the last check before late cards join a finished flashcard deck. A coverage audit thought the deck was missing some facts, and a writer produced CANDIDATE cards for them. You get the source unit, the cards the deck ALREADY has from it (each as "question -> answer"), and the candidates. Decide for each candidate whether it earns a place in the deck.
+
+Add a candidate only if all of these hold:
+- No existing card already tests its fact. Compare what is tested, not the wording: the same question asked the other way round, a cloze of a fact a basic card already asks, or a narrower slice of an existing card's answer is the same fact.
+- No earlier candidate that you are adding tests its fact.
+- An examiner would plausibly ask it: a definition, formula, mechanism, distinction, condition, or a number the source emphasises. Not an aside, an illustration, the details of one example, or a heading turned into a question.
+- The source supports it.
+
+A deck that repeats itself or pads wastes the student's review time, so a candidate has to earn its place: when in doubt, reject it. Rejecting every candidate is a fine answer.
+
+Give every candidate a decision: its index, `add`, and a short specific reason (for a repeat, name the card it repeats). Return only JSON."""
+
+
+def additions_messages(unit, existing_lines, candidates):
+    source = unit.text if len(unit.text) <= COVERAGE_SOURCE_CAP else unit.text[:COVERAGE_SOURCE_CAP] + "\n...[truncated]"
+    existing = "\n".join(f"- {line}" for line in existing_lines) or "(no cards)"
+    blocks = "\n".join(f"[{i}] {card_line(c)}" for i, c in enumerate(candidates))
+    return [
+        {"role": "system", "content": ADDITIONS_SYSTEM},
+        {"role": "user", "content": f"UNIT: {unit.title}\n\nSOURCE:\n{source}\n\nEXISTING CARDS:\n{existing}\n\nCANDIDATES:\n{blocks}"},
+    ]
+
+
+def review_additions(client, unit, existing_lines, candidates):
+    """Pure: the gate a back-fill card passes before it joins the deck. Returns
+    {"decisions": {index: {"add": bool, "reason": str}}, "usage": {...}, "model": str}.
+    A candidate the reviewer did not rule on has no entry; the caller leaves it out."""
+    result = client.chat("critic", additions_messages(unit, existing_lines, candidates), response_format=ADDITIONS_SCHEMA,
+                         max_tokens=4000, agent="gatekeeper")
+    data = extract_json(result.content)
+    decisions = {}
+    for item in (data.get("decisions") or []) if isinstance(data, dict) else []:
+        try:
+            idx = int(item.get("index"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if 0 <= idx < len(candidates):
+            decisions[idx] = {"add": bool(item.get("add")), "reason": (item.get("reason") or "").strip()[:400]}
+    return {"decisions": decisions, "usage": dict(result.usage), "model": result.model}

@@ -6,8 +6,9 @@ Two cheap calls per batch of cards:
    cards whose front leaks the answer (the classic cloze failure) and gives a difficulty
    signal: a well-formed card a strong model still can't answer cold is discriminating.
 2. Judge pass: with the source, the cards, and the cold answers in view, the model rules
-   on each card — supported by the source, atomic, unambiguous, not leaking — and
-   returns keep / rewrite / drop with a reason and, for rewrites, the fixed card.
+   on each card — supported by the source, atomic, unambiguous, not leaking, and worth
+   a student's review time — and returns keep / rewrite / drop with a reason and, for
+   rewrites, the fixed card.
 
 This replaces the old bag-of-words `is_in_scope`, which could not tell a wrong card that
 used the right vocabulary from a right one.
@@ -21,7 +22,7 @@ from ..validators import is_valid_cloze, normalize_math, normalize_text
 
 logger = logging.getLogger(__name__)
 
-CRITIC_PROMPT_VERSION = "critic-v1"
+CRITIC_PROMPT_VERSION = "critic-v2"
 BATCH_SIZE = 20
 SOURCE_CAP = 24000
 
@@ -76,6 +77,7 @@ JUDGE_SCHEMA = json_schema_format(
                         "ambiguous": {"type": "boolean"},
                         "leaks_answer": {"type": "boolean"},
                         "cold_answer_correct": {"type": "boolean"},
+                        "worthwhile": {"type": "boolean"},
                         "difficulty": {"type": "integer"},
                         "verdict": {"type": "string", "enum": ["keep", "rewrite", "drop"]},
                         "reason": {"type": "string"},
@@ -83,7 +85,7 @@ JUDGE_SCHEMA = json_schema_format(
                     },
                     "required": [
                         "index", "supported", "atomic", "ambiguous", "leaks_answer", "cold_answer_correct",
-                        "difficulty", "verdict", "reason", "rewrite",
+                        "worthwhile", "difficulty", "verdict", "reason", "rewrite",
                     ],
                 },
             }
@@ -102,12 +104,13 @@ Judge every card on:
 - ambiguous: the question could reasonably have several correct answers, or lacks the scope/conditions needed to answer it.
 - leaks_answer: the prompt itself gives the answer away (a cloze whose surrounding words name the deleted term, a question containing its own answer). Use the cold answer as evidence: if it matched only because the wording leaks, flag it; if it matched because the fact is common knowledge, do not.
 - cold_answer_correct: whether the cold answer is right according to the source.
+- worthwhile: a student preparing for an exam on this material would lose something by not knowing the answer. Not worthwhile: a detail that is only true of one worked example or one sample picture (the particular numbers in an exercise, which state an arrow of an example diagram leads to), the specifics of a practice question, a heading or caption turned into a question, an answer that only restates its question. Judge the fact, not its difficulty: an easy definition is worthwhile. When unsure, it is worthwhile.
 - difficulty 1-3: 1 = basic recall most students know, 2 = requires studying this material, 3 = a fine distinction most students get wrong.
 
 Verdicts:
 - keep: supported, atomic, not ambiguous, not leaking. Minor stylistic issues are still keep.
 - rewrite: the fact is valuable and supported but the wording is ambiguous, leaks, is not atomic (rewrite as the single most important fact), or has a cloze/format problem. Provide the fixed card in `rewrite` using the same JSON shape (basic: front+back; cloze: cloze_text+extra with {{c1::...}}). Keep math as \\( ... \\).
-- drop: unsupported by the source, trivially guessable, meta/filler, or a duplicate of another card in this batch (drop the later one). Give a specific reason.
+- drop: unsupported by the source, not worthwhile, trivially guessable, meta/filler, or a duplicate of another card in this batch (drop the later one). Give a specific reason.
 
 Set `rewrite` to null unless verdict is rewrite. Return only JSON."""
 
@@ -127,6 +130,11 @@ def card_answer(card):
         return card.get("back") or ""
     answers = re.findall(r"\{\{c\d+::(.+?)(?:::[^}]*)?\}\}", card.get("cloze_text") or "")
     return " / ".join(answers)
+
+
+def card_line(card):
+    """A card as one line, question and answer, for prompts that list a deck's cards."""
+    return " ".join(f"{card_prompt(card)} -> {card_answer(card)}".split())
 
 
 def _card_block(i, card, cold=None):
@@ -169,7 +177,8 @@ def figure_source(source_text, figure_text):
     return (
         f"{source_text}\n\n"
         "FIGURE (part of the source: these cards were written from it and each one shows its image, so a card may "
-        'point at "this diagram" or at one of its labels):\n'
+        'point at "this diagram" or at one of its labels. A card that only asks for an incidental detail of this one '
+        "picture is not worthwhile unless the source expects the student to know this exact figure):\n"
         f"{figure_text}"
     )
 
@@ -246,6 +255,8 @@ def apply_verdict(card, verdict):
             tags.append("critic:unsupported")
         if verdict.get("leaks_answer"):
             tags.append("critic:leaks_answer")
+        if not verdict.get("worthwhile", True):
+            tags.append("critic:not_worthwhile")
         return card, "deleted", tags
     if decision == "rewrite":
         rewrite = verdict.get("rewrite") or {}

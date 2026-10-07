@@ -86,6 +86,12 @@
       <div class="rs" data-reveal><b>${{ '%.3f'|format(totals.cost or 0) }}</b><span>spent{% if totals.cached %} · {{ totals.cached }} cached{% endif %}</span></div>
     </div>
 
+    {% set origin = stats.by_origin or {} %}
+    {% if stats.budget and origin %}
+    {# The estimate is not a cap, so say how far the run went past it and where the extra cards came from. #}
+    <p class="sub origin-line">{{ 'Asked for' if (deck.settings_json or {}).get('target_cards') else 'Estimated' }} {{ stats.budget }} · kept {{ stats.cards_ok }}: {{ origin.text or 0 }} from the text{% if origin.figures %}, {{ origin.figures }} from figures{% endif %}{% if origin.backfill %}, {{ origin.backfill }} back-filled{% endif %}{% if stats.backfill_rejected %} ({{ stats.backfill_rejected }} back-fill card{{ '' if stats.backfill_rejected == 1 else 's' }} turned away){% endif %}</p>
+    {% endif %}
+
     {% if payload.summary %}
     <div class="planner-note center">{{ icon('brain', 15) }}<span>{{ payload.summary }}</span></div>
     {% endif %}

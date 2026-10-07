@@ -16,7 +16,11 @@
   </div>
   <div class="actions">
     <span class="pill violet">{{ icon('brain', 12) }} {{ plan.mode }} · {{ plan.turns }} turns</span>
-    <span class="pill">budget {{ plan.budget }}</span>
+    {% if (deck.settings_json or {}).get('target_cards') %}
+    <span class="pill" title="The deck size you asked for. The planner stays close to it.">target {{ plan.budget }}</span>
+    {% else %}
+    <span class="pill" title="An estimate from the size and density of the material, not a limit. The planner goes over it where the material holds more.">estimate {{ plan.budget }}</span>
+    {% endif %}
     {% if figure_count %}<span class="pill warn">{{ icon('image', 12) }} {{ figure_count }} figures</span>{% endif %}
     {% if deck.has_cheat_sheet %}<a class="btn" href="{{ url_for('main.cheat_sheet', deck_id=deck.id) }}">{{ icon('sheet', 15) }} Read the cheat sheet</a>{% endif %}
   </div>
@@ -33,17 +37,27 @@
     {% for task in plan.tasks %}
     {% set names = [] %}
     {% for i in task.unit_idxs %}{% if unit_by_idx.get(i) %}{% set _ = names.append(unit_by_idx[i].title) %}{% endif %}{% endfor %}
-    <div class="panel plan-task {{ task.origin }}" data-plan-task>
+    {% set fig = figures.get(task.figure_id) if task.figure_id else none %}
+    <div class="panel plan-task {{ task.origin }} {{ 'figure-task' if fig else '' }}" data-plan-task>
       <div class="pt-head">
         <label class="pt-skip" title="Skip this task">
           <input type="checkbox" class="check" name="skip_{{ task.id }}" data-skip>
           <span>skip</span>
         </label>
+        {% if fig %}
+        <a class="pt-figure" href="{{ url_for('main.figure_image', figure_id=fig.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('main.figure_image', figure_id=fig.id) }}" alt="{{ fig.caption or ('Figure ' ~ figure_numbers[fig.id]) }}" loading="lazy"></a>
+        {% endif %}
         <div class="pt-title">
+          {% if fig %}
+          <b>Figure {{ figure_numbers[fig.id] }}{% if fig.caption %} · {{ fig.caption }}{% endif %}</b>
+          <small>{% if fig.page %}p.{{ fig.page }} · {% endif %}in {{ names|join(' · ') or ('unit ' ~ task.unit_idxs|join(', ')) }} · image on every card{% if task.origin != 'planner' %} · {{ task.origin }}{% endif %}</small>
+          {% else %}
           <b>{{ names|join(' · ') or ('units ' ~ task.unit_idxs|join(', ')) }}</b>
           <small>units {{ task.unit_idxs|map('string')|join(', ') }}{% if task.origin != 'planner' %} · {{ task.origin }}{% endif %}</small>
+          {% endif %}
         </div>
         <div class="pt-controls">
+          {% if not fig %}
           <div class="select-wrap">
             <select name="strategy_{{ task.id }}" aria-label="Strategy">
               {% for key, s in strategies.items() %}
@@ -51,6 +65,7 @@
               {% endfor %}
             </select>
           </div>
+          {% endif %}
           <div class="pt-target">
             <input type="number" name="target_{{ task.id }}" value="{{ task.target_cards }}" min="1" max="60" inputmode="numeric" aria-label="Target cards" data-target>
             <span>cards</span>
@@ -60,6 +75,17 @@
       <textarea name="notes_{{ task.id }}" rows="2" data-autogrow placeholder="Notes for the worker">{{ task.notes }}</textarea>
     </div>
     {% endfor %}
+
+    {% if figures_left_out %}
+    <details class="panel plan-left-out">
+      <summary>{{ icon('image', 14) }} {{ figures_left_out|length }} figure{{ '' if figures_left_out|length == 1 else 's' }} given no cards</summary>
+      <ul>
+        {% for number, fig, reason in figures_left_out %}
+        <li><b>Figure {{ number }}</b>{% if fig.caption %} {{ fig.caption }}{% endif %}{% if fig.page %} <span class="hint">p.{{ fig.page }}</span>{% endif %}<small>{{ reason }}</small></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
 
     <div class="plan-foot panel">
       <div class="plan-total">{{ icon('target', 16) }} <span>About <b data-plan-total>{{ total_target }}</b> cards from <b data-plan-count>{{ plan.tasks|length }}</b> tasks</span></div>

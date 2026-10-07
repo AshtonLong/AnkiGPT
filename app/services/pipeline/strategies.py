@@ -11,7 +11,7 @@ adds its own section. The shared part is placed first so prompt caches hit acros
 
 from dataclasses import dataclass, field
 
-PROMPT_VERSION = "v6-agentic"
+PROMPT_VERSION = "v7-agentic"
 
 BASE_RULES = """You are an expert flashcard author for spaced repetition (Anki). You write cards ONLY from the source text you are given.
 
@@ -211,10 +211,12 @@ _register(
             "is or does, or what a plot shows, with the figure embedded on the card."
         ),
         rules="""STRATEGY: FIGURE RECALL
-- You are given a description of a figure (and its labelled parts) plus the surrounding source text.
-- Write cards that require recognising or recalling something FROM the figure: what a labelled structure is/does, what the axes or trend of a plot show, what a highlighted region represents.
-- Phrase questions so they make sense with the image displayed above them: "In this diagram, what does the structure labelled X do?".
-- Do not restate facts already obvious from the caption alone; ground in the labelled parts and the source text.""",
+- You are given a description of a figure (and its labelled parts) plus the surrounding source text. The figure's image is shown above every card you write.
+- Write cards only for what a student has to recognise in, or recall from, a figure like this: what a labelled part is or does, what a notation or symbol in it means, how the structure is organised, what the axes or the trend of a plot show.
+- Test what the figure teaches, not the accident of the example. When the figure is one instance of a general idea (a sample state diagram, a worked Venn diagram, an example parse tree), ask about the idea it illustrates. Do not quiz its particular numbers, labels or arrows unless the source expects the student to know this exact figure.
+- Phrase questions so they make sense with the image displayed above them: "In this diagram, what does the structure labelled X do?". The student sees the image while answering, so never ask for something that can simply be read off it.
+- A fact the text states and that needs no picture belongs to the text cards, not here. Do not restate the caption.
+- Fewer good cards beat the requested number: when the figure supports fewer than asked for, write fewer, and write none if nothing qualifies.""",
         default_type="basic",
         cards_per_1k_chars=2.0,
     )
@@ -222,15 +224,22 @@ _register(
 
 
 DEFAULT_STRATEGY = "general"
+# The one strategy that is not a choice: it is what a figure task runs, and nothing else does.
+FIGURE_STRATEGY = "figure_recall"
 
 
 def get_strategy(key):
     return STRATEGIES.get(key) or STRATEGIES[DEFAULT_STRATEGY]
 
 
+def text_strategies():
+    """The strategies a task over unit text can be given."""
+    return {key: s for key, s in STRATEGIES.items() if key != FIGURE_STRATEGY}
+
+
 def strategy_catalog():
     """Compact catalogue for the planner prompt."""
-    return "\n".join(f"- {s.key}: {s.description}" for s in STRATEGIES.values())
+    return "\n".join(f"- {s.key}: {s.description}" for s in text_strategies().values())
 
 
 def system_prompt(strategy_key, card_style, focus="", exclude="", glossary=""):

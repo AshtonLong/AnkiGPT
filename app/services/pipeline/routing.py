@@ -19,7 +19,7 @@ ROLES = ("mapper", "cheatsheet", "planner", "worker", "critic", "reconcile", "vi
 # which a user can still set apart (see pipeline.efforts).
 AGENT_ROLES = {
     "mapper": "mapper", "cheatsheet": "cheatsheet", "planner": "planner", "vision": "vision", "worker": "worker",
-    "cold_reader": "critic", "judge": "critic", "improver": "critic", "coach": "critic",
+    "cold_reader": "critic", "judge": "critic", "gatekeeper": "critic", "improver": "critic", "coach": "critic",
     "merger": "reconcile", "coverage": "reconcile",
 }
 # The values a user can pick for OpenRouter's `reasoning.effort`, lowest first. OpenRouter
