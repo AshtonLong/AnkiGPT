@@ -239,7 +239,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // Every window, the second ones opened for figures included, gets the same restrictions.
-  app.on('web-contents-created', (_event, contents) => restrict(contents));
+  app.on('web-contents-created', (_event, contents) => restrict(contents, log));
 
   app.on('before-quit', (event) => {
     if (!confirmQuit()) event.preventDefault();

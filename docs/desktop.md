@@ -34,6 +34,9 @@ Everything in the [user guide](user-guide.md) applies, with these differences:
 - **Export saves a file.** **Export deck** opens a Save dialog in your Downloads folder.
   When the file is written you can choose **Open in Anki**, which hands the package to
   Anki to import, or **Show in folder**.
+- **The cheat sheet saves as a PDF.** Its button reads **Save as PDF** and writes the
+  file itself, through the same Save dialog, instead of opening a print dialog. To put
+  it on paper, open the PDF and print from there.
 - **Closing the window quits the app.** Generation stops when the app closes, so the app
   asks before quitting while a deck is being generated. A deck that was cut off shows
   as failed the next time you open the app, with **Retry generation**.
@@ -208,3 +211,6 @@ On a Windows account that has never had AnkiGPT installed:
 9. Launch a second copy: the first window is focused.
 10. Update from the previous release: decks and the key survive, and a backup exists.
 11. Uninstall and reinstall: decks are still there.
+12. Open the cheat sheet of a deck whose source has formulas: they are typeset. **Save as
+    PDF** opens a Save dialog and writes a PDF with the formulas typeset and the diagrams
+    in place.

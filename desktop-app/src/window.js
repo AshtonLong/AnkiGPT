@@ -1,7 +1,7 @@
 /*
  * Windows and everything that restricts them (SPEC.md sections 6 and 7.1 to 7.4):
  * window options and saved state, navigation rules, permissions, the launch-token
- * header, downloads, and the right-click menu.
+ * header, downloads, pages saved as PDF, and the right-click menu.
  *
  * The page in the window is an ordinary web page talking to the local backend. It gets
  * no Node.js access, no preload script and no IPC channel. Card content written by a
@@ -18,6 +18,10 @@ const DEFAULT_SIZE = { width: 1280, height: 860 };
 const MINIMUM_SIZE = { width: 960, height: 640 };
 const BACKGROUND = '#FAFBFC'; // the page background, so there is no white flash
 const TOKEN_HEADER = 'X-AnkiGPT-Token';
+// A page asks for a PDF of itself by navigating here (static/experience.js). The
+// navigation is blocked like any other that leaves the app, so the page stays put.
+const SAVE_PDF_URL = 'ankigpt:save-pdf';
+const LETTER_COUNTRIES = ['US', 'CA', 'MX']; // everywhere else prints on A4
 
 /** DevTools are off in packaged builds unless ANKIGPT_DEVTOOLS=1 is set. */
 const devToolsAllowed = !app.isPackaged || process.env.ANKIGPT_DEVTOOLS === '1';
@@ -124,15 +128,74 @@ function hasRegisteredProgram(extension) {
   return Promise.all(keys.map(exists)).then((found) => found.some(Boolean));
 }
 
+// ------------------------------------------------------------------ pages as PDF
+const savingPdf = new WeakSet(); // web contents with a PDF on the way
+
+/** "Cheat sheet · Cell biology · AnkiGPT" becomes "Cheat sheet - Cell biology.pdf". */
+function pdfFileName(title) {
+  const name = title
+    .replace(/\s*·\s*AnkiGPT\s*$/, '')
+    .replace(/\s*·\s*/g, ' - ')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .slice(0, 120)
+    .replace(/[. ]+$/, '');
+  return `${name || 'AnkiGPT'}.pdf`;
+}
+
+/**
+ * Write the page in `contents` to a PDF the user picks a place for. The page is laid
+ * out with its print styles, the way a browser's "Save as PDF" would. Electron has no
+ * print preview, and on some computers its print dialog fails without ever opening
+ * ("Invalid printer settings"), so `window.print()` cannot do this job here.
+ */
+async function savePageAsPdf(contents, log) {
+  if (savingPdf.has(contents)) return;
+  savingPdf.add(contents);
+  const window = BrowserWindow.fromWebContents(contents);
+  const live = () => window && !window.isDestroyed();
+  try {
+    // Backgrounds stay off, as in a browser's print dialog: the page's print styles name
+    // the shading that belongs on paper, and the window's own colour stays off it.
+    const data = await contents.printToPDF({
+      pageSize: LETTER_COUNTRIES.includes(app.getLocaleCountryCode()) ? 'Letter' : 'A4',
+    });
+    const options = {
+      title: 'Save as PDF',
+      defaultPath: path.join(app.getPath('downloads'), pdfFileName(contents.getTitle())),
+      filters: [{ name: 'PDF document', extensions: ['pdf'] }],
+    };
+    const { canceled, filePath } = await (live() ? dialog.showSaveDialog(window, options) : dialog.showSaveDialog(options));
+    if (canceled || !filePath) return;
+    await fs.promises.writeFile(filePath, data);
+    offerToOpen(window, filePath, false);
+  } catch (error) {
+    log.warn(`Could not save the page as a PDF: ${error.message}`);
+    const options = {
+      type: 'error',
+      title: 'AnkiGPT',
+      message: "The PDF couldn't be saved",
+      detail: 'If a PDF with that name is open in another program, close it and try again.',
+      buttons: ['OK'],
+      noLink: true,
+    };
+    if (live()) dialog.showMessageBox(window, options);
+    else dialog.showMessageBox(options);
+  } finally {
+    savingPdf.delete(contents);
+  }
+}
+
 // ------------------------------------------------------------------ every window
 /** Navigation rules, the unsaved-changes prompt and the right-click menu, for any web contents. */
-function restrict(contents) {
+function restrict(contents, log) {
   // Fires for navigation in any frame, started by the user or by the page.
   contents.on('will-frame-navigate', (event) => {
     const kind = classify(event.url);
     if (kind === 'app') return;
     event.preventDefault();
-    if (kind === 'external' && event.isMainFrame) shell.openExternal(event.url);
+    if (!event.isMainFrame) return;
+    if (event.url === SAVE_PDF_URL) savePageAsPdf(contents, log);
+    else if (kind === 'external') shell.openExternal(event.url);
   });
   // The same rule for the two other ways a main-frame navigation is announced (a file
   // dropped on the window, a server redirect). Blocking twice does no harm.

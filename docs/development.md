@@ -47,7 +47,7 @@ mode: no sign-in, the request guard, the local user, interrupted runs, backups a
 | `GET` | `/decks/<id>/progress.json` | Trace as JSON (polled by the status page) |
 | `GET,POST` | `/decks/<id>/plan` | Review / edit / run the work order; re-plan |
 | `GET` | `/decks/<id>` | Card editor with run insights |
-| `GET` | `/decks/<id>/cheat-sheet` | The cheat sheet as a printable page, diagrams in place |
+| `GET` | `/decks/<id>/cheat-sheet` | The cheat sheet as a printable page, diagrams in place and maths typeset |
 | `POST` | `/decks/<id>/reviews` | Import an Anki package with review history |
 | `POST` | `/decks/<id>/coach` | Rewrite struggling cards |
 | `POST` | `/decks/<id>/export` | Export `.apkg` (with figure media) |

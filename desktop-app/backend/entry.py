@@ -231,12 +231,13 @@ def _check_key_round_trip(app):
 
 
 def _check_assets(app):
-    for template in ("base.html", "decks.html", "settings.html", "partials/card_row.html"):
+    for template in ("base.html", "decks.html", "settings.html", "deck_cheatsheet.html", "partials/card_row.html"):
         app.jinja_env.get_template(template)
     client = app.test_client()
     paths = ("/decks", "/auth/profile", "/static/style.css", "/static/fonts.css", "/static/app.js",
              "/static/brand.svg", "/static/vendor/htmx.min.js", "/static/fonts/figtree-latin.woff2",
-             "/static/fonts/fragment-mono-latin.woff2")
+             "/static/fonts/fragment-mono-latin.woff2", "/static/sheet.js", "/static/vendor/katex/katex.min.js",
+             "/static/vendor/katex/katex.min.css", "/static/vendor/katex/fonts/KaTeX_Main-Regular.woff2")
     for path in paths:
         response = client.get(path, base_url=f"http://{SELF_CHECK_HOST}", headers={"X-AnkiGPT-Token": SELF_CHECK_TOKEN})
         if response.status_code != 200:

@@ -83,8 +83,21 @@
     $('#confirm-dialog').close();
     confirmForm.requestSubmit();
   });
+  /* A browser prints the page, and its print dialog can save a PDF. The desktop app has
+     no print preview and cannot rely on Electron's print dialog, so there the shell
+     writes the PDF: it answers this address by saving the page, and the page never
+     leaves (desktop-app/SPEC.md section 7.3). */
+  var inShell = /\bElectron\//.test(navigator.userAgent);
   $$('[data-print]').forEach(function (button) {
-    button.addEventListener('click', function () { window.print(); });
+    button.addEventListener('click', function () {
+      if (!inShell) { window.print(); return; }
+      // Images below the fold have not been fetched yet, and the PDF needs them all.
+      var images = $$('img').map(function (img) {
+        img.loading = 'eager';
+        return img.decode().catch(function () {});
+      });
+      Promise.all(images.concat(document.fonts.ready)).then(function () { location.href = 'ankigpt:save-pdf'; });
+    });
   });
   var filters = $('[data-toggle-filters]');
   if (filters) filters.addEventListener('click', function () {

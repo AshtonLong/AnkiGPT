@@ -40,8 +40,9 @@ adds one model pass over the source. The run trace shows how far each unit was
 condensed.
 
 Once the plan exists, **Cheat sheet** (on the plan review, the finished run, and the
-deck editor) opens the sheet as a page with its diagrams in place. Read it to see
-exactly what your cards were written from, or print it.
+deck editor) opens the sheet as a page with its diagrams in place and its formulas
+typeset. Read it to see exactly what your cards were written from, or choose **Print or
+save as PDF** to keep a copy; the PDF has the typeset formulas too.
 
 Enable **Review the plan before writing** to pause after planning. If extracted PDF
 figures are available, **Read figures with vision** controls whether they are read. The

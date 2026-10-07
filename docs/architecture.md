@@ -37,7 +37,10 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
      image and the writer did not. Once the planner has ruled on the figures, the
      diagrams it gave no cards come off the sheet again, so the sheet and the image cards
      are the same set. `GET /decks/<id>/cheat-sheet` renders the sheet as a printable
-     page with each image where its marker sits.
+     page with each image where its marker sits. The writer is asked for maths as
+     `\( ... \)` and `\[ ... \]`, like the cards; the page marks each formula (`$...$`
+     and `$$...$$` are read too) and KaTeX, served from `static/vendor/katex`, typesets
+     it on screen and in print.
 2. **Figures** (PDFs) — figure regions are rendered from the page (so vector labels
    survive) and each gets one vision call. It says whether the figure is material to
    learn (exercises and decoration are not), lists its labelled parts and the facts it
