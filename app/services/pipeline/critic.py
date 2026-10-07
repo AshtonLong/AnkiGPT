@@ -162,6 +162,18 @@ def judge_messages(cards, cold_answers, source_text):
     ]
 
 
+def figure_source(source_text, figure_text):
+    """The source for cards written from a figure: the unit text plus what the vision
+    pass read off the image. The text alone rarely states what a diagram shows, so
+    without this the judge drops figure cards as unsupported."""
+    return (
+        f"{source_text}\n\n"
+        "FIGURE (part of the source: these cards were written from it and each one shows its image, so a card may "
+        'point at "this diagram" or at one of its labels):\n'
+        f"{figure_text}"
+    )
+
+
 def _merge_usage(*usages):
     out = {"prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0}
     for u in usages:

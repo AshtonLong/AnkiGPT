@@ -3,12 +3,15 @@
 import json
 
 from app.extensions import db as _db
-from app.models import Card, Deck, LLMRun, PipelineTask, Source, User
+from app.models import Card, Deck, Figure, LLMRun, PipelineTask, Source, User
 from app.services import deckgen
 from app.services import llm as llm_module
 from app.services.llm import OpenRouterError
+from app.services.pipeline import orchestrator
 
-from conftest import FakeLLM, fake_embeddings, fake_response
+import pytest
+
+from conftest import FakeLLM, fake_embeddings, fake_response, login
 
 SOURCE = """# Photosynthesis
 
@@ -225,7 +228,7 @@ def test_cheat_sheet_becomes_the_source_for_every_later_phase(app, monkeypatch):
         sheets = [c for c in fake.calls if c["name"] == "cheat_sheet"]
         assert len(sheets) == 2
         system, user = sheets[0]["messages"][0]["content"], sheets[0]["messages"][1]["content"]
-        assert "bring one cheat sheet into the exam room" in system
+        assert "bring a cheat sheet into the exam room" in system
         assert "Bio 101 final" in user and "ATP" in user
 
         # The units now hold the cheat sheet, sized as the densest kind of material.
@@ -324,3 +327,146 @@ def test_empty_cheat_sheet_fails_without_wiping_the_deck(app, monkeypatch):
         assert "cheat sheet came back empty" in deck.run_json["last_error"]
         assert not [c for c in fake.calls if c["tools"]], "planner must not run on an empty cheat sheet"
         assert _db.session.get(Card, existing_id) is not None
+
+
+# ------------------------------------------------------- diagrams and the critic
+FIGURE_FACT = "The stroma holds the Calvin cycle enzymes"
+
+
+class FigureLLM(FakeLLM):
+    """Writes one card from the figure for a figure task, and a critic that only keeps
+    that card when the figure's analysis is part of the source it was shown."""
+
+    def _anki_cards(self, messages):
+        if "FIGURE under study" not in messages[-1]["content"]:
+            return super()._anki_cards(messages)
+        return fake_response(json.dumps({"cards": [{
+            "type": "basic", "front": "In this diagram, what does the stroma hold?", "back": "The Calvin cycle enzymes",
+            "cloze_text": None, "extra": None, "tags": [], "source_quote": None}]}))
+
+    def _critic_verdicts(self, messages):
+        source = messages[-1]["content"].split("\n\nCARDS:")[0]
+        response = super()._critic_verdicts(messages)
+        verdicts = json.loads(response["choices"][0]["message"]["content"])["verdicts"]
+        if "stroma" in messages[-1]["content"] and FIGURE_FACT not in source:
+            for verdict in verdicts:
+                verdict.update(supported=False, verdict="drop", reason="not in source")
+        return fake_response(json.dumps({"verdicts": verdicts}))
+
+
+def _make_figure_deck(app, monkeypatch, settings):
+    """A two-page deck: an examinable diagram on page 1, a decorative photo on page 2."""
+    fake = FigureLLM()
+    monkeypatch.setattr(llm_module, "openrouter_chat", fake)
+    # Every card its own direction, so reconcile merges nothing and only the critic can drop a card.
+    monkeypatch.setattr(llm_module, "openrouter_embeddings",
+                        lambda texts, *a, **k: [[float(i == j) for j in range(len(texts))] for i in range(len(texts))])
+    vision = []
+
+    def analyze(client, image, mime, context):
+        vision.append((image, context))
+        if image == b"diagram":
+            return {"useful": True, "kind": "diagram", "caption": "Chloroplast", "suggested_cards": 2,
+                    "description": "A labelled chloroplast.", "parts": ["A: stroma"], "facts": [FIGURE_FACT]}
+        return {"useful": False, "kind": "decorative", "caption": "A leaf", "suggested_cards": 0,
+                "description": "A photo of a leaf.", "parts": [], "facts": []}
+
+    monkeypatch.setattr(orchestrator.figures_mod, "analyze_figure", analyze)
+    deck_id = _make_deck(app, settings={"page_offsets": [[1, 0], [2, SOURCE.index("# Respiration")]], **settings})
+    with app.app_context():
+        _db.session.add_all([
+            Figure(deck_id=deck_id, page=2, hash="photo", image=b"photo"),
+            Figure(deck_id=deck_id, page=1, hash="diagram", image=b"diagram"),
+        ])
+        _db.session.commit()
+    return deck_id, fake, vision
+
+
+def _figure_cards(deck_id):
+    return Card.query.filter(Card.deck_id == deck_id, Card.figure_id.isnot(None)).all()
+
+
+@pytest.mark.parametrize("cheat_sheet", [False, True])
+def test_figure_cards_survive_the_critic(app, monkeypatch, cheat_sheet):
+    deck_id, fake, vision = _make_figure_deck(app, monkeypatch, {"cheat_sheet": cheat_sheet})
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        assert _db.session.get(Deck, deck_id).status == "ready"
+        # The judge was shown what the vision pass read off the figure, so it kept the card.
+        judged = [c for c in fake.calls if c["name"] == "critic_verdicts" and "stroma" in c["messages"][-1]["content"]]
+        assert len(judged) == 1 and FIGURE_FACT in judged[0]["messages"][-1]["content"].split("\n\nCARDS:")[0]
+        assert [(c.status, c.critic_json["verdict"]) for c in _figure_cards(deck_id)] == [("ok", "keep")]
+        assert len(vision) == 2
+
+
+def test_cheat_sheet_keeps_the_source_diagrams(app, monkeypatch):
+    deck_id, fake, vision = _make_figure_deck(app, monkeypatch, {"cheat_sheet": True})
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        deck = _db.session.get(Deck, deck_id)
+        assert deck.status == "ready"
+
+        # Figures are read first, from the full source rather than the sheet.
+        phases = [t.phase for t in PipelineTask.query.filter_by(deck_id=deck_id, kind="phase").order_by(PipelineTask.seq)]
+        assert phases[:4] == ["map", "figures", "cheatsheet", "plan"] and phases.count("figures") == 1
+        assert DROPPED_DETAIL in dict(vision)[b"diagram"]
+
+        # The writer is told about the diagram in its section, and only there. Figures are
+        # numbered in page order whatever order they were stored in.
+        first, second = [c["messages"][1]["content"] for c in fake.calls if c["name"] == "cheat_sheet"]
+        assert "[[Figure 1]] (p.1, diagram) Chloroplast" in first and FIGURE_FACT in first
+        assert "Diagrams" not in second and "A leaf" not in first
+
+        # The fake writer never places the marker; the diagram stays on the sheet anyway.
+        units = Source.query.filter_by(deck_id=deck_id).order_by(Source.idx).all()
+        assert units[0].text == (
+            "- Photosynthesis converts CO2 and water into glucose using light.\n\n[[Figure 1]] Chloroplast")
+        assert "[[Figure" not in units[1].text
+        assert deck.run_json["cheat_sheet"]["figures"] == 1
+        node = PipelineTask.query.filter_by(deck_id=deck_id, phase="cheatsheet", kind="task").order_by(PipelineTask.seq).first()
+        assert node.label.endswith("· 1 diagram")
+        diagram = Figure.query.filter_by(deck_id=deck_id, hash="diagram").one()
+        assert [c.figure_id for c in _figure_cards(deck_id)] == [diagram.id]
+
+
+def test_cheat_sheet_page_after_a_run(app, client, monkeypatch):
+    deck_id, _fake, _vision = _make_figure_deck(app, monkeypatch, {"cheat_sheet": True})
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        diagram_id = Figure.query.filter_by(deck_id=deck_id, hash="diagram").one().id
+    login(client, email="gen@example.com")
+    page = client.get(f"/decks/{deck_id}/cheat-sheet").text
+    assert "Photosynthesis converts CO2 and water into glucose using light." in page
+    assert f'<img src="/figures/{diagram_id}.png" alt="Chloroplast"' in page and "<b>Figure 1</b> Chloroplast" in page
+    assert DROPPED_DETAIL not in page and page.count("<img ") == 1
+
+
+def test_figures_are_not_read_twice_across_the_plan_review_pause(app, monkeypatch):
+    deck_id, _fake, vision = _make_figure_deck(app, monkeypatch, {"cheat_sheet": True, "review_plan": True})
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        assert _db.session.get(Deck, deck_id).status == "planned"
+        assert len(vision) == 2 and "[[Figure 1]]" in Source.query.filter_by(deck_id=deck_id, idx=0).one().text
+        assert _generate(app, monkeypatch, deck_id, resume_from_plan=True) == deck_id
+        assert _db.session.get(Deck, deck_id).status == "ready"
+        assert len(vision) == 2
+        assert PipelineTask.query.filter_by(deck_id=deck_id, kind="phase", phase="figures").count() == 1
+        assert [c.status for c in _figure_cards(deck_id)] == ["ok"]
+
+
+def test_unit_kept_in_full_still_carries_its_diagram(app, monkeypatch):
+    deck_id, fake, _vision = _make_figure_deck(app, monkeypatch, {"cheat_sheet": True})
+
+    def flaky(messages):
+        if "SECTION: Unit 0" in messages[-1]["content"]:
+            raise OpenRouterError("upstream down", status_code=503)
+        return FakeLLM._cheat_sheet(fake, messages)
+
+    fake._cheat_sheet = flaky
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        unit = Source.query.filter_by(deck_id=deck_id, idx=0).one()
+        assert DROPPED_DETAIL in unit.text and unit.text.endswith("\n\n[[Figure 1]] Chloroplast")
+        stats = _db.session.get(Deck, deck_id).run_json["cheat_sheet"]
+        assert stats["kept_full"] == [0] and stats["figures"] == 1
+        assert [c.status for c in _figure_cards(deck_id)] == ["ok"]

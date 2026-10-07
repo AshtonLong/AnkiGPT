@@ -21,13 +21,21 @@ source ──▶ MAP ──▶ PLAN ──▶ FIGURES ──▶ WRITE ──▶ 
    references, and recaps. Short sources skip the model and become one unit.
    - **Cheat sheet** (optional, off by default) — with **Make a cheat sheet first**
      ticked, each live unit is rewritten as the section of a cheat sheet a student could
-     bring into the exam: only what earns marks, in plain language, grounded in the
-     source. The unit's text is then *replaced* by that section, so the planner sizes,
-     workers write from, the critic judges against, and the coverage audit back-fills
-     from the cheat sheet alone; nothing later can re-inflate what it cut. One cached
-     call per unit, in parallel. A unit whose call fails keeps its full text; a unit with
-     nothing exam-critical is skipped; an entirely empty sheet fails the run before
-     anything is replaced.
+     bring into the exam: every examinable concept in its barest form, edge cases
+     included, in plain language. A concept keeps at most one example, and only one the
+     source gives; nothing is added from outside the source. The unit's text is then
+     *replaced* by that section, so the planner sizes, workers write from, the critic
+     judges against, and the coverage audit back-fills from the cheat sheet alone;
+     nothing later can re-inflate what it cut. One cached call per unit, in parallel. A
+     unit whose call fails keeps its full text; a unit with nothing exam-critical is
+     skipped; an entirely empty sheet fails the run before anything is replaced.
+
+     The sheet keeps the source's diagrams, so with this option the **Figures** phase
+     runs before it instead of after the plan. The writer is told what each diagram in
+     its section shows and places a `[[Figure N]]` marker line for it; a diagram it
+     leaves out is added at the end of the section, because the vision pass saw the
+     image and the writer did not. `GET /decks/<id>/cheat-sheet` renders the sheet as a
+     printable page with each image where its marker sits.
 2. **Plan** — the planner is a real tool-using loop. It reads units it is unsure about,
    searches the source, and *spawns tasks*: which units, which **card strategy**, how many
    cards, and specific notes for the worker. Every live unit must end up covered
@@ -38,7 +46,8 @@ source ──▶ MAP ──▶ PLAN ──▶ FIGURES ──▶ WRITE ──▶ 
 3. **Figures** (PDFs) — figure regions are rendered from the page (so vector labels
    survive), a vision call decides whether each is examinable and lists its labelled
    parts, and useful ones become image-backed `figure_recall` tasks. Images ship inside
-   the `.apkg`.
+   the `.apkg`. The critic judges those cards against the unit text *plus* what the
+   vision pass read off the figure; the text alone rarely states what a diagram shows.
 4. **Write** — each task is one worker call: the strategy's grammar + the planner's notes
    + the unit text **verbatim** (the source itself, or its cheat-sheet section when that
    option is on) + a hint of what sibling tasks cover. Tasks run concurrently (`PIPELINE_MAX_WORKERS`). Truncated outputs are retried
@@ -105,7 +114,7 @@ app/
     pipeline/
       orchestrator.py   the run: phases, persistence, status transitions
       document_map.py   phase 0 — skeleton + mapper
-      cheatsheet.py     optional — condense each unit to an exam cheat sheet
+      cheatsheet.py     optional — condense each unit to an exam cheat sheet, diagrams kept
       planner.py        phase 1 — tool-using planning agent + invariants
       strategies.py     card grammars
       workers.py        phase 2 — worker prompt + call
@@ -135,7 +144,8 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 - `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
   totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
 - `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).
-  Its `text` is the cheat-sheet section when the deck was generated with that option.
+  Its `text` is the cheat-sheet section when the deck was generated with that option;
+  a `[[Figure N]]` line in it is a diagram kept on the sheet.
 - `Card` — with `strategy`, `difficulty`, `source_quote`, `critic_json`, `order_key`,
   `guid`, `review_stats_json`, and links to its task, unit, and figure.
 - `PipelineTask` — the trace tree (phase → task), with status, model, tokens, cost.

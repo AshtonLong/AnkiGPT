@@ -89,14 +89,23 @@ class Deck(db.Model):
         "Figure", backref="deck", cascade="all, delete-orphan", passive_deletes=True
     )
 
+    @property
+    def has_cheat_sheet(self):
+        """Whether the stored units are the cheat sheet of the latest run. A run records
+        its cheat sheet before the plan, and the units are only replaced once the plan
+        exists, so both must be there."""
+        run = self.run_json or {}
+        return bool(run.get("cheat_sheet") and run.get("plan"))
+
 
 class Source(db.Model):
     """One *unit* of the document map: a semantically coherent slice of the source.
 
     It holds the planner's view of the document (kind, density, prerequisites), and `text`
     is what worker tasks read verbatim: the source slice itself, or its exam cheat-sheet
-    section when the deck's `cheat_sheet` setting is on. The char and page offsets always
-    point into the original source.
+    section when the deck's `cheat_sheet` setting is on (a `[[Figure N]]` line there is a
+    diagram kept on the sheet). The char and page offsets always point into the original
+    source.
     """
 
     id = db.Column(db.Integer, primary_key=True)

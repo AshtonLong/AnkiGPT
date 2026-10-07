@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "partials/ui.html" import icon %}
+{% block title %}Cheat sheet · {{ deck.title }} · AnkiGPT{% endblock %}
+{% block content %}
+{% set kept_full = stats.get('kept_full') or [] %}
+{% set diagrams = stats.get('figures') or 0 %}
+
+<div class="page-head sheet-head" data-reveal>
+  <div>
+    <span class="eyebrow">Cheat sheet</span>
+    <h1>{{ deck.title }}</h1>
+    <p>The bare bones of your source. Every card in this deck was written from this page and nothing else.</p>
+    <div class="meta">
+      <span class="pill">{{ sections|length }} section{{ '' if sections|length == 1 else 's' }}</span>
+      {% if diagrams %}<span class="pill warn">{{ icon('image', 12) }} {{ diagrams }} diagram{{ '' if diagrams == 1 else 's' }}</span>{% endif %}
+      {% if stats.get('chars_in') %}<span class="pill">{{ '{:,}'.format(stats.chars_in) }} → {{ '{:,}'.format(stats.chars_out) }} chars</span>{% endif %}
+    </div>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('arrow-left', 15) }} Deck</a>
+    <button class="btn primary" type="button" data-print>{{ icon('download') }} Print or save as PDF</button>
+  </div>
+</div>
+
+<article class="panel sheet" data-reveal style="--d:60">
+  {% for unit, blocks in sections %}
+  <section class="sheet-section">
+    <h2>{{ unit.title }}{% if unit.page_start %} <small>p.{{ unit.page_start }}{% if unit.page_end and unit.page_end != unit.page_start %}–{{ unit.page_end }}{% endif %}</small>{% endif %}</h2>
+    {% if unit.idx in kept_full %}<p class="hint">This section could not be condensed, so it is shown in full.</p>{% endif %}
+    {% for block in blocks %}
+    {% if block.type == 'heading' %}
+    <h3>{{ block.text|sheet_inline }}</h3>
+    {% elif block.type == 'list' %}
+    <ul>
+      {% for item in block['items'] %}
+      <li class="{{ 'sub' if item.sub }} {{ 'example' if item.example }} {{ 'numbered' if item.label }}">{% if item.label %}<span class="n">{{ item.label }}</span> {% endif %}{{ item.text|sheet_inline }}</li>
+      {% endfor %}
+    </ul>
+    {% elif block.type == 'table' %}
+    <table>
+      {% for row in block.rows %}
+      {% set cell_tag = 'th' if loop.first else 'td' %}
+      <tr>{% for cell in row %}<{{ cell_tag }}>{{ cell|sheet_inline }}</{{ cell_tag }}>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+    {% elif block.type == 'figure' %}
+    {% set fig = figures.get(block.number) %}
+    {% if fig %}
+    <figure>
+      <a href="{{ url_for('main.figure_image', figure_id=fig.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('main.figure_image', figure_id=fig.id) }}" alt="{{ fig.caption or ('Figure ' ~ block.number) }}" loading="lazy"></a>
+      <figcaption><b>Figure {{ block.number }}</b>{% if fig.caption %} {{ fig.caption }}{% endif %}{% if fig.page %} <span class="hint">p.{{ fig.page }}</span>{% endif %}</figcaption>
+    </figure>
+    {% endif %}
+    {% else %}
+    <p class="{{ 'example' if block.example }}">{{ block.text|sheet_inline }}</p>
+    {% endif %}
+    {% endfor %}
+  </section>
+  {% else %}
+  <div class="empty"><h3>Nothing on the sheet</h3><p>Every unit of this deck was skipped.</p></div>
+  {% endfor %}
+</article>
+{% endblock %}

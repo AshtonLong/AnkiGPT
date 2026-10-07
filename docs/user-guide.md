@@ -25,11 +25,19 @@ exclusions, and must-include terms. Leave deck size on **Auto** or set an approx
 target. Validation, deduplication, and coverage work can change the final count.
 
 Turn on **Make a cheat sheet first** when the full source would be information
-overload. Before any cards are planned, the source is boiled down to what you would put
-on a cheat sheet you were allowed to bring into the exam, and cards are written from
-that alone. Expect fewer, higher-yield cards; detail the cheat sheet leaves out gets no
-card, and the coverage audit will not add it back. It is off by default and adds one
-model pass over the source. The run trace shows how far each unit was condensed.
+overload. Before any cards are planned, the source is boiled down to what you would fit
+on a cheat sheet you were allowed to bring into the exam: every concept in its barest
+form, with its edge cases, and without the background, repetition, and academic padding.
+A concept keeps at most one example, and only if your source gives one; nothing is
+added that your source does not say. Diagrams from a PDF stay on the sheet. Cards are
+written from that alone. Expect fewer, higher-yield cards; detail the cheat sheet leaves
+out gets no card, and the coverage audit will not add it back. It is off by default and
+adds one model pass over the source. The run trace shows how far each unit was
+condensed.
+
+Once the plan exists, **Cheat sheet** (on the plan review, the finished run, and the
+deck editor) opens the sheet as a page with its diagrams in place. Read it to see
+exactly what your cards were written from, or print it.
 
 Enable **Review the plan before writing** to pause after planning. If extracted PDF
 figures are available, **Read figures with vision** controls whether they are analyzed

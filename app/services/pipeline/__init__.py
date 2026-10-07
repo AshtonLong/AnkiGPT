@@ -1,6 +1,7 @@
 """Agentic card-generation pipeline.
 
-    map -> (cheat sheet) -> plan -> figures -> write -> critique -> reconcile -> coverage -> finish
+    map -> plan -> figures -> write -> critique -> reconcile -> coverage -> finish
+    map -> figures -> cheat sheet -> plan -> write -> ...   (with the cheat sheet on)
 
 See `orchestrator.py` for the run, `planner.py` for the agent that decides how the
 material is carved up, and `strategies.py` for the card grammars workers write with.

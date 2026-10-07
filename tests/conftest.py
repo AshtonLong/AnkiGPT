@@ -163,7 +163,8 @@ class FakeLLM:
         return fake_response(json.dumps({"answers": [{"index": i, "answer": "unknown"} for i in range(n)]}))
 
     def _critic_verdicts(self, messages):
-        user = messages[-1]["content"]
+        # Only the cards: a source line may itself open with "[" (a cheat-sheet figure marker).
+        user = messages[-1]["content"].split("\nCARDS:\n", 1)[-1]
         verdicts = []
         for block in user.split("\n\n"):
             if not block.startswith("["):

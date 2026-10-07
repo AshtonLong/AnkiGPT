@@ -83,6 +83,9 @@
     $('#confirm-dialog').close();
     confirmForm.requestSubmit();
   });
+  $$('[data-print]').forEach(function (button) {
+    button.addEventListener('click', function () { window.print(); });
+  });
   var filters = $('[data-toggle-filters]');
   if (filters) filters.addEventListener('click', function () {
     var open = filters.closest('form').classList.toggle('filters-open');

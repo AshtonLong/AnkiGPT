@@ -31,6 +31,9 @@
     {% if deck.status == 'planned' %}
     <a class="btn cool" href="{{ url_for('main.plan_deck', deck_id=deck.id) }}">{{ icon('brain', 15) }} Review plan</a>
     {% endif %}
+    {% if deck.has_cheat_sheet %}
+    <a class="btn" href="{{ url_for('main.cheat_sheet', deck_id=deck.id) }}">{{ icon('sheet', 15) }} Cheat sheet</a>
+    {% endif %}
     <a class="btn" href="{{ url_for('main.status', deck_id=deck.id) }}">{{ icon('git', 15) }} Run trace</a>
     <button class="btn primary" type="button" data-open-dialog="export-dialog">{{ icon('download') }} Export deck</button>
   </div>

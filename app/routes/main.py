@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import uuid
 from collections import defaultdict
 
@@ -17,6 +18,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
+from markupsafe import Markup, escape
 from sqlalchemy import func
 from werkzeug.utils import secure_filename
 
@@ -29,7 +31,8 @@ from ..services.export import export_deck as export_deck_file
 from ..services.pdf import extract_pdf_text
 from ..services.pipeline import progress_for
 from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach_cards, read_review_stats
-from ..services.pipeline.figures import extract_figures
+from ..services.pipeline.cheatsheet import sheet_blocks
+from ..services.pipeline.figures import extract_figures, number_figures
 from ..services.pipeline.planner import Plan
 from ..services.pipeline.strategies import STRATEGIES
 from ..services.pipeline.trace import PHASES, phases_for
@@ -39,6 +42,7 @@ from ..tasks import dispatch_generation
 bp = Blueprint("main", __name__)
 
 CARD_STYLES = ("basic", "cloze", "mixed")
+SHEET_INLINE_RE = re.compile(r"\*\*(.+?)\*\*|`([^`]+)`")
 
 
 @bp.before_request
@@ -435,6 +439,41 @@ def deck_editor(deck_id):
         insights=_insights(deck),
         units=units,
         phases=PHASES,
+    )
+
+
+@bp.app_template_filter("sheet_inline")
+def sheet_inline(text):
+    """Escape a line of the cheat sheet, keeping the bold and code spans models write."""
+    text = text or ""
+    parts = []
+    pos = 0
+    for match in SHEET_INLINE_RE.finditer(text):
+        parts.append(escape(text[pos:match.start()]))
+        if match.group(1):
+            parts.append(Markup("<strong>%s</strong>") % match.group(1))
+        else:
+            parts.append(Markup("<code>%s</code>") % match.group(2))
+        pos = match.end()
+    parts.append(escape(text[pos:]))
+    return Markup("").join(parts)
+
+
+@bp.route("/decks/<int:deck_id>/cheat-sheet")
+def cheat_sheet(deck_id):
+    """The cheat sheet the cards were written from, as a page: each unit's section with
+    its diagrams in place."""
+    deck = get_owned_deck(deck_id)
+    if not deck.has_cheat_sheet:
+        flash("This deck was generated without a cheat sheet. Turn on Make a cheat sheet first and generate again to get one.", "info")
+        return redirect(url_for("main.deck_editor", deck_id=deck.id))
+    figures = Figure.query.filter_by(deck_id=deck.id).all()
+    numbers = number_figures(figures)
+    units = Source.query.filter_by(deck_id=deck.id, skipped=False).order_by(Source.idx).all()
+    return render_template(
+        "deck_cheatsheet.html", deck=deck, stats=deck.run_json["cheat_sheet"],
+        sections=[(unit, sheet_blocks(unit.text)) for unit in units],
+        figures={numbers[fig.id]: fig for fig in figures},
     )
 
 
