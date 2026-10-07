@@ -100,6 +100,7 @@
 
     <div class="status-actions">
       <a class="btn primary lg" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('edit') }} Open editor</a>
+      {% if deck.has_cheat_sheet %}<a class="btn lg" href="{{ url_for('main.cheat_sheet', deck_id=deck.id) }}">{{ icon('sheet') }} Cheat sheet</a>{% endif %}
       <a class="btn lg ghost" href="{{ url_for('main.decks') }}">All decks</a>
     </div>
 

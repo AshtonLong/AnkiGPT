@@ -4569,3 +4569,37 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
   .btn:hover, .btn:active, .tile .tile-ic, .drop .drop-ic { transform: none !important; }
 }
 @media print { .tray { display: none; } }
+
+/* Cheat sheet page: dense and two-column like the real thing, and printable as it. */
+.sheet { padding: 28px 32px; columns: 2 340px; column-gap: 40px; column-rule: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; }
+.sheet-section { margin-bottom: 22px; }
+.sheet-section:last-child { margin-bottom: 0; }
+.sheet h2 { font-size: 16px; letter-spacing: -.01em; padding-bottom: 6px; margin-bottom: 8px; border-bottom: 2px solid var(--ink); break-after: avoid; }
+.sheet h2 small { font: 10px var(--mono); color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+.sheet h3 { font-size: 13.5px; letter-spacing: 0; margin: 12px 0 4px; color: var(--accent); break-after: avoid; }
+.sheet p { margin: 0 0 6px; }
+.sheet ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.sheet li { position: relative; padding-left: 14px; margin: 2px 0; break-inside: avoid; }
+.sheet li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+.sheet li.sub { margin-left: 16px; }
+.sheet li.numbered { padding-left: 0; }
+.sheet li.numbered::before, .sheet li.example::before { display: none; }
+.sheet li .n { font: 11px var(--mono); color: var(--muted); margin-right: 3px; }
+.sheet .example { padding-left: 10px; border-left: 2px solid var(--line); color: #52677D; font-size: 12.5px; }
+.sheet code { font: .9em var(--mono); background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+.sheet table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 12.5px; break-inside: avoid; }
+.sheet th, .sheet td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+.sheet th { background: var(--soft); font-weight: 600; }
+.sheet figure { margin: 10px 0; padding: 8px; border: 1px solid var(--line); border-radius: 7px; break-inside: avoid; }
+.sheet figure img { display: block; width: 100%; max-height: 300px; object-fit: contain; }
+.sheet figcaption { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+.sheet figcaption b { color: var(--ink); }
+.sheet .empty { column-span: all; }
+@media (max-width: 760px) { .sheet { padding: 20px; columns: 1; } }
+@media print {
+  .sheet-head .actions, .sheet-head p { display: none; }
+  .sheet-head { margin-bottom: 12px; }
+  .sheet { border: 0; box-shadow: none; padding: 0; columns: 2; column-gap: 24px; font-size: 10.5px; }
+  .sheet .example, .sheet table { font-size: 10px; }
+  .sheet figure img { max-height: 200px; }
+}

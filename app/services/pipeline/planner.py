@@ -165,7 +165,8 @@ def _planner_user_message(units, settings, budget, doc_meta, figure_counts=None)
     cheat_sheet_note = [
         "The unit texts are an exam cheat sheet already condensed from the student's material (kind and summary "
         "describe the original). Every line was kept because it is examinable: do not skip a unit for being terse "
-        "or looking like a recap, and size each task to cover its whole unit."
+        "or looking like a recap, and size each task to cover its whole unit. A line starting [[Figure N]] is a "
+        "diagram kept on the sheet; it gets image cards of its own, so leave it out of the budget."
     ] if settings.get("cheat_sheet") else []
     return "\n".join(
         [

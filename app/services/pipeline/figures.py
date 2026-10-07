@@ -151,6 +151,24 @@ def vision_messages(image_bytes, mime, context_text):
     ]
 
 
+def number_figures(figures):
+    """Figure.id -> the number a deck's figure goes by ("Figure 3"), in page order. A
+    deck's figures are fixed at upload, so the numbers hold across runs."""
+    ordered = sorted(figures, key=lambda fig: (fig.page or 0, fig.id))
+    return {fig.id: number for number, fig in enumerate(ordered, start=1)}
+
+
+def describe_figure(figure):
+    """What the vision pass read off a figure, as prompt text. `figure` is
+    {caption, description, parts, facts} with parts and facts already joined."""
+    return (
+        f"Caption: {figure.get('caption') or '(none)'}\n"
+        f"Description: {figure.get('description') or '(none)'}\n"
+        f"Labelled parts / data: {figure.get('parts') or '(none)'}\n"
+        f"Testable facts the figure conveys: {figure.get('facts') or '(none)'}"
+    )
+
+
 def analyze_figure(client, image_bytes, mime, context_text):
     """Pure: returns the analysis dict plus usage."""
     result = client.chat("vision", vision_messages(image_bytes, mime, context_text), response_format=VISION_SCHEMA, max_tokens=3000)

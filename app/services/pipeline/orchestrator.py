@@ -1,5 +1,6 @@
-"""The generation run: map -> (cheat sheet) -> plan -> (figures) -> write -> critique ->
-reconcile -> coverage -> finish.
+"""The generation run: map -> plan -> (figures) -> write -> critique -> reconcile ->
+coverage -> finish. With the cheat sheet on it is map -> (figures) -> cheat sheet -> plan
+-> write -> ...: the figures are read first so the sheet can keep the diagrams.
 
 Everything model-facing is a pure job run through `parallel.run_jobs`; this module owns
 the DB side: units, tasks, cards, the trace, and the deck's status transitions.
@@ -156,7 +157,8 @@ def _run(deck, resume_from_plan=False):
     deck.status = "processing"
     db.session.commit()
 
-    if resume_from_plan and (deck.run_json or {}).get("plan"):
+    resumed = bool(resume_from_plan and (deck.run_json or {}).get("plan"))
+    if resumed:
         _restore_plan(ctx)
     else:
         tracer.clear()
@@ -166,6 +168,8 @@ def _run(deck, resume_from_plan=False):
         )
         _phase_map(ctx)
         if ctx.settings.get("cheat_sheet"):
+            # The sheet keeps the source's diagrams, so they have to be read before it.
+            _phase_figures(ctx)
             _phase_cheatsheet(ctx)
         _phase_plan(ctx)
         if ctx.settings.get("review_plan"):
@@ -175,7 +179,10 @@ def _run(deck, resume_from_plan=False):
             logger.info("Deck %s planned; waiting for review", deck.id)
             return deck.id
 
-    _phase_figures(ctx)
+    if "figures" not in tracer.phase_nodes:
+        _phase_figures(ctx)
+    elif resumed:
+        _restore_figure_tasks(ctx)
     written = _phase_write(ctx)
     _phase_critique(ctx, written)
     _phase_reconcile(ctx)
@@ -225,12 +232,14 @@ def _phase_cheatsheet(ctx):
     tracer.phase("cheatsheet")
     model = ctx.client.model_for("cheatsheet")
     live = [u for u in ctx.units if not u.skipped]
+    figures = _sheet_figures(ctx)
     nodes = {}
     jobs = []
     for u in live:
-        messages = cheatsheet_mod.build_messages(u, ctx.units, ctx.settings, ctx.doc_meta)
+        figs = figures.get(u.idx, [])
+        messages = cheatsheet_mod.build_messages(u, ctx.units, ctx.settings, ctx.doc_meta, figures=figs)
         node = tracer.task("cheatsheet", (u.title or f"Unit {u.idx + 1}")[:150], unit_ids=[u.idx], model=model)
-        nodes[node.id] = {"node": node, "unit": u, "messages": messages}
+        nodes[node.id] = {"node": node, "unit": u, "messages": messages, "figures": figs}
         jobs.append(Job(
             id=node.id,
             fn=(lambda m=messages: cheatsheet_mod.write_cheat_sheet(ctx.client, m)),
@@ -238,24 +247,28 @@ def _phase_cheatsheet(ctx):
             meta={"role": "cheatsheet", "model": model},
         ))
 
-    stats = {"units": len(live), "condensed": 0, "emptied": 0, "failed": 0, "chars_in": 0, "chars_out": 0}
+    stats = {"units": len(live), "condensed": 0, "emptied": 0, "failed": 0, "chars_in": 0, "chars_out": 0,
+             "figures": 0, "kept_full": []}
 
     def on_start(job):
         tracer.start(nodes[job.id]["node"])
 
     def on_done(res):
         entry = nodes[res.job.id]
-        node, unit = entry["node"], entry["unit"]
+        node, unit, figs = entry["node"], entry["unit"], entry["figures"]
         if not res.ok:
             # A unit that could not be condensed keeps its full text rather than being lost.
             logger.warning("Deck %s cheat sheet for unit %s failed: %s", ctx.deck.id, unit.idx, res.error)
             stats["failed"] += 1
+            stats["kept_full"].append(unit.idx)
+            stats["figures"] += len(figs)
+            unit.text = cheatsheet_mod.place_figures(unit.text, figs)
             tracer.log_call(node, "cheatsheet", None, messages=entry["messages"], error=res.error,
                             prompt_version=cheatsheet_mod.CHEATSHEET_PROMPT_VERSION)
             tracer.finish(node, status="failed", error=format_generation_error(res.error))
             return
         value = res.value or {}
-        sheet = value.get("cheat_sheet") or ""
+        sheet = cheatsheet_mod.place_figures(value.get("cheat_sheet") or "", figs)
         before = unit.chars
         cr = ChatResult(content=value.get("content") or "", message={}, usage=res.usage or {},
                         model=value.get("model") or node.model)
@@ -268,14 +281,17 @@ def _phase_cheatsheet(ctx):
             stats["condensed"] += 1
             stats["chars_in"] += before
             stats["chars_out"] += len(sheet)
+            stats["figures"] += len(figs)
             node.label = f"{node.label} · {before:,} → {len(sheet):,} chars"
+            if figs:
+                node.label += f" · {len(figs)} diagram{'s' if len(figs) != 1 else ''}"
         else:
             unit.skipped = True
             unit.skip_reason = "Nothing exam-critical to put on the cheat sheet."
             stats["emptied"] += 1
             node.label = f"{node.label} · nothing exam-critical, skipped"
         tracer.finish(node, status="cached" if res.cached else "done",
-                      result={"chars_in": before, "chars_out": len(sheet)})
+                      result={"chars_in": before, "chars_out": len(sheet), "figures": len(figs)})
 
     results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
                        abort_on=_abort_on)
@@ -444,11 +460,67 @@ def _figure_counts_by_unit(ctx):
 
 
 # -------------------------------------------------------------------- figures
+def _figures_wanted(ctx):
+    return bool(current_app.config.get("PIPELINE_FIGURES_ENABLED", True) and ctx.settings.get("use_figures", True))
+
+
+def _figure_task(ctx, fig):
+    """The card-writing task a figure earns, or None: the vision pass must have judged it
+    examinable and worth at least one card, and it must sit in a unit."""
+    idx = _unit_idx_for_page(ctx, fig.page)
+    suggested = int((fig.analysis_json or {}).get("suggested_cards") or 0)
+    if not fig.useful or suggested <= 0 or idx is None:
+        return None
+    return planner_mod.PlanTask(
+        id=0, unit_idxs=[idx], strategy="figure_recall", target_cards=max(1, min(8, suggested)),
+        notes=f"Figure on p.{fig.page}: {fig.caption}", origin="figure", figure_id=fig.id,
+    )
+
+
+def _restore_figure_tasks(ctx):
+    """With the cheat sheet on, the figures were read before the plan-review pause.
+    Rebuild their tasks from the stored analyses instead of paying for the vision pass
+    twice."""
+    if not _figures_wanted(ctx):
+        return
+    for fig in Figure.query.filter_by(deck_id=ctx.deck.id).order_by(Figure.page, Figure.id).all():
+        task = _figure_task(ctx, fig)
+        if task is not None:
+            ctx.figure_tasks.append(task)
+
+
+def _figure_payload(fig):
+    analysis = fig.analysis_json or {}
+    return {
+        "caption": fig.caption, "description": fig.description,
+        "parts": "; ".join(analysis.get("parts") or []), "facts": "; ".join(analysis.get("facts") or []),
+    }
+
+
+def _sheet_figures(ctx):
+    """unit idx -> the diagrams its cheat-sheet section keeps: every figure that earns
+    cards, so what is on the sheet and what gets image cards are the same set."""
+    if not _figures_wanted(ctx):
+        return {}
+    figs = Figure.query.filter_by(deck_id=ctx.deck.id).all()
+    numbers = figures_mod.number_figures(figs)
+    by_unit = defaultdict(list)
+    for fig in sorted(figs, key=lambda f: numbers[f.id]):
+        task = _figure_task(ctx, fig)
+        if task is None:
+            continue
+        analysis = fig.analysis_json or {}
+        by_unit[task.unit_idxs[0]].append({
+            "number": numbers[fig.id], "page": fig.page, "kind": fig.kind, "caption": fig.caption,
+            "description": fig.description, "parts": analysis.get("parts") or [], "facts": analysis.get("facts") or [],
+        })
+    return by_unit
+
+
 def _phase_figures(ctx):
     tracer = ctx.tracer
-    cfg = current_app.config
     figs = Figure.query.filter_by(deck_id=ctx.deck.id).order_by(Figure.page).all()
-    if not figs or not cfg.get("PIPELINE_FIGURES_ENABLED", True) or not ctx.settings.get("use_figures", True):
+    if not figs or not _figures_wanted(ctx):
         tracer.phase("figures", status="skipped")
         tracer.end_phase("figures", status="skipped")
         return
@@ -489,16 +561,9 @@ def _phase_figures(ctx):
         fig.description = (data.get("description") or "")[:2000]
         fig.analysis_json = {k: data.get(k) for k in ("parts", "facts", "suggested_cards")}
         db.session.commit()
-        if fig.useful and int(data.get("suggested_cards") or 0) > 0:
-            idx = _unit_idx_for_page(ctx, fig.page)
-            if idx is not None:
-                ctx.figure_tasks.append(
-                    planner_mod.PlanTask(
-                        id=0, unit_idxs=[idx], strategy="figure_recall",
-                        target_cards=max(1, min(8, int(data.get("suggested_cards") or 2))),
-                        notes=f"Figure on p.{fig.page}: {fig.caption}", origin="figure", figure_id=fig.id,
-                    )
-                )
+        task = _figure_task(ctx, fig)
+        if task is not None:
+            ctx.figure_tasks.append(task)
         tracer.finish(
             node, status="cached" if res.cached else "done", usage=res.usage, cached=res.cached,
             result={"useful": fig.useful, "kind": fig.kind, "caption": fig.caption},
@@ -611,11 +676,7 @@ def _run_write_tasks(ctx, phase, tasks, origin_tag=None):
         if task.figure_id:
             fig = db.session.get(Figure, task.figure_id)
             if fig is not None:
-                analysis = fig.analysis_json or {}
-                figure_payload = {
-                    "caption": fig.caption, "description": fig.description,
-                    "parts": "; ".join(analysis.get("parts") or []), "facts": "; ".join(analysis.get("facts") or []),
-                }
+                figure_payload = _figure_payload(fig)
         job, _messages = _worker_job_for(ctx, task, node, siblings, figure_payload)
         nodes[node.id] = {"task": task, "node": node, "cards": [], "messages": _messages}
         jobs.append(job)
@@ -684,6 +745,9 @@ def _run_critic(ctx, phase, entries):
         if not cards:
             continue
         source_text = ctx.source_text_for(entry["task"].unit_idxs)
+        fig = db.session.get(Figure, entry["task"].figure_id) if entry["task"].figure_id else None
+        if fig is not None:
+            source_text = critic_mod.figure_source(source_text, figures_mod.describe_figure(_figure_payload(fig)))
         for start in range(0, len(cards), critic_mod.BATCH_SIZE):
             batch = cards[start : start + critic_mod.BATCH_SIZE]
             dicts = [_card_dict(c) for c in batch]
