@@ -92,7 +92,7 @@ volume, which is a different file from `instance/ankigpt.db` in a local checkout
 | `OPENROUTER_MODEL` | `openai/gpt-6-luna` | Default model for every role. |
 | `OPENROUTER_MODEL_{MAPPER,CHEATSHEET,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). |
 | `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
-| `OPENROUTER_REASONING_{PLANNER,CHEATSHEET,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Reasoning effort per role (planner and cheat sheet default to `medium`); empty omits the parameter. |
+| `OPENROUTER_REASONING_{PLANNER,CHEATSHEET,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Default reasoning effort per role: `minimal`, `low`, `medium`, `high` or `xhigh` (planner and cheat sheet default to `medium`); empty omits the parameter. Each user can set their own effort per agent under **My profile → Advanced**, which wins over these. |
 | `OPENROUTER_TEMPERATURE` | | Unset by default — reasoning models reject it. |
 | `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | empty / `AnkiGPT` | Optional provider attribution headers. |
 | `OPENROUTER_MAX_TOKENS` | `16000` | Output cap per call (OpenRouter charges per token used). |

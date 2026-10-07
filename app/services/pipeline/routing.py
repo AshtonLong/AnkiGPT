@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 
 ROLES = ("mapper", "cheatsheet", "planner", "worker", "critic", "reconcile", "vision")
 
+# Every agent of the pipeline and the role it runs as. An agent takes its model and its
+# default effort from the role; the critic and reconcile roles each run several agents,
+# which a user can still set apart (see pipeline.efforts).
+AGENT_ROLES = {
+    "mapper": "mapper", "cheatsheet": "cheatsheet", "planner": "planner", "vision": "vision", "worker": "worker",
+    "cold_reader": "critic", "judge": "critic", "improver": "critic", "coach": "critic",
+    "merger": "reconcile", "coverage": "reconcile",
+}
+# The values a user can pick for OpenRouter's `reasoning.effort`, lowest first. OpenRouter
+# maps a level a model lacks to the nearest one it has.
+EFFORT_LEVELS = ("minimal", "low", "medium", "high", "xhigh")
+
 
 @dataclass
 class ChatResult:
@@ -47,10 +59,11 @@ class ChatResult:
 class LLMClient:
     """Resolves roles to models and performs calls. Built once per generation run.
 
-    `api_key` is the key of the user the run belongs to (see services.credentials).
+    `api_key` is the key of the user the run belongs to (see services.credentials), and
+    `efforts` the reasoning effort that user set per agent (see pipeline.efforts).
     """
 
-    def __init__(self, config, api_key=""):
+    def __init__(self, config, api_key="", efforts=None):
         get = config.get if hasattr(config, "get") else (lambda k, d=None: getattr(config, k, d))
         self.api_key = api_key
         self.site_url = get("OPENROUTER_SITE_URL", "")
@@ -73,12 +86,30 @@ class LLMClient:
         for role in ROLES:
             self.models[role] = get(f"OPENROUTER_MODEL_{role.upper()}", "") or self.default_model
             self.reasoning[role] = (get(f"OPENROUTER_REASONING_{role.upper()}", "") or "").strip() or None
+        self.efforts = {
+            agent: effort for agent, effort in (efforts or {}).items()
+            if agent in AGENT_ROLES and effort in EFFORT_LEVELS
+        }
 
     def model_for(self, role):
         return self.models.get(role, self.default_model)
 
-    def reasoning_for(self, role):
-        return self.reasoning.get(role)
+    def reasoning_for(self, agent):
+        """The effort an agent thinks at: the user's own, else its role's default."""
+        return self.efforts.get(agent) or self.reasoning.get(AGENT_ROLES.get(agent, agent))
+
+    def effort_key(self, *agents):
+        """Cache-key parts for a result these agents produce.
+
+        A result made at one effort must not answer a run at another. Only an agent the
+        user moved off its default adds anything, so results cached at the defaults keep
+        the keys they already have.
+        """
+        moved = [
+            f"{agent}={self.efforts[agent]}" for agent in agents
+            if agent in self.efforts and self.efforts[agent] != self.reasoning.get(AGENT_ROLES[agent])
+        ]
+        return ("effort:" + ",".join(moved),) if moved else ()
 
     def chat(
         self,
@@ -90,9 +121,12 @@ class LLMClient:
         max_tokens=None,
         reasoning_effort=None,
         model=None,
+        agent=None,
     ):
+        """One call as `role`. `agent` says which of the role's agents is calling, when
+        the role runs more than one."""
         model = model or self.model_for(role)
-        effort = reasoning_effort if reasoning_effort is not None else self.reasoning_for(role)
+        effort = reasoning_effort if reasoning_effort is not None else self.reasoning_for(agent or role)
         # Resolved at call time on purpose: tests monkeypatch llm.openrouter_chat.
         response = llm_module.openrouter_chat(
             messages,

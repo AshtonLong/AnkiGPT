@@ -11,6 +11,7 @@ from ..desktop import is_desktop
 from ..extensions import db
 from ..models import Card, Deck, User
 from ..services.credentials import key_problem, openrouter_key_for, set_user_key, user_key
+from ..services.pipeline.efforts import EFFORT_LABELS, effort_groups, efforts_from_form, set_user_efforts
 from ..services.mailer import send_mail
 
 RESET_MAX_AGE = 3600  # seconds a reset link stays valid
@@ -160,7 +161,9 @@ def profile():
     errors = {}
     section = request.form.get("section", "") if request.method == "POST" else ""
     key_notice = "Your OpenRouter key is saved. You're ready to generate."
-    # Desktop has no account to edit: this URL is its Settings page, and the key is the only form.
+    effort_notice = "Your effort settings are saved. They apply from your next run."
+    # Desktop has no account to edit: this URL is its Settings page, with the key and the
+    # advanced settings as its only forms.
     desktop = is_desktop()
     values = {
         "display_name": current_user.display_name or "",
@@ -169,7 +172,7 @@ def profile():
         "email": current_user.email,
     }
     if request.method == "POST":
-        if desktop and section != "api-key":
+        if desktop and section not in ("api-key", "advanced"):
             errors["form"] = "Choose a setting to update."
         elif section == "profile":
             values.update({key: request.form.get(key, "").strip()
@@ -217,6 +220,16 @@ def profile():
                     errors["openrouter_api_key"] = problem
                 else:
                     set_user_key(current_user, key)
+        elif section == "advanced":
+            if request.form.get("action") == "reset":
+                set_user_efforts(current_user, {})
+                effort_notice = "Every agent is back on its default effort."
+            else:
+                efforts = efforts_from_form(request.form)
+                if efforts is None:
+                    errors["form"] = "Set each agent's effort with its slider, then save again."
+                else:
+                    set_user_efforts(current_user, efforts)
         else:
             errors["form"] = "Choose a profile setting to update."
 
@@ -228,7 +241,8 @@ def profile():
                 errors["email"] = "That email address is already in use."
             else:
                 flash({"profile": "Your profile is saved.", "email": "Your sign-in email is updated.",
-                       "password": "Your password is updated.", "api-key": key_notice}[section], "success")
+                       "password": "Your password is updated.", "api-key": key_notice,
+                       "advanced": effort_notice}[section], "success")
                 return redirect(url_for("auth.profile", _anchor=section), code=303)
 
     deck_count = Deck.query.filter_by(user_id=current_user.id).count()
@@ -242,10 +256,12 @@ def profile():
         "hint": current_user.openrouter_key_hint or "",
         "server_fallback": bool(current_app.config.get("OPENROUTER_API_KEY")),
     }
+    advanced = {"effort_groups": effort_groups(current_user, current_app.config),
+                "effort_labels": list(EFFORT_LABELS.values())}
     if desktop:
         return render_template("settings.html", errors=errors, deck_count=deck_count, card_count=card_count,
                                api_key=api_key, data_dir=current_app.config["DESKTOP_DATA_DIR"],
-                               app_version=current_app.config["APP_VERSION"]), 422 if errors else 200
+                               app_version=current_app.config["APP_VERSION"], **advanced), 422 if errors else 200
     return render_template("profile.html", values=values, errors=errors, active_section=section,
                            avatar_colors=User.AVATAR_COLORS, deck_count=deck_count,
-                           card_count=card_count, api_key=api_key), 422 if errors else 200
+                           card_count=card_count, api_key=api_key, **advanced), 422 if errors else 200

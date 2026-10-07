@@ -11,6 +11,7 @@ from flask import current_app
 from ..extensions import db
 from ..models import Card, Deck, LLMRun, PipelineTask, Source, utcnow
 from .credentials import openrouter_key_for
+from .pipeline.efforts import user_efforts
 from .llm import extract_json, json_schema_format
 from .pipeline import critic as critic_mod
 from .pipeline import workers as workers_mod
@@ -63,7 +64,7 @@ def regenerate_source(source_id, strategy=None):
     if not deck:
         return None
     settings = dict(deck.settings_json or {})
-    client = LLMClient(current_app.config, openrouter_key_for(deck.user))
+    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user))
     unit = _unit_from_source(source)
     # Reuse the strategy the planner chose for this unit when we can find it.
     previous = (
@@ -158,7 +159,7 @@ def improve_card(card_id):
     deck = db.session.get(Deck, card.deck_id)
     if not deck:
         return None
-    client = LLMClient(current_app.config, openrouter_key_for(deck.user))
+    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user))
     source = db.session.get(Source, card.source_id) if card.source_id else None
     grounding = ""
     if source:
@@ -181,7 +182,7 @@ def improve_card(card_id):
         {"role": "system", "content": "You are an expert Anki card editor. You output strict JSON only. No prose."},
         {"role": "user", "content": prompt},
     ]
-    result = client.chat("critic", messages, response_format=response_format, max_tokens=2000)
+    result = client.chat("critic", messages, response_format=response_format, max_tokens=2000, agent="improver")
     data = extract_json(result.content)
     if card.type == "basic":
         card.front = normalize_math(normalize_text(data.get("front", card.front)))

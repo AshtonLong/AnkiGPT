@@ -135,7 +135,8 @@ def resolve_clusters(client, clusters, cards):
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0}
     for start in range(0, len(clusters), MAX_CLUSTERS_PER_CALL):
         batch = clusters[start : start + MAX_CLUSTERS_PER_CALL]
-        result = client.chat("reconcile", merge_messages(batch, cards), response_format=MERGE_SCHEMA, max_tokens=6000)
+        result = client.chat("reconcile", merge_messages(batch, cards), response_format=MERGE_SCHEMA, max_tokens=6000,
+                             agent="merger")
         usage["prompt_tokens"] += result.input_tokens
         usage["completion_tokens"] += result.output_tokens
         usage["cost"] += result.cost
@@ -210,7 +211,8 @@ def coverage_messages(unit, card_prompts):
 
 def audit_unit(client, unit, card_prompts):
     """Pure: returns {"score": int, "missing": [...], "usage": {...}}."""
-    result = client.chat("reconcile", coverage_messages(unit, card_prompts), response_format=COVERAGE_SCHEMA, max_tokens=5000)
+    result = client.chat("reconcile", coverage_messages(unit, card_prompts), response_format=COVERAGE_SCHEMA, max_tokens=5000,
+                         agent="coverage")
     try:
         data = extract_json(result.content)
     except Exception:

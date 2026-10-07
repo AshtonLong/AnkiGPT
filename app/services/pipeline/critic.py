@@ -185,7 +185,8 @@ def run_critic_batch(client, cards, source_text, cold_pass=True):
     usages = []
     if cold_pass and cards:
         try:
-            cold = client.chat("critic", cold_messages(cards), response_format=COLD_SCHEMA, max_tokens=4000)
+            cold = client.chat("critic", cold_messages(cards), response_format=COLD_SCHEMA, max_tokens=4000,
+                               agent="cold_reader")
             usages.append(cold.usage)
             data = extract_json(cold.content)
             for item in data.get("answers") or []:
@@ -196,7 +197,8 @@ def run_critic_batch(client, cards, source_text, cold_pass=True):
         except Exception as exc:
             # The cold pass is a signal, not a gate; the judge still runs without it.
             logger.warning("Cold pass failed: %s", exc)
-    judge = client.chat("critic", judge_messages(cards, cold_answers, source_text), response_format=JUDGE_SCHEMA)
+    judge = client.chat("critic", judge_messages(cards, cold_answers, source_text), response_format=JUDGE_SCHEMA,
+                        agent="judge")
     usages.append(judge.usage)
     data = extract_json(judge.content)
     verdicts = {}
