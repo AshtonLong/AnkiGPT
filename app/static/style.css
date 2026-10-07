@@ -1404,6 +1404,50 @@ input[type=file]::file-selector-button {
   background:var(--bg)
 }
 
+.pt-figure {
+  flex:none;
+  display:block;
+  padding:4px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff
+}
+
+.pt-figure img {
+  display:block;
+  width:72px;
+  height:54px;
+  object-fit:contain
+}
+
+.plan-left-out {
+  padding:16px 24px;
+  margin-bottom:16px;
+  font-size:13px
+}
+
+.plan-left-out summary {
+  cursor:pointer;
+  color:var(--muted);
+  display:flex;
+  gap:8px;
+  align-items:center
+}
+
+.plan-left-out ul {
+  list-style:none;
+  margin:14px 0 0;
+  padding:0;
+  display:grid;
+  gap:12px
+}
+
+.plan-left-out small {
+  display:block;
+  color:var(--muted);
+  margin-top:2px
+}
+
 .is-skipped {
   background:var(--soft);
   box-shadow:none

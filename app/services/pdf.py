@@ -5,7 +5,6 @@ list of [page_number, char_offset] pairs so the document map can tell which page
 unit spans and figures can be attached to the unit they sit in.
 """
 
-import inspect
 import re
 
 from pypdf import PdfReader
@@ -113,6 +112,13 @@ def _chunk_text(raw):
     return ""
 
 
+def _chunk_page(raw):
+    """0-based page index a page chunk says it is, or None when it does not say."""
+    metadata = raw.get("metadata") if isinstance(raw, dict) else None
+    number = metadata.get("page_number") if isinstance(metadata, dict) else None
+    return number - 1 if isinstance(number, int) and number >= 1 else None
+
+
 def _pages_with_pymupdf4llm(file_path, start, end):
     """Per-page Markdown strings for pages [start, end), or None if unavailable."""
     try:
@@ -127,32 +133,27 @@ def _pages_with_pymupdf4llm(file_path, start, end):
     to_markdown = getattr(pymupdf4llm, "to_markdown", None)
     if to_markdown is None:
         return None
-    try:
-        params = set(inspect.signature(to_markdown).parameters)
-    except (TypeError, ValueError):
-        params = set()
     page_indexes = list(range(start, end))
     if not page_indexes:
         return []
+    # Ask for one chunk per page outright. The function's signature cannot be consulted
+    # first: recent releases wrap it as (*args, **kwargs), and a caller that goes by the
+    # signature gets the whole document back as one blob with no page boundaries.
     try:
         with pymupdf.open(file_path) as doc:
-            kwargs = {}
-            if "page_chunks" in params:
-                kwargs["page_chunks"] = True
-            if "pages" in params:
-                kwargs["pages"] = page_indexes
-            raw = to_markdown(doc, **kwargs)
+            raw = to_markdown(doc, page_chunks=True, pages=page_indexes)
     except Exception:
         return None
-    if isinstance(raw, list):
-        pages = [_chunk_text(item) for item in raw]
-        if "pages" not in params:
-            pages = pages[start:end]
-        return [_normalize_pdf_text(p) for p in pages]
-    if isinstance(raw, str):
-        # No page chunking available: one blob, page offsets unknown beyond the first.
-        return [_normalize_pdf_text(raw)]
-    return None
+    if not isinstance(raw, list):
+        # No per-page text. The plain extractor keeps the page boundaries and the range.
+        return None
+    pages = [""] * len(page_indexes)
+    for position, item in enumerate(raw):
+        page = _chunk_page(item)
+        slot = position if page is None else page - start
+        if 0 <= slot < len(pages):
+            pages[slot] = _normalize_pdf_text(_chunk_text(item))
+    return pages
 
 
 def _join_pages(pages, first_page_number):

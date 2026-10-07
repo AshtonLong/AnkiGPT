@@ -86,7 +86,9 @@ class FakeLLM:
     - Worker (anki_cards schema) -> two cards per call, one deliberately duplicated
       across tasks so the reconcile phase has something to remove.
     - Critic cold pass / judge -> keeps everything except a card flagged unsupported.
-    - Duplicate resolution / coverage audit -> canned answers.
+    - Coverage audit -> one canned gap. Back-fill review -> lets a gap card in unless the
+      unit already has the same card.
+    - Duplicate resolution -> keeps the first card of each cluster.
     """
 
     def __init__(self, unit_titles=None):
@@ -173,7 +175,7 @@ class FakeLLM:
             unsupported = "Krebs" in block
             verdicts.append({
                 "index": idx, "supported": not unsupported, "atomic": True, "ambiguous": False, "leaks_answer": False,
-                "cold_answer_correct": False, "difficulty": 2, "verdict": "drop" if unsupported else "keep",
+                "cold_answer_correct": False, "worthwhile": True, "difficulty": 2, "verdict": "drop" if unsupported else "keep",
                 "reason": "not in source" if unsupported else "fine", "rewrite": None,
             })
         return fake_response(json.dumps({"verdicts": verdicts}))
@@ -194,6 +196,19 @@ class FakeLLM:
         return fake_response(json.dumps({"coverage_score": 80, "missing": [
             {"fact": "Water is split during the light reactions.", "importance": 3, "source_quote": "water"},
         ]}))
+
+    # --- back-fill review: turns away a candidate the unit already has word for word
+    def _backfill_review(self, messages):
+        existing, candidates = messages[-1]["content"].split("\n\nEXISTING CARDS:\n", 1)[1].split("\n\nCANDIDATES:\n", 1)
+        have = {line[2:] for line in existing.splitlines() if line.startswith("- ")}
+        decisions = []
+        for line in candidates.splitlines():
+            if not line.startswith("["):
+                continue
+            idx, card = line[1:].split("] ", 1)
+            repeat = card in have
+            decisions.append({"index": int(idx), "add": not repeat, "reason": "repeats an existing card" if repeat else "new fact"})
+        return fake_response(json.dumps({"decisions": decisions}))
 
     def _improved_basic_card(self, messages):
         return fake_response(json.dumps({"front": "Improved front?", "back": "Improved back."}))
