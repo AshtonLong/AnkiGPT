@@ -8,7 +8,7 @@ from app.services.llm import run_tool_loop, tool_spec
 from app.services.pipeline import cheatsheet, critic, document_map, planner, reconcile
 from app.services.pipeline.cache import make_key
 from app.services.pipeline.strategies import STRATEGIES, system_prompt
-from app.services.pipeline.trace import phases_for
+from app.services.pipeline.trace import PHASES, phases_for
 
 from conftest import fake_response, tool_call
 
@@ -248,8 +248,13 @@ class TestCheatSheet:
     def test_prompt_is_framed_as_an_exam_cheat_sheet(self):
         units = self._units()
         system = cheatsheet.build_messages(units[1], units, {"focus": "kinetics"})[0]["content"]
-        assert "bring one cheat sheet into the exam room" in system
+        assert "bring a cheat sheet into the exam room" in system
         assert "lose marks" in system
+        # Bare bones: every concept and its edge cases, nothing the source does not give.
+        assert "complete in breadth and minimal in depth" in system
+        assert "edge cases" in system and "difficulty for its own sake" in system
+        assert "only an example the source itself gives" in system
+        assert "Never make one up" in system
         # Deck settings stay out of the system prompt so it caches across decks.
         assert system == cheatsheet.CHEATSHEET_SYSTEM
 
@@ -262,6 +267,76 @@ class TestCheatSheet:
         assert "- Enzyme kinetics  <- this section" in user
         assert "- U0\n" in user and "U2" not in user  # skipped units are left off the outline
         assert user.endswith("SECTION: Enzyme kinetics (kind: formulas)\n\nv = Vmax[S] / (Km + [S])")
+
+    def _figures(self):
+        return [
+            {"number": 2, "page": 7, "kind": "chart", "caption": "Rate against  substrate concentration",
+             "description": "A hyperbolic curve.", "parts": ["x-axis: [S]"], "facts": ["Rate plateaus at Vmax"]},
+            {"number": 5, "page": 8, "kind": "chart", "caption": "Lineweaver-Burk plot", "description": "",
+             "parts": [], "facts": []},
+        ]
+
+    def test_section_diagrams_are_listed_for_the_writer(self):
+        units = self._units()
+        user = cheatsheet.build_messages(units[1], units, {}, figures=self._figures())[1]["content"]
+        listing, section = user.split("SECTION: ")
+        assert "[[Figure 2]] (p.7, chart) Rate against  substrate concentration" in listing
+        assert "  Shows: A hyperbolic curve.\n  Labelled: x-axis: [S]\n  Conveys: Rate plateaus at Vmax" in listing
+        assert "[[Figure 5]] (p.8, chart) Lineweaver-Burk plot\n\n" in listing
+        assert section.endswith("v = Vmax[S] / (Km + [S])")
+        assert "Diagrams" not in cheatsheet.build_messages(units[1], units, {}, figures=[])[1]["content"]
+
+    def test_every_diagram_ends_up_on_the_sheet_exactly_once(self):
+        figures = self._figures()
+        written = "\n".join([
+            "## Kinetics",
+            "- Km is the [S] at half of Vmax (see [[Figure 2]]).",
+            "- [[figure 2]]: the curve",
+            "[[Figure 2]]",  # a repeat
+            "[[Figure 9]]",  # not one of this section's diagrams
+            "- Vmax is the highest rate.",
+        ])
+        assert cheatsheet.place_figures(written, figures) == "\n".join([
+            "## Kinetics",
+            "- Km is the [S] at half of Vmax (see Figure 2).",
+            "[[Figure 2]] Rate against substrate concentration",
+            "- Vmax is the highest rate.",
+            "",
+            "[[Figure 5]] Lineweaver-Burk plot",  # left out by the writer, kept anyway
+        ])
+        # A section the writer emptied still carries its diagrams.
+        assert cheatsheet.place_figures("", figures[1:]) == "[[Figure 5]] Lineweaver-Burk plot"
+        assert cheatsheet.place_figures("- Km is ...", []) == "- Km is ..."
+
+    def test_sheet_is_parsed_into_blocks_for_the_page(self):
+        sheet = "\n".join([
+            "## Kinetics",
+            "- Km is the [S] at half of Vmax.",
+            "  - Example: Vmax 10, rate 5 at [S] = 2, so Km = 2.",
+            "[[Figure 2]] Rate against substrate concentration",
+            "1. Measure the rate.",
+            "   Repeat at each [S].",
+            "",
+            "| Inhibitor | Km |",
+            "|---|---|",
+            "| Competitive | rises |",
+            "",
+            "**Limits**",
+            "Holds only at steady state,",
+            "with [S] far above [E].",
+        ])
+        blocks = cheatsheet.sheet_blocks(sheet)
+        assert [b["type"] for b in blocks] == ["heading", "list", "figure", "list", "table", "heading", "text"]
+        assert blocks[0]["text"] == "Kinetics" and blocks[5]["text"] == "Limits"
+        first, example = blocks[1]["items"]
+        assert not first["sub"] and not first["example"]
+        assert example["sub"] and example["example"]
+        assert blocks[2]["number"] == 2
+        assert blocks[3]["items"] == [
+            {"text": "Measure the rate. Repeat at each [S].", "label": "1.", "sub": False, "example": False}]
+        assert blocks[4]["rows"] == [["Inhibitor", "Km"], ["Competitive", "rises"]]
+        assert blocks[6]["text"] == "Holds only at steady state, with [S] far above [E]."
+        assert cheatsheet.sheet_blocks("") == []
 
     def test_write_returns_the_cleaned_sheet(self):
         raw = "\n## Kinetics  \n- Km is ...\r\n\n\n\n\n- Vmax is ...\n"
@@ -283,12 +358,24 @@ class TestCheatSheet:
 
     def test_planner_is_told_only_when_the_sheet_is_on(self):
         units = _units(2)
-        assert "exam cheat sheet" in planner._planner_user_message(units, {"cheat_sheet": True}, 10, {})
+        told = planner._planner_user_message(units, {"cheat_sheet": True}, 10, {})
+        assert "exam cheat sheet" in told and "[[Figure N]]" in told
         assert "cheat sheet" not in planner._planner_user_message(units, {}, 10, {})
         assert "cheat sheet" not in planner._planner_user_message(units, {"cheat_sheet": False}, 10, {})
 
     def test_phase_is_listed_only_for_decks_that_asked(self):
         assert "cheatsheet" not in dict(phases_for({}))
         assert "cheatsheet" not in dict(phases_for(None))
+        # The sheet keeps the diagrams, so figures are read before it instead of after the plan.
+        assert [k for k, _ in phases_for({})][:4] == ["map", "plan", "figures", "write"]
         keys = [k for k, _ in phases_for({"cheat_sheet": True})]
-        assert keys[:3] == ["map", "cheatsheet", "plan"]
+        assert keys[:5] == ["map", "figures", "cheatsheet", "plan", "write"]
+        assert sorted(keys) == sorted(k for k, _ in PHASES)
+
+
+def test_critic_reads_the_figure_as_part_of_the_source():
+    source = critic.figure_source("- The chloroplast is the site of photosynthesis.", "Caption: Chloroplast")
+    user = critic.judge_messages([{"type": "basic", "front": "q", "back": "a"}], {}, source)[1]["content"]
+    before_cards = user.split("\n\nCARDS:")[0]
+    assert before_cards.startswith("SOURCE:\n- The chloroplast is the site of photosynthesis.")
+    assert "FIGURE (part of the source" in before_cards and before_cards.endswith("Caption: Chloroplast")

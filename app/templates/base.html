@@ -76,7 +76,7 @@
       <div class="breadcrumbs">
 <a href="{{ url_for('main.decks') }}">Workspace</a>
 <span>/</span>
-<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor','auth.profile':settings_page}.get(request.endpoint, 'Your decks') }}</b>
+<b>{{ {'main.decks':'Your decks','main.new_deck':'New deck','main.preview_deck':'Source review','main.plan_deck':'Review plan','main.status':'Generation','main.deck_editor':'Deck editor','main.cheat_sheet':'Cheat sheet','auth.profile':settings_page}.get(request.endpoint, 'Your decks') }}</b>
 </div>
       <div class="topbar-actions">
       {% include 'partials/auth_control.html' %}

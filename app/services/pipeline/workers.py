@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from ..llm import CARD_RESPONSE_FORMAT, extract_json, finish_reason
 from ..schemas import ChunkSchema
 from ..validators import normalize_math, normalize_text
+from .figures import describe_figure
 from .strategies import PROMPT_VERSION, system_prompt
 
 logger = logging.getLogger(__name__)
@@ -52,13 +53,7 @@ def build_worker_messages(task, units, settings, card_style, siblings=None, figu
             + "\n".join(hints)
         )
     if figure is not None:
-        parts.append(
-            "FIGURE under study (an image of it will be shown on the card):\n"
-            f"Caption: {figure.get('caption') or '(none)'}\n"
-            f"Description: {figure.get('description') or '(none)'}\n"
-            f"Labelled parts / data: {figure.get('parts') or '(none)'}\n"
-            f"Testable facts the figure conveys: {figure.get('facts') or '(none)'}"
-        )
+        parts.append("FIGURE under study (an image of it will be shown on the card):\n" + describe_figure(figure))
     parts.append("SOURCE (use only this):\n\n" + "\n\n".join(_unit_block(u) for u in units))
     return [
         {"role": "system", "content": system},

@@ -2,7 +2,7 @@
 import io
 
 from app.extensions import db
-from app.models import Card, Deck
+from app.models import Card, Deck, Figure, Source
 from app.services import llm
 from app.services.export import export_deck
 from app.services.pipeline.feedback import coach_cards
@@ -140,10 +140,48 @@ def test_cheat_sheet_toggle_is_opt_in_and_sticks(client, app, monkeypatch):
     client.post(f'/decks/{deck_id}/preview', data={'cheat_sheet': 'on'})
     with app.app_context():
         assert db.session.get(Deck, deck_id).settings_json['cheat_sheet'] is True
-    assert phases()[:3] == ['map', 'cheatsheet', 'plan']
+    assert phases()[:4] == ['map', 'figures', 'cheatsheet', 'plan']
     assert b'name="cheat_sheet" data-cheat-sheet checked>' in client.get(f'/decks/{deck_id}/preview').data
     # Retrying a failed run must not silently drop the setting.
     with app.app_context():
         db.session.get(Deck, deck_id).status = 'failed'
         db.session.commit()
     assert b'name="cheat_sheet" value="on"' in client.get(f'/decks/{deck_id}/status').data
+
+
+def test_cheat_sheet_page_shows_the_sheet_with_its_diagrams(client, app):
+    deck_id, _ = make_deck(client, app)
+    # A deck generated without the option has no sheet and no link to one.
+    assert client.get(f'/decks/{deck_id}/cheat-sheet').headers['Location'].endswith(f'/decks/{deck_id}')
+    assert 'cheat-sheet' not in client.get(f'/decks/{deck_id}').text
+    with app.app_context():
+        deck = db.session.get(Deck, deck_id)
+        deck.run_json = {'plan': {'tasks': []}, 'cheat_sheet': {
+            'units': 2, 'figures': 1, 'chars_in': 900, 'chars_out': 120, 'kept_full': [1]}}
+        figure = Figure(deck_id=deck_id, page=4, hash='h', image=b'\x89PNG', caption='A stack of plates')
+        sheet = '\n'.join(['## Order', '- A **stack** is LIFO.', '  - Example: push 1, push 2, pop gives 2.',
+                           '[[Figure 1]] A stack of plates', '- <script>alert(1)</script>'])
+        db.session.add_all([
+            figure,
+            Source(deck_id=deck_id, idx=0, title='Stacks', text=sheet, hash='a', page_start=4, page_end=5),
+            Source(deck_id=deck_id, idx=1, title='Queues', text='A queue is FIFO.', hash='b'),
+            Source(deck_id=deck_id, idx=2, title='Bibliography', text='Skipped.', hash='c', skipped=True),
+        ])
+        db.session.commit()
+        figure_id = figure.id
+    response = client.get(f'/decks/{deck_id}/cheat-sheet')
+    assert response.status_code == 200
+    page = response.text
+    assert '<h2>Stacks <small>p.4–5</small></h2>' in page and '<h3>Order</h3>' in page
+    assert 'A <strong>stack</strong> is LIFO.' in page
+    assert '<li class="sub example ">Example: push 1, push 2, pop gives 2.</li>' in page
+    assert f'<img src="/figures/{figure_id}.png" alt="A stack of plates"' in page
+    assert '<b>Figure 1</b> A stack of plates' in page and '[[Figure' not in page
+    # The sheet is model output over an uploaded file: it is escaped, never trusted.
+    assert '&lt;script&gt;alert(1)&lt;/script&gt;' in page and '<script>alert(1)' not in page
+    # A unit that could not be condensed says so; a skipped unit is not on the sheet.
+    assert page.count('shown in full') == 1 and 'A queue is FIFO.' in page
+    assert 'Bibliography' not in page
+    assert '1 diagram<' in page and '900 → 120 chars' in page
+    for path in (f'/decks/{deck_id}', f'/decks/{deck_id}/status', f'/decks/{deck_id}/plan'):
+        assert f'/decks/{deck_id}/cheat-sheet' in client.get(path).text, path

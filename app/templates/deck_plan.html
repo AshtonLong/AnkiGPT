@@ -18,6 +18,7 @@
     <span class="pill violet">{{ icon('brain', 12) }} {{ plan.mode }} · {{ plan.turns }} turns</span>
     <span class="pill">budget {{ plan.budget }}</span>
     {% if figure_count %}<span class="pill warn">{{ icon('image', 12) }} {{ figure_count }} figures</span>{% endif %}
+    {% if deck.has_cheat_sheet %}<a class="btn" href="{{ url_for('main.cheat_sheet', deck_id=deck.id) }}">{{ icon('sheet', 15) }} Read the cheat sheet</a>{% endif %}
   </div>
 </div>
 
