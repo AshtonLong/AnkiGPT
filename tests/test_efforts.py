@@ -48,7 +48,7 @@ def test_every_agent_runs_as_a_role_and_has_a_slider():
 def test_an_agent_follows_its_role_until_the_user_sets_it():
     client = LLMClient(DEFAULTS)
     assert client.reasoning_for("planner") == "medium"
-    assert {client.reasoning_for(a) for a in ("cold_reader", "judge", "improver", "coach", "merger", "coverage")} == {"low"}
+    assert {client.reasoning_for(a) for a in ("cold_reader", "judge", "gatekeeper", "improver", "coach", "merger", "coverage")} == {"low"}
     assert client.reasoning_for("worker") is None
     # A caller that names only the role still gets the role's effort.
     assert client.reasoning_for("critic") == "low"
@@ -161,7 +161,8 @@ def test_stored_values_that_no_longer_mean_anything_are_dropped(app):
 def test_a_run_sends_each_agent_the_effort_its_owner_chose(client, app, monkeypatch):
     register(client)
     app.config["OPENROUTER_API_KEY"] = "sk-or-server"
-    _save(client, mapper=1, planner=5, worker=3, cold_reader=1, judge=4, merger=3, coverage=5, improver=2, coach=4)
+    _save(client, mapper=1, planner=5, worker=3, cold_reader=1, judge=4, gatekeeper=2, merger=3, coverage=5, improver=2,
+          coach=4)
 
     fake, sent = FakeLLM(), {}
 
@@ -191,5 +192,6 @@ def test_a_run_sends_each_agent_the_effort_its_owner_chose(client, app, monkeypa
     assert sent == {
         "document_map": {"minimal"}, "planner": {"xhigh"}, "anki_cards": {"medium"},
         "cold_answers": {"minimal"}, "critic_verdicts": {"high"}, "duplicate_resolution": {"medium"},
-        "coverage_audit": {"xhigh"}, "improved_basic_card": {"low"}, "diagnosed_cards": {"high"},
+        "coverage_audit": {"xhigh"}, "backfill_review": {"low"}, "improved_basic_card": {"low"},
+        "diagnosed_cards": {"high"},
     }

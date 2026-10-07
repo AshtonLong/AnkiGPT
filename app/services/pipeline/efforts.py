@@ -15,9 +15,9 @@ EFFORT_LABELS = {"minimal": "Minimal", "low": "Low", "medium": "Medium", "high":
 AGENT_GROUPS = (
     ("Reading and planning", "Before any card is written", (
         ("mapper", "Outliner", "Splits your source into study units."),
-        ("cheatsheet", "Cheat sheet writer", "Boils each unit down when “Make a cheat sheet first” is on."),
-        ("planner", "Planner", "Decides what to cover and hands out the writing tasks."),
         ("vision", "Figure reader", "Reads the figures found in a PDF."),
+        ("cheatsheet", "Cheat sheet writer", "Boils each unit down when “Make a cheat sheet first” is on."),
+        ("planner", "Planner", "Decides what to cover, figures included, and hands out the writing tasks."),
     )),
     ("Writing", "The cards themselves", (
         ("worker", "Card writers", "Write the cards for each task in the plan."),
@@ -25,8 +25,9 @@ AGENT_GROUPS = (
     ("Review agents", "Every check a card goes through afterwards", (
         ("cold_reader", "Cold reader", "Answers each card without the source, to catch cards that give their answer away."),
         ("judge", "Judge", "Rules keep, rewrite or drop on each card against the source."),
-        ("merger", "Duplicate resolver", "Picks the card to keep when several test the same fact."),
         ("coverage", "Coverage auditor", "Looks for testable facts that no card covers yet."),
+        ("gatekeeper", "Back-fill reviewer", "Decides whether each card written for a coverage gap earns its place in the deck."),
+        ("merger", "Duplicate resolver", "Picks the card to keep when several test the same fact."),
         ("improver", "Card improver", "Rewrites a single card when you choose AI improve."),
         ("coach", "Coach", "Diagnoses and rewrites the cards you keep getting wrong in Anki."),
     )),

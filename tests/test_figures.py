@@ -45,13 +45,16 @@ def test_figure_jobs_use_snapshots_and_report_failures(app, monkeypatch, caplog,
         orchestrator._phase_figures(ctx)
 
         assert sorted(received) == [(str(i).encode(), "image/png", unit.text) for i in range(3)]
-        assert len(ctx.figure_tasks) == 3 - failures
-        assert all(t.figure_id and t.unit_idxs == [0] for t in ctx.figure_tasks)
+        # Reading a figure decides nothing; what was read is handed to the planner.
+        offered = orchestrator._plan_figures(ctx)
+        assert len(offered) == 3 - failures
+        assert all(f["unit_idx"] == 0 and f["suggested"] == 2 and f["caption"] == "Cell" for f in offered)
+        assert [f["number"] for f in offered] == list(range(failures + 1, 4))
         assert Figure.query.filter_by(deck_id=deck.id, useful=True).count() == 3 - failures
         phase = PipelineTask.query.filter_by(deck_id=deck.id, kind="phase", phase="figures").one()
         assert phase.status == ("failed" if failures else "done")
         assert phase.result_json["failed"] == failures
-        assert phase.result_json["tasks"] == 3 - failures
+        assert phase.result_json["pictures"] == 3 - failures
         if failures:
             assert "Vision service unavailable" in caplog.text
             assert phase.error

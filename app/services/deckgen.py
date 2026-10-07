@@ -19,7 +19,7 @@ from .pipeline.document_map import Unit
 from .pipeline.orchestrator import format_generation_error, generate_deck  # noqa: F401
 from .pipeline.planner import PlanTask, heuristic_target
 from .pipeline.routing import LLMClient
-from .pipeline.strategies import DEFAULT_STRATEGY
+from .pipeline.strategies import DEFAULT_STRATEGY, FIGURE_STRATEGY
 from .validators import is_math_valid, is_valid_cloze, normalize_math, normalize_text
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ def regenerate_source(source_id, strategy=None):
     chosen = strategy
     if not chosen:
         for t in previous:
-            if source.idx in (t.unit_ids or []) and t.strategy and t.strategy != "figure_recall":
+            if source.idx in (t.unit_ids or []) and t.strategy and t.strategy != FIGURE_STRATEGY:
                 chosen = t.strategy
                 break
     chosen = chosen or DEFAULT_STRATEGY
@@ -134,7 +134,9 @@ def regenerate_source(source_id, strategy=None):
                 r.critic_json = {k: v.get(k) for k in ("verdict", "reason", "supported", "leaks_answer", "difficulty")}
         except Exception:
             logger.exception("Critic failed during regenerate of unit %s", source_id)
-    Card.query.filter_by(source_id=source_id).delete()
+    # The unit's text cards are what was rewritten. Its figure cards came from figure
+    # tasks, which this does not rerun, so they stay.
+    Card.query.filter_by(source_id=source_id).filter(Card.figure_id.is_(None)).delete()
     order_base = source.idx * 1000
     for i, r in enumerate(rows, start=1):
         r.order_key = order_base + i

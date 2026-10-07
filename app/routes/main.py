@@ -34,7 +34,7 @@ from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach
 from ..services.pipeline.cheatsheet import sheet_blocks
 from ..services.pipeline.figures import extract_figures, number_figures
 from ..services.pipeline.planner import Plan
-from ..services.pipeline.strategies import STRATEGIES
+from ..services.pipeline.strategies import text_strategies
 from ..services.pipeline.trace import PHASES, phases_for
 from ..services.validators import is_valid_cloze
 from ..tasks import dispatch_generation
@@ -345,7 +345,8 @@ def plan_deck(deck_id):
                 target = task.target_cards
             task.target_cards = max(1, min(60, target))
             strategy = request.form.get(f"strategy_{task.id}") or task.strategy
-            if strategy in STRATEGIES:
+            # A figure task has one way of writing its cards, and no text task has it.
+            if not task.figure_id and strategy in text_strategies():
                 task.strategy = strategy
             task.notes = (request.form.get(f"notes_{task.id}") or task.notes or "")[:1500]
             kept.append(task)
@@ -360,10 +361,17 @@ def plan_deck(deck_id):
         dispatch_generation(deck.id, resume_from_plan=True)
         return redirect(url_for("main.status", deck_id=deck.id))
     unit_by_idx = {u.idx: u for u in units}
-    figure_count = Figure.query.filter_by(deck_id=deck.id).count()
+    figures = {fig.id: fig for fig in Figure.query.filter_by(deck_id=deck.id).all()}
+    numbers = number_figures(figures.values())
+    # The figures the planner gave no cards, with its reason, in page order.
+    left_out = sorted(
+        ((numbers[fid], figures[fid], reason) for fid, reason in plan.figure_skips.items() if fid in figures),
+        key=lambda row: row[0],
+    )
     return render_template(
         "deck_plan.html", deck=deck, plan=plan, units=units, unit_by_idx=unit_by_idx, run=run,
-        strategies=STRATEGIES, figure_count=figure_count,
+        strategies=text_strategies(), figure_count=len(figures), figures=figures, figure_numbers=numbers,
+        figures_left_out=left_out,
     )
 
 

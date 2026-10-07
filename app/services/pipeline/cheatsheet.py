@@ -11,7 +11,9 @@ the cheat sheet left out.
 The sheet keeps the source's diagrams. Figures are read by the vision pass first, the
 writer is told what each one shows, and a kept diagram is one line of the section: a
 `[[Figure N]]` marker and its caption. `sheet_blocks` parses a section for the HTML page,
-which puts the image itself where the marker sits.
+which puts the image itself where the marker sits. Once the planner has ruled on the
+figures, the diagrams it gave no cards come off again (`remove_figures`), so what is on
+the sheet and what gets image cards are the same set.
 
 One call per unit and pure, so units are condensed in parallel and cached like workers.
 """
@@ -200,6 +202,17 @@ def place_figures(text, figures):
 def _figure_line(figure):
     caption = " ".join((figure.get("caption") or "").split())
     return f"{figure_marker(figure['number'])} {caption}".rstrip()
+
+
+def remove_figures(text, numbers):
+    """A section without the diagrams numbered `numbers`. The sheet is written before the
+    plan with every diagram on it; the ones the planner then gives no cards come off."""
+    kept = []
+    for line in (text or "").split("\n"):
+        match = FIGURE_LINE_RE.match(line)
+        if not (match and int(match.group(1)) in numbers):
+            kept.append(line)
+    return clean_text("\n".join(kept))
 
 
 # ------------------------------------------------------------------ the HTML page

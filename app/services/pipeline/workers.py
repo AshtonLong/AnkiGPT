@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 WORKER_PROMPT_VERSION = f"{PROMPT_VERSION}:worker"
 SIBLING_HINT_LIMIT = 6
+EXISTING_CARD_LIMIT = 80
 
 
 def _unit_block(unit):
@@ -29,9 +30,12 @@ def _unit_block(unit):
     return f"{header}\n\n{unit.text}"
 
 
-def build_worker_messages(task, units, settings, card_style, siblings=None, figure=None, target_override=None):
+def build_worker_messages(task, units, settings, card_style, siblings=None, figure=None, target_override=None,
+                          existing=None):
     """`units` are the Unit objects for task.unit_idxs in order; `siblings` is a list of
-    (strategy, unit_idxs, notes) for other tasks touching the same units."""
+    (strategy, unit_idxs, notes) for other tasks touching the same units; `existing` is
+    the cards the deck already has from this material, each as "question -> answer", for
+    a task that writes after them (a figure, a coverage gap)."""
     system = system_prompt(
         task.strategy, card_style,
         focus=settings.get("focus", ""), exclude=settings.get("exclude", ""), glossary=settings.get("glossary", ""),
@@ -39,6 +43,8 @@ def build_worker_messages(task, units, settings, card_style, siblings=None, figu
     target = target_override or task.target_cards
     parts = [
         f"TASK: write about {target} cards using the {task.strategy} strategy.",
+        "That count is an estimate, not a quota: write more if the material holds more examinable facts than it "
+        "allows for and fewer if it holds less. Never pad to reach it.",
         f"Planner notes: {task.notes or '(none)'}",
     ]
     context = settings.get("exam_context") or ""
@@ -51,6 +57,14 @@ def build_worker_messages(task, units, settings, card_style, siblings=None, figu
         parts.append(
             "Other workers are covering the same material with these briefs; do NOT duplicate their cards:\n"
             + "\n".join(hints)
+        )
+    if existing:
+        shown = existing[:EXISTING_CARD_LIMIT]
+        parts.append(
+            "The deck already has these cards from this material. Do NOT write a card that tests a fact one of them "
+            "already tests, whatever the wording or the direction of the question:\n"
+            + "\n".join(f"- {line}" for line in shown)
+            + (f"\n- ...and {len(existing) - len(shown)} more" if len(existing) > len(shown) else "")
         )
     if figure is not None:
         parts.append("FIGURE under study (an image of it will be shown on the card):\n" + describe_figure(figure))

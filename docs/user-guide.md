@@ -22,15 +22,19 @@ Both limits are configurable. Continue to source review to check the extraction.
 The source preview displays the first 4,000 characters; generation uses the full
 stored source, subject to the source cap above. Add exam/context, focus areas,
 exclusions, and must-include terms. Leave deck size on **Auto** or set an approximate
-target. Validation, deduplication, and coverage work can change the final count.
+target. Either way the number is a suggestion, not a cap: on Auto the planner works from
+an estimate of what the material is worth and goes over it where the material holds
+more; a target you set is followed more closely, and the coverage back-fill then adds
+only what an examiner would very likely ask. The finished run shows the estimate next to
+how many cards came from the text, from figures, and from the back-fill.
 
 Turn on **Make a cheat sheet first** when the full source would be information
 overload. Before any cards are planned, the source is boiled down to what you would fit
 on a cheat sheet you were allowed to bring into the exam: every concept in its barest
 form, with its edge cases, and without the background, repetition, and academic padding.
 A concept keeps at most one example, and only if your source gives one; nothing is
-added that your source does not say. Diagrams from a PDF stay on the sheet. Cards are
-written from that alone. Expect fewer, higher-yield cards; detail the cheat sheet leaves
+added that your source does not say. Diagrams from a PDF that earn cards stay on the
+sheet. Cards are written from that alone. Expect fewer, higher-yield cards; detail the cheat sheet leaves
 out gets no card, and the coverage audit will not add it back. It is off by default and
 adds one model pass over the source. The run trace shows how far each unit was
 condensed.
@@ -40,14 +44,18 @@ deck editor) opens the sheet as a page with its diagrams in place. Read it to se
 exactly what your cards were written from, or print it.
 
 Enable **Review the plan before writing** to pause after planning. If extracted PDF
-figures are available, **Read figures with vision** controls whether they are analyzed
-for image-backed cards. Select **Plan & generate** to begin.
+figures are available, **Read figures with vision** controls whether they are read. The
+planner then decides which figures get image-backed cards and how many. An image that is
+only text (a table of formulas, say) is transcribed and treated as text; exercises and
+decoration get nothing. Select **Plan & generate** to begin.
 
 ## 3. Review the plan and follow progress
 
 When plan review is enabled, inspect the document map and proposed tasks. Skip tasks,
 change strategies, set each task's target (1–60 cards), or edit its worker notes.
-Keep at least one task, then choose **Run this plan**. **Re-plan** asks the planner
+Figure tasks are listed with their image under the unit they belong to, and can be
+skipped or resized like any other; the figures the planner gave no cards are listed
+below the tasks with its reason. Keep at least one task, then choose **Run this plan**. **Re-plan** asks the planner
 to produce another plan and can incur additional model calls.
 
 The run trace shows phase and task status, token usage, and recorded cost. You can
@@ -116,18 +124,19 @@ which is shown beside it.
 | Agent | What it does |
 |---|---|
 | Outliner | Splits your source into study units. |
-| Cheat sheet writer | Boils each unit down when **Make a cheat sheet first** is on. |
-| Planner | Decides what to cover and hands out the writing tasks. |
 | Figure reader | Reads the figures found in a PDF. |
+| Cheat sheet writer | Boils each unit down when **Make a cheat sheet first** is on. |
+| Planner | Decides what to cover, figures included, and hands out the writing tasks. |
 | Card writers | Write the cards for each task in the plan. |
 | Cold reader | Answers each card without the source, to catch cards that give their answer away. |
 | Judge | Rules keep, rewrite or drop on each card against the source. |
-| Duplicate resolver | Picks the card to keep when several test the same fact. |
 | Coverage auditor | Looks for testable facts that no card covers yet. |
+| Back-fill reviewer | Decides whether each card written for a coverage gap earns its place in the deck. |
+| Duplicate resolver | Picks the card to keep when several test the same fact. |
 | Card improver | Rewrites a single card when you choose **AI improve**. |
 | Coach | Diagnoses and rewrites the cards you keep getting wrong in Anki. |
 
-The last six are the review agents: each check a card goes through after it is written
+The last seven are the review agents: each check a card goes through after it is written
 has its own slider. **Set all** moves every slider at once, **Save effort** stores your
 choices, and **Reset to defaults** clears them. Changes apply from your next run, and to
 your account only. Some models have fewer effort levels than the slider; OpenRouter

@@ -11,15 +11,18 @@ from ...models import LLMRun, PipelineTask, utcnow
 
 logger = logging.getLogger(__name__)
 
+# In run order. Figures are read before anything is planned: the planner decides which of
+# them get cards, and the cheat sheet keeps the diagrams. Duplicates are resolved last,
+# so the cards the coverage back-fill adds are de-duplicated with the rest.
 PHASES = [
     ("map", "Map"),
+    ("figures", "Figures"),
     ("cheatsheet", "Cheat sheet"),
     ("plan", "Plan"),
-    ("figures", "Figures"),
     ("write", "Write"),
     ("critique", "Critique"),
-    ("reconcile", "Reconcile"),
     ("coverage", "Coverage"),
+    ("reconcile", "Reconcile"),
     ("finish", "Finish"),
 ]
 PHASE_LABELS = dict(PHASES)
@@ -27,12 +30,10 @@ PHASE_LABELS = dict(PHASES)
 
 def phases_for(settings):
     """The phases a run with these deck settings goes through, in order. The cheat sheet
-    is opt-in, so a deck that didn't ask for it shows no trace of the phase. A deck that
-    did has its figures read first, because the sheet keeps the diagrams."""
+    is opt-in, so a deck that didn't ask for it shows no trace of the phase."""
     if not (settings or {}).get("cheat_sheet"):
         return [(key, label) for key, label in PHASES if key != "cheatsheet"]
-    first = ("map", "figures", "cheatsheet")
-    return [(key, PHASE_LABELS[key]) for key in first] + [(key, label) for key, label in PHASES if key not in first]
+    return list(PHASES)
 
 
 class Tracer:

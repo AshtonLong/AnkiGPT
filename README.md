@@ -39,9 +39,10 @@ interface with sample data, not results from a live AI run.*
 ## What happens behind the scenes
 
 The pipeline maps the source into units, plans specialist tasks, and writes cards in
-parallel. Optional vision analysis turns useful PDF figures into image-backed cards.
-A critic checks generated cards; duplicate reconciliation and a coverage pass refine
-the deck. The live run trace and **Run insights** expose task status, tokens, and
+parallel. Optional vision analysis reads PDF figures, and the planner decides which of
+them get image-backed cards. A critic checks generated cards; a coverage pass back-fills
+gaps, each added card having to pass a review of its own, and duplicates are reconciled
+last. The live run trace and **Run insights** expose task status, tokens, and
 recorded costs. [Read the pipeline reference →](docs/architecture.md)
 
 **You stay in control:** only cards with `ok` status (shown as **Reviewed** in the
