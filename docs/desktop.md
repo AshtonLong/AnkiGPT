@@ -28,7 +28,9 @@ Everything in the [user guide](user-guide.md) applies, with these differences:
 - **No account.** There is nothing to sign up for or sign in to. Decks belong to this
   computer.
 - **Settings instead of My profile.** Add your OpenRouter key under **Settings**
-  (`Ctrl+,`). The page also shows where your data is stored and the app version.
+  (`Ctrl+,`). The page also has the **Advanced** panel, where you set
+  [how hard each agent thinks](user-guide.md#advanced-how-hard-each-agent-thinks), and
+  shows where your data is stored and the app version.
 - **Export saves a file.** **Export deck** opens a Save dialog in your Downloads folder.
   When the file is written you can choose **Open in Anki**, which hands the package to
   Anki to import, or **Show in folder**.
@@ -73,7 +75,8 @@ Everything is kept in `%APPDATA%\AnkiGPT`, which you can open with
 
 ### Advanced settings
 
-There is no model picker yet. To change the model or the pipeline settings, create
+Reasoning effort is set per agent under **Settings → Advanced**. There is no model
+picker yet. To change the model or the pipeline settings, create
 `%APPDATA%\AnkiGPT\data\settings.env` and restart the app:
 
 ```ini
@@ -88,6 +91,8 @@ Only these keys are read: `OPENROUTER_MODEL`, `OPENROUTER_MODEL_*`,
 `OPENROUTER_TIMEOUT_SECONDS`, `OPENROUTER_MAX_TOKENS`, `PIPELINE_*` and
 `MAX_SOURCE_CHARS`. They mean the same as in [setup](setup.md#configuration). Any other
 key is ignored and named in `backend.log`. Your OpenRouter key does not go in this file.
+An `OPENROUTER_REASONING_*` value here is the default the **Advanced** sliders show; a
+slider you have moved still wins.
 
 ## Troubleshooting
 

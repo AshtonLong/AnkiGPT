@@ -105,6 +105,34 @@ again; the page only tells you which key is saved by its last four characters. P
 new key to replace it, or choose **Remove key**. OpenRouter charges you for what your
 decks use, and the run trace shows the recorded cost of each run.
 
+### Advanced: how hard each agent thinks
+
+A deck is built by several AI agents, and **My profile → Advanced** has a slider for
+each one. Move a slider to set that agent's reasoning effort: **Minimal**, **Low**,
+**Medium**, **High** or **Extra high**. More effort means more careful work, and a
+slower and costlier run. A slider left on **Default** follows the app's own setting,
+which is shown beside it.
+
+| Agent | What it does |
+|---|---|
+| Outliner | Splits your source into study units. |
+| Cheat sheet writer | Boils each unit down when **Make a cheat sheet first** is on. |
+| Planner | Decides what to cover and hands out the writing tasks. |
+| Figure reader | Reads the figures found in a PDF. |
+| Card writers | Write the cards for each task in the plan. |
+| Cold reader | Answers each card without the source, to catch cards that give their answer away. |
+| Judge | Rules keep, rewrite or drop on each card against the source. |
+| Duplicate resolver | Picks the card to keep when several test the same fact. |
+| Coverage auditor | Looks for testable facts that no card covers yet. |
+| Card improver | Rewrites a single card when you choose **AI improve**. |
+| Coach | Diagnoses and rewrites the cards you keep getting wrong in Anki. |
+
+The last six are the review agents: each check a card goes through after it is written
+has its own slider. **Set all** moves every slider at once, **Save effort** stores your
+choices, and **Reset to defaults** clears them. Changes apply from your next run, and to
+your account only. Some models have fewer effort levels than the slider; OpenRouter
+then uses the nearest level the model has.
+
 ## Troubleshooting
 
 - **No extracted text:** use a PDF with selectable text or paste notes directly.

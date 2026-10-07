@@ -88,10 +88,21 @@ task. The status page polls `/decks/<id>/progress.json` and renders the tree liv
 what the planner decided, which workers are in flight, what the critic dropped, tokens
 and cost per phase. The editor's **Run insights** panel shows the same after the fact.
 
+### Reasoning effort per agent
+
+Each call is made by one of eleven agents. Most are a role; the critic role runs the
+cold reader, the judge, the card improver and the coach, and the reconcile role runs the
+duplicate resolver and the coverage auditor (`routing.AGENT_ROLES`). An agent takes its
+model and its default effort from its role's configuration. A user can set the effort
+of any single agent under **My profile → Advanced** (`pipeline/efforts.py`); only the
+agents they moved are stored, in `User.agent_efforts_json`, and those win for that
+user's runs.
+
 ### Content-addressed cache
 
 Cheat-sheet, worker, critic, vision and coverage results are cached on a hash of
-(role, model, prompt version, inputs). A cache hit avoids a provider call for that task. Mapping, planning, embeddings,
+(role, model, prompt version, inputs), plus the reasoning effort of any agent its user
+moved off the default. A cache hit avoids a provider call for that task. Mapping, planning, embeddings,
 and changed inputs can still incur calls; a repeated deck is not guaranteed to be free.
 The cache is database-wide, not scoped to an individual user.
 
@@ -111,7 +122,8 @@ app/
       reconcile.py      phase 4 — embedding clusters, coverage audit
       figures.py        PDF figure extraction + vision analysis
       feedback.py       Anki review import + coach
-      routing.py        role -> model client
+      routing.py        role -> model client, and each agent's reasoning effort
+      efforts.py        the effort each user set per agent (the Advanced panel)
       cache.py          content-addressed cache
       parallel.py       thread-pool fan-out
       trace.py          PipelineTask / LLMRun tracing
@@ -127,8 +139,8 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 
 ## Data model
 
-- `User` — credentials, display name, bio, avatar color, deck ownership, and the
-  user's encrypted OpenRouter API key.
+- `User` — credentials, display name, bio, avatar color, deck ownership, the
+  user's encrypted OpenRouter API key, and the reasoning effort they set per agent.
 - `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan, phase,
   totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
 - `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).

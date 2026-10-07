@@ -289,16 +289,19 @@ one helper so desktop says "Settings" and web still says "My profile".
 ### 5.5 The Settings page
 
 Same URL as the profile page (`/auth/profile`), rendered from its own template in desktop
-mode. It has three panels:
+mode. It has four panels:
 
 1. **OpenRouter API key.** The existing panel and behaviour, unchanged: save, replace,
    remove, last four characters shown, never displayed again. The link to
    `openrouter.ai/keys` opens in the user's browser.
-2. **Your data.** Plain statements: decks are stored on this computer at the shown path;
+2. **Advanced.** One reasoning-effort slider per agent, the same panel the web profile
+   page has. Added after version 1; the defaults the sliders show come from
+   `settings.env` (section 5.9).
+3. **Your data.** Plain statements: decks are stored on this computer at the shown path;
    source material and cards are sent to OpenRouter under the user's key when generating,
    improving or coaching; nothing is sent to an AnkiGPT server; the app contacts GitHub
    to check for updates.
-3. **About.** App version.
+4. **About.** App version.
 
 Display name, bio, avatar colour, email and password are not shown on desktop.
 

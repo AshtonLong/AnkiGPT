@@ -81,7 +81,8 @@ python run.py
 Open [localhost:5000](http://127.0.0.1:5000), create an account, and paste your
 OpenRouter API key under **My profile**. Then choose **New deck**.
 The workspace requires sign-in; the landing page has a public illustrative sample.
-**My profile** also manages your display name, bio, avatar color, email, and password.
+**My profile** also manages your display name, bio, avatar color, email, and password,
+and under **Advanced** how much reasoning effort each AI agent uses.
 
 ### Docker
 
