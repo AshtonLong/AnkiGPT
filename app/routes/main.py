@@ -1,7 +1,6 @@
 import io
 import json
 import os
-import re
 import uuid
 from collections import defaultdict
 
@@ -31,7 +30,7 @@ from ..services.export import export_deck as export_deck_file
 from ..services.pdf import extract_pdf_text
 from ..services.pipeline import progress_for
 from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach_cards, read_review_stats
-from ..services.pipeline.cheatsheet import sheet_blocks
+from ..services.pipeline.cheatsheet import INLINE_RE, MATH_GROUPS, sheet_blocks
 from ..services.pipeline.figures import extract_figures, number_figures
 from ..services.pipeline.planner import Plan
 from ..services.pipeline.strategies import text_strategies
@@ -42,7 +41,6 @@ from ..tasks import dispatch_generation
 bp = Blueprint("main", __name__)
 
 CARD_STYLES = ("basic", "cloze", "mixed")
-SHEET_INLINE_RE = re.compile(r"\*\*(.+?)\*\*|`([^`]+)`")
 
 
 @bp.before_request
@@ -452,16 +450,25 @@ def deck_editor(deck_id):
 
 @bp.app_template_filter("sheet_inline")
 def sheet_inline(text):
-    """Escape a line of the cheat sheet, keeping the bold and code spans models write."""
+    """Escape a line of the cheat sheet, keeping the bold, code and maths models write.
+
+    Maths goes out as its LaTeX source on a marked span, which static/sheet.js typesets.
+    The span's own text is the formula as it was written, so that is what shows when it
+    cannot be typeset."""
     text = text or ""
     parts = []
     pos = 0
-    for match in SHEET_INLINE_RE.finditer(text):
+    for match in INLINE_RE.finditer(text):
         parts.append(escape(text[pos:match.start()]))
-        if match.group(1):
-            parts.append(Markup("<strong>%s</strong>") % match.group(1))
+        kind = match.lastgroup
+        if kind == "bold":
+            parts.append(Markup("<strong>%s</strong>") % sheet_inline(match.group(kind)))
+        elif kind == "code":
+            parts.append(Markup("<code>%s</code>") % match.group(kind))
         else:
-            parts.append(Markup("<code>%s</code>") % match.group(2))
+            display = Markup(" data-display") if MATH_GROUPS[kind] else ""
+            parts.append(Markup('<span class="tex" data-tex="%s"%s>%s</span>') % (
+                match.group(kind).strip(), display, match.group(0)))
         pos = match.end()
     parts.append(escape(text[pos:]))
     return Markup("").join(parts)

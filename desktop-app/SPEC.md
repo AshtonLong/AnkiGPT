@@ -338,7 +338,8 @@ produced are reused from the cache, while mapping and planning are paid for agai
   and htmx 1.9.12 from jsDelivr. Both move into `app/static/` (fonts as `.woff2` with
   `@font-face` rules, htmx as a file, each with its licence). Without this the desktop app
   renders unstyled text and loses its interactivity when offline. One code path serves
-  both versions.
+  both versions. KaTeX, which typesets the maths on the cheat sheet page, is bundled the
+  same way (`static/vendor/katex`, with its fonts and licence).
 - **Offline error.** A connection failure during generation currently surfaces as
   `OpenRouter request failed: <raw exception text>` (`services/llm.py:196`).
   `format_generation_error` gains a case: "Couldn't reach OpenRouter. Check your internet
@@ -427,6 +428,7 @@ The OpenRouter key is never written to a log.
 | Navigate to an `https://` address | Blocked; opened in the user's default browser |
 | Open a new window on the app's own origin (figure images, `partials/card_row.html:15`) | Opens in a second app window with the same restrictions, so the token header is still added |
 | Open a new window on an `https://` address (`openrouter.ai/keys`) | Opened in the default browser |
+| Navigate to `ankigpt:save-pdf` | Blocked; the shell saves the page as a PDF (section 7.3) |
 | Anything else | Blocked |
 
 When a page blocks unloading with `beforeunload`, as `static/profile.js:54` does, Electron
@@ -447,6 +449,26 @@ The export button fetches the `.apkg` and saves it through a download link
 
 Uploads (PDFs, and `.apkg`/`.colpkg` files for review import) use the page's normal file
 inputs and drag-and-drop. Nothing changes.
+
+**Saving a page as a PDF.** In a browser the cheat sheet's button calls `window.print()`,
+and the print dialog can save a PDF. That does not carry over: Electron has no print
+preview, and on some computers its print dialog fails without opening ("Invalid printer
+settings"), which leaves the button doing nothing. So in the shell the button (which
+reads **Save as PDF** in desktop mode) navigates to `ankigpt:save-pdf` instead
+(`static/experience.js`), after loading any image the page had put off. The shell blocks
+that navigation like any other that leaves the app, so the page stays where it is, and
+answers it:
+
+1. `printToPDF` renders the page with its print styles, on Letter paper in the US, Canada
+   and Mexico and A4 elsewhere. Backgrounds are off, as in a browser's dialog; the print
+   styles mark the shading that belongs on paper with `print-color-adjust`.
+2. A native Save dialog opens in the Downloads folder, named after the page's title.
+3. When the file is written, the same dialog as for a download offers **Open**, **Show in
+   folder** and **Done**. If it cannot be written, a dialog says so.
+
+A navigation is something any web page can already do, so this adds no preload script
+and no IPC channel, and the page gets nothing but a Save dialog the user can cancel. Only
+the main frame is answered.
 
 ### 7.4 Menus
 
@@ -629,6 +651,9 @@ On a Windows account that has never had AnkiGPT installed:
 9. Launch a second copy: the first window is focused.
 10. Update from the previous release: decks and the key survive, and a backup exists.
 11. Uninstall and reinstall: decks are still there.
+12. Open the cheat sheet of a deck whose source has formulas: they are typeset. **Save as
+    PDF** opens a Save dialog and writes a PDF with the formulas typeset and the diagrams
+    in place.
 
 There is no automated end-to-end test of the Electron shell in version 1.
 

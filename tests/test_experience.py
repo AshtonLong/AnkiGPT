@@ -185,3 +185,42 @@ def test_cheat_sheet_page_shows_the_sheet_with_its_diagrams(client, app):
     assert '1 diagram<' in page and '900 → 120 chars' in page
     for path in (f'/decks/{deck_id}', f'/decks/{deck_id}/status', f'/decks/{deck_id}/plan'):
         assert f'/decks/{deck_id}/cheat-sheet' in client.get(path).text, path
+
+
+def test_cheat_sheet_maths_is_marked_up_for_typesetting(client, app):
+    deck_id, _ = make_deck(client, app)
+    with app.app_context():
+        db.session.get(Deck, deck_id).run_json = {'plan': {'tasks': []}, 'cheat_sheet': {'units': 1, 'figures': 1}}
+        sheet = '\n'.join([
+            r'## Speed \(v\)',
+            r'- **Range \(R\)**: \[R = \frac{v_0^2 \sin 2\theta}{g}\]',
+            r'- Dollar signs too: $a < b$ and $$c > d$$.',
+            r'- Prices are not maths: $5 or $10, US$20, and $HOME/bin:$PATH.',
+            r'- `(letter|_|$)(digit|$)*` is code, and \(x **y** z\) is maths.',
+            '[[Figure 1]] The graph',
+        ])
+        db.session.add_all([
+            Figure(deck_id=deck_id, page=1, hash='h', image=b'\x89PNG', caption=r'Graph of \(y = x^2\)'),
+            Source(deck_id=deck_id, idx=0, title='Motion', text=sheet, hash='a'),
+        ])
+        db.session.commit()
+    page = client.get(f'/decks/{deck_id}/cheat-sheet').text
+    # Each formula goes out as its source, on a span the page's script typesets.
+    assert r'<h3>Speed <span class="tex" data-tex="v">\(v\)</span></h3>' in page
+    assert r'<strong>Range <span class="tex" data-tex="R">\(R\)</span></strong>: ' in page
+    assert (r'<span class="tex" data-tex="R = \frac{v_0^2 \sin 2\theta}{g}" data-display>'
+            r'\[R = \frac{v_0^2 \sin 2\theta}{g}\]</span>') in page
+    assert '<span class="tex" data-tex="a &lt; b">$a &lt; b$</span>' in page
+    assert '<span class="tex" data-tex="c &gt; d" data-display>$$c &gt; d$$</span>' in page
+    assert 'Prices are not maths: $5 or $10, US$20, and $HOME/bin:$PATH.' in page
+    # Code is read first, so its `$` and `|` are not maths, and maths keeps its asterisks.
+    assert '<code>(letter|_|$)(digit|$)*</code>' in page
+    assert r'<span class="tex" data-tex="x **y** z">\(x **y** z\)</span>' in page
+    assert r'<b>Figure 1</b> Graph of <span class="tex" data-tex="y = x^2">\(y = x^2\)</span>' in page
+    assert page.count('class="tex"') == 7
+    # KaTeX comes from this app and only on this page.
+    for asset in ('vendor/katex/katex.min.css', 'vendor/katex/katex.min.js', 'vendor/katex/mhchem.min.js', 'sheet.js'):
+        assert f'/static/{asset}"' in page
+        assert client.get(f'/static/{asset}').status_code == 200
+    assert 'katex' not in client.get(f'/decks/{deck_id}').text
+    assert 'data-print>' in page and 'Print or save as PDF' in page
