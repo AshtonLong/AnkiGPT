@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
 {% block title %}Cheat sheet · {{ deck.title }} · AnkiGPT{% endblock %}
+{% block head %}
+  {# KaTeX typesets the sheet's maths. It is served from this app, like the fonts, so it works offline. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/katex/katex.min.css') }}">
+  <script src="{{ url_for('static', filename='vendor/katex/katex.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='vendor/katex/mhchem.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='sheet.js') }}" defer></script>
+{% endblock %}
 {% block content %}
 {% set kept_full = stats.get('kept_full') or [] %}
 {% set diagrams = stats.get('figures') or 0 %}
@@ -18,7 +25,7 @@
   </div>
   <div class="actions">
     <a class="btn ghost" href="{{ url_for('main.deck_editor', deck_id=deck.id) }}">{{ icon('arrow-left', 15) }} Deck</a>
-    <button class="btn primary" type="button" data-print>{{ icon('download') }} Print or save as PDF</button>
+    <button class="btn primary" type="button" data-print>{{ icon('download') }} {{ 'Save as PDF' if desktop_mode else 'Print or save as PDF' }}</button>
   </div>
 </div>
 
@@ -48,7 +55,7 @@
     {% if fig %}
     <figure>
       <a href="{{ url_for('main.figure_image', figure_id=fig.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('main.figure_image', figure_id=fig.id) }}" alt="{{ fig.caption or ('Figure ' ~ block.number) }}" loading="lazy"></a>
-      <figcaption><b>Figure {{ block.number }}</b>{% if fig.caption %} {{ fig.caption }}{% endif %}{% if fig.page %} <span class="hint">p.{{ fig.page }}</span>{% endif %}</figcaption>
+      <figcaption><b>Figure {{ block.number }}</b>{% if fig.caption %} {{ fig.caption|sheet_inline }}{% endif %}{% if fig.page %} <span class="hint">p.{{ fig.page }}</span>{% endif %}</figcaption>
     </figure>
     {% endif %}
     {% else %}

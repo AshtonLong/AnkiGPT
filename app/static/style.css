@@ -4618,9 +4618,9 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
 .sheet { padding: 28px 32px; columns: 2 340px; column-gap: 40px; column-rule: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; }
 .sheet-section { margin-bottom: 22px; }
 .sheet-section:last-child { margin-bottom: 0; }
-.sheet h2 { font-size: 16px; letter-spacing: -.01em; padding-bottom: 6px; margin-bottom: 8px; border-bottom: 2px solid var(--ink); break-after: avoid; }
-.sheet h2 small { font: 10px var(--mono); color: var(--muted); letter-spacing: 0; margin-left: 6px; }
-.sheet h3 { font-size: 13.5px; letter-spacing: 0; margin: 12px 0 4px; color: var(--accent); break-after: avoid; }
+.sheet h2 { font-size: 16px; letter-spacing: -.01em; padding-bottom: 6px; margin-bottom: 8px; border-bottom: 2px solid var(--ink); break-after: avoid; break-inside: avoid; }
+.sheet h2 small { font: 10px var(--mono); color: var(--muted); letter-spacing: 0; margin-left: 6px; white-space: nowrap; }
+.sheet h3 { font-size: 13.5px; letter-spacing: 0; margin: 12px 0 4px; color: var(--accent); break-after: avoid; break-inside: avoid; }
 .sheet p { margin: 0 0 6px; }
 .sheet ul { list-style: none; margin: 0 0 6px; padding: 0; }
 .sheet li { position: relative; padding-left: 14px; margin: 2px 0; break-inside: avoid; }
@@ -4639,8 +4639,18 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
 .sheet figcaption { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
 .sheet figcaption b { color: var(--ink); }
 .sheet .empty { column-span: all; }
+/* Maths typeset by KaTeX (static/sheet.js). Its default size is tuned for serif body text
+   and runs large beside Figtree; a displayed formula sits tight, as everything here does. */
+.sheet .katex { font-size: 1.1em; }
+.sheet .katex-display { margin: 5px 0; padding: 1px 0; overflow-x: auto; overflow-y: hidden; }
+/* A column is narrow: let a displayed formula wrap after = and + the way an inline one does. */
+.sheet .katex-display > .katex { white-space: normal; }
+.sheet .katex-display > .katex > .katex-html > .base { margin: 2px 0; }
 @media (max-width: 760px) { .sheet { padding: 20px; columns: 1; } }
 @media print {
+  body { background: #fff; }
+  /* Bullets, table headings and code spans are painted as backgrounds, which paper drops unless told. */
+  .sheet-head, .sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sheet-head .actions, .sheet-head p { display: none; }
   .sheet-head { margin-bottom: 12px; }
   .sheet { border: 0; box-shadow: none; padding: 0; columns: 2; column-gap: 24px; font-size: 10.5px; }

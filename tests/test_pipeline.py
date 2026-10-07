@@ -446,6 +446,8 @@ class TestCheatSheet:
         assert "edge cases" in system and "difficulty for its own sake" in system
         assert "only an example the source itself gives" in system
         assert "Never make one up" in system
+        # The sheet's page typesets maths written the way the cards write it.
+        assert r"Math: \( ... \) inline and \[ ... \] for a formula on a line of its own. Never $...$." in system
         # Deck settings stay out of the system prompt so it caches across decks.
         assert system == cheatsheet.CHEATSHEET_SYSTEM
 
@@ -536,6 +538,21 @@ class TestCheatSheet:
         assert blocks[4]["rows"] == [["Inhibitor", "Km"], ["Competitive", "rises"]]
         assert blocks[6]["text"] == "Holds only at steady state, with [S] far above [E]."
         assert cheatsheet.sheet_blocks("") == []
+
+    def test_a_bar_inside_maths_or_code_stays_in_its_table_cell(self):
+        sheet = "\n".join([
+            "| Pattern | Meaning |",
+            "|---|---|",
+            r"| \(|x| \le 1\) | `a|b` is `a` or `b` |",
+            r"| $|\vec{v}|$ | \[|A| = ad - bc\] |",
+            "| costs $5 | $6 | **a | b** |",
+        ])
+        assert cheatsheet.sheet_blocks(sheet)[0]["rows"] == [
+            ["Pattern", "Meaning"],
+            [r"\(|x| \le 1\)", "`a|b` is `a` or `b`"],
+            [r"$|\vec{v}|$", r"\[|A| = ad - bc\]"],
+            ["costs $5", "$6", "**a", "b**"],
+        ]
 
     def test_write_returns_the_cleaned_sheet(self):
         raw = "\n## Kinetics  \n- Km is ...\r\n\n\n\n\n- Vmax is ...\n"

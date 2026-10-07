@@ -26,7 +26,7 @@ from ..llm import OpenRouterError, extract_json, json_schema_format
 
 logger = logging.getLogger(__name__)
 
-CHEATSHEET_PROMPT_VERSION = "cheatsheet-v2"
+CHEATSHEET_PROMPT_VERSION = "cheatsheet-v3"
 
 # Every line of a cheat sheet is examinable, whatever the mapper thought of the prose it
 # came from, so a condensed unit sits at the top of the density scale. Leaving the
@@ -82,6 +82,7 @@ HOW TO WRITE IT
 - Short headings with terse bullets beneath them. One fact per bullet.
 - Every bullet must stand on its own as a complete statement: name its subject, spell out an abbreviation the first time it appears, and never lean on "it", "this", "the above" or on anything that is not on the sheet. The student's flashcards are written from this sheet and from nothing else, so a line that is cryptic here becomes a card nobody can answer.
 - Reproduce formulas, symbols, numbers, units and names exactly as the source gives them.
+- Math: \\( ... \\) inline and \\[ ... \\] for a formula on a line of its own. Never $...$.
 - Use only what the source states. Add nothing from outside knowledge, and do not correct or extend the source. A line the source does not support has no place on the sheet, however true it is.
 
 HOW MUCH
@@ -220,6 +221,20 @@ HEADING_RE = re.compile(r"^(?:#{1,6}\s+(.+?)\s*#*|\*\*([^*]+)\*\*:?)$")
 ITEM_RE = re.compile(r"^(\s*)(?:[-*•]|(\d+[.)]))\s+(.*)$")
 TABLE_RULE_RE = re.compile(r"^\|?\s*:?-{2,}[-:|\s]*$")
 EXAMPLE_RE = re.compile(r"^\**(?:worked\s+)?example\b", re.IGNORECASE)
+# What a line may hold besides plain text: a code span, maths, bold. The scan runs left to
+# right and code is tried first, so a `$` or `|` inside backticks stays code. A lone `$`
+# opens maths only the way Pandoc reads it (no space inside the pair, nothing joined on
+# outside it), which leaves prices alone.
+INLINE_RE = re.compile(
+    r"`(?P<code>[^`]+)`"
+    r"|\\\((?P<paren>.+?)\\\)"
+    r"|\\\[(?P<bracket>.+?)\\\]"
+    r"|\$\$(?P<dollars>.+?)\$\$"
+    r"|(?<![\\$\w])\$(?P<dollar>[^\s$](?:[^$]*?[^\s$\\])?)\$(?![\w$])"
+    r"|\*\*(?P<bold>.+?)\*\*"
+)
+# The maths groups of INLINE_RE, and whether each one is a displayed formula.
+MATH_GROUPS = {"paren": False, "bracket": True, "dollars": True, "dollar": False}
 
 
 def sheet_blocks(text):
@@ -257,7 +272,7 @@ def sheet_blocks(text):
                 continue
             if blank or not last("table"):
                 blocks.append({"type": "table", "rows": []})
-            blocks[-1]["rows"].append([cell.strip() for cell in line.strip("|").split("|")])
+            blocks[-1]["rows"].append(_cells(line))
         elif not blank and last("list") and raw[:1].isspace():
             # An indented line under a bullet continues that bullet.
             blocks[-1]["items"][-1]["text"] += " " + line
@@ -266,3 +281,15 @@ def sheet_blocks(text):
         else:
             blocks.append({"type": "text", "text": line, "example": bool(EXAMPLE_RE.match(line))})
     return blocks
+
+
+def _cells(row):
+    """The cells of one table row. A `|` inside maths or a code span belongs to its cell."""
+    row = row.strip("|")
+    kept = [m.span() for m in INLINE_RE.finditer(row) if m.lastgroup != "bold"]
+    cells, start = [], 0
+    for pos, char in enumerate(row):
+        if char == "|" and not any(a <= pos < b for a, b in kept):
+            cells.append(row[start:pos].strip())
+            start = pos + 1
+    return cells + [row[start:].strip()]

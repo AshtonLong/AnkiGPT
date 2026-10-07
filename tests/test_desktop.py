@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 import sqlite3
 import threading
 import zipfile
@@ -19,7 +20,7 @@ from app.desktop import (
     read_settings_env, set_port,
 )
 from app.extensions import db as _db
-from app.models import Card, Deck, Figure, PipelineTask, User
+from app.models import Card, Deck, Figure, PipelineTask, Source, User
 from app.services import llm as llm_module
 from app.services.credentials import user_key
 from app.services.llm import MissingAPIKeyError, OpenRouterConnectionError, OpenRouterError
@@ -616,6 +617,30 @@ def test_fonts_and_htmx_are_served_by_the_app(client):
     assert b"htmx" in client.get("/static/vendor/htmx.min.js").data[:400]
     for licence in ("fonts/Figtree-OFL.txt", "fonts/FragmentMono-OFL.txt", "vendor/htmx-LICENSE.txt"):
         assert client.get(f"/static/{licence}").status_code == 200
+
+
+def test_the_cheat_sheet_saves_as_a_pdf_and_typesets_maths_offline(client, app):
+    deck_id = make_deck(app)
+    with app.app_context():
+        _db.session.get(Deck, deck_id).run_json = {"plan": {"tasks": []}, "cheat_sheet": {"units": 1}}
+        _db.session.add(Source(deck_id=deck_id, idx=0, title="Motion", text=r"- Speed: \(v = d / t\)", hash="a"))
+        _db.session.commit()
+    html = client.get(f"/decks/{deck_id}/cheat-sheet").get_data(as_text=True)
+    # The shell writes the PDF when this button is pressed; there is no print dialog to offer.
+    assert "data-print>" in html and "Save as PDF" in html and "Print or save" not in html
+    assert r'<span class="tex" data-tex="v = d / t">\(v = d / t\)</span>' in html
+    for remote in ("cdn.jsdelivr.net", "cdnjs.cloudflare.com", "https://unpkg.com"):
+        assert remote not in html
+    assert '/static/vendor/katex/katex.min.js"' in html and '/static/sheet.js"' in html
+    assert b"katex" in client.get("/static/vendor/katex/katex.min.js").data[:400]
+    stylesheet = client.get("/static/vendor/katex/katex.min.css").get_data(as_text=True)
+    assert "https://" not in stylesheet
+    # A browser takes the first format it can read, which is always the .woff2.
+    fonts = set(re.findall(r"url\(fonts/([\w-]+\.woff2)\)", stylesheet))
+    assert len(fonts) == 20
+    for name in fonts:
+        assert client.get(f"/static/vendor/katex/fonts/{name}").data[:4] == b"wOF2"
+    assert client.get("/static/vendor/katex/LICENSE.txt").status_code == 200
 
 
 # -------------------------------------------------------------- offline errors

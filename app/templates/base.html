@@ -20,6 +20,7 @@
 </script>
   <script src="{{ url_for('static', filename='experience.js') }}" defer>
 </script>
+  {% block head %}{% endblock %}
 </head>
 <body class="{{ 'app-shell' if app_page else 'public-shell' }} {% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">Skip to content</a>
