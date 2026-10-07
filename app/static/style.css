@@ -4645,7 +4645,10 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
 .sheet .katex-display { margin: 5px 0; padding: 1px 0; overflow-x: auto; overflow-y: hidden; }
 /* A column is narrow: let a displayed formula wrap after = and + the way an inline one does. */
 .sheet .katex-display > .katex { white-space: normal; }
-.sheet .katex-display > .katex > .katex-html > .base { margin: 2px 0; }
+.sheet .katex-display > .katex > .katex-html > .katex-base { margin: 2px 0; }
+/* static/sheet.js gives a formula with a piece too wide for a column the scale that fits it (--fit).
+   On screen a displayed formula scrolls instead, so only one inside a line is scaled. */
+.sheet .tex:not([data-display]) .katex { font-size: calc(1.1em * var(--fit, 1)); }
 @media (max-width: 760px) { .sheet { padding: 20px; columns: 1; } }
 @media print {
   body { background: #fff; }
@@ -4656,4 +4659,7 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
   .sheet { border: 0; box-shadow: none; padding: 0; columns: 2; column-gap: 24px; font-size: 10.5px; }
   .sheet .example, .sheet table { font-size: 10px; }
   .sheet figure img { max-height: 200px; }
+  /* Paper cannot scroll, so a displayed formula is scaled to fit as well. */
+  .sheet .katex-display { overflow: visible; }
+  .sheet .tex .katex { font-size: calc(1.1em * var(--fit, 1)); }
 }
