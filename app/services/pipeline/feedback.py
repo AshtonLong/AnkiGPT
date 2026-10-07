@@ -22,6 +22,7 @@ from ..credentials import openrouter_key_for
 from ..llm import extract_json, is_terminal_error
 from ..validators import is_valid_cloze, normalize_math, normalize_text
 from . import critic as critic_mod
+from .efforts import user_efforts
 from .routing import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ def coach_cards(deck_id, card_ids=None):
     cards = [c for c in query.all() if (card_ids or (c.review_stats_json or {}).get("struggling"))]
     if not cards:
         return {"cards": 0, "rewritten": 0, "split": 0, "kept": 0}
-    client = LLMClient(current_app.config, openrouter_key_for(deck.user))
+    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user))
     phase = PipelineTask(deck_id=deck_id, seq=0, phase="coach", kind="phase", label="Coach struggling cards",
                          status="running", started_at=utcnow())
     db.session.add(phase)
@@ -184,7 +185,8 @@ def coach_cards(deck_id, card_ids=None):
             payload = [(_card_dict(c), c.review_stats_json or {}) for c in batch]
             messages = critic_mod.diagnose_messages(payload, source_text)
             try:
-                result = client.chat("critic", messages, response_format=critic_mod.DIAGNOSE_SCHEMA, max_tokens=8000)
+                result = client.chat("critic", messages, response_format=critic_mod.DIAGNOSE_SCHEMA, max_tokens=8000,
+                                     agent="coach")
                 data = extract_json(result.content)
             except Exception as exc:
                 node.status = "failed"

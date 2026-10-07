@@ -1,0 +1,31 @@
+{# The Advanced panel: one reasoning-effort slider per agent. Shared by the profile page and
+   the desktop Settings page, which pass their own `number`. Stop 0 follows the default. #}
+{% from "partials/ui.html" import icon %}
+<section class="profile-panel" id="advanced" aria-labelledby="advanced-title">
+  <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('gauge', 21) }}</span><div><h2 id="advanced-title">Advanced</h2><p>How hard each AI agent thinks while it works on your decks.</p></div><span class="profile-section-number">{{ number }}</span></div>
+  <form method="post" action="{{ url_for('auth.profile', _anchor='advanced') }}" data-profile-form data-effort-form data-effort-labels="{{ effort_labels|join('|') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="advanced">
+    <div class="profile-fields">
+      <p class="effort-intro">More effort means more careful work and a slower, costlier run. An agent left on <b>Default</b> follows the app's own setting. Changes apply from your next run.</p>
+      <div class="effort-all" role="group" aria-label="Set every agent at once"><span>Set all</span>
+        <button type="button" data-effort-all="0">Default</button>{% for label in effort_labels %}<button type="button" data-effort-all="{{ loop.index }}">{{ label }}</button>{% endfor %}
+      </div>
+      {% for group in effort_groups %}
+      <fieldset class="effort-group">
+        <legend>{{ group.title }} <span>{{ group.note }}</span></legend>
+        {% for agent in group.agents %}
+        <div class="effort-row{% if agent.stop %} is-set{% endif %}">
+          <div><label for="effort_{{ agent.key }}">{{ agent.name }}</label><p class="hint" id="effort_{{ agent.key }}-hint">{{ agent.does }}</p></div>
+          <div class="range-row">
+            <input type="range" id="effort_{{ agent.key }}" name="effort_{{ agent.key }}" min="0" max="{{ effort_labels|length }}" step="1" value="{{ agent.stop }}" list="effort-stops" data-effort data-default-label="{{ agent.default_label }}" aria-describedby="effort_{{ agent.key }}-hint" aria-valuetext="{{ agent.label }}">
+            <output for="effort_{{ agent.key }}">{{ agent.label }}</output>
+          </div>
+        </div>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+      <datalist id="effort-stops">{% for stop in range(effort_labels|length + 1) %}<option value="{{ stop }}"></option>{% endfor %}</datalist>
+    </div>
+    <div class="profile-form-footer"><span class="profile-save-state" data-save-state aria-live="polite"></span><div><button class="btn ghost" type="submit" name="action" value="reset">Reset to defaults</button><button class="btn primary" type="submit">Save effort {{ icon('arrow-right', 15) }}</button></div></div>
+  </form>
+</section>

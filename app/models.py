@@ -23,6 +23,9 @@ class User(UserMixin, db.Model):
     # four characters are kept in the clear so the profile can show which key is saved.
     openrouter_key_encrypted = db.Column(db.Text)
     openrouter_key_hint = db.Column(db.String(8))
+    # Reasoning effort per agent, for the agents the user moved off the default; see
+    # services.pipeline.efforts.
+    agent_efforts_json = db.Column(db.JSON)
     # Throttles reset emails so the form can't be used to spam an inbox.
     reset_requested_at = db.Column(db.DateTime)
 

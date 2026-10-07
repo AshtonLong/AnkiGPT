@@ -1,4 +1,4 @@
-/* Profile editing: live identity preview and honest unsaved-change feedback. */
+/* Profile editing: live identity preview, effort sliders and honest unsaved-change feedback. */
 (function () {
   'use strict';
   var forms = Array.from(document.querySelectorAll('[data-profile-form]'));
@@ -48,6 +48,25 @@
       }, 0);
     });
     form.addEventListener('submit', function () { submitting = true; });
+  });
+  // Advanced: each slider names its stop. Stop 0 is the default the agent follows.
+  document.querySelectorAll('[data-effort-form]').forEach(function (form) {
+    var labels = form.dataset.effortLabels.split('|');
+    var sliders = Array.from(form.querySelectorAll('input[data-effort]'));
+    function show(slider) {
+      var stop = parseInt(slider.value, 10);
+      var text = stop ? labels[stop - 1] : slider.dataset.defaultLabel;
+      slider.setAttribute('aria-valuetext', text);
+      form.querySelector('output[for="' + slider.id + '"]').textContent = text;
+      slider.closest('.effort-row').classList.toggle('is-set', stop > 0);
+    }
+    sliders.forEach(function (slider) { slider.addEventListener('input', function () { show(slider); }); });
+    form.querySelectorAll('[data-effort-all]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        sliders.forEach(function (slider) { slider.value = button.dataset.effortAll; show(slider); });
+        form.dispatchEvent(new Event('change'));
+      });
+    });
   });
   document.querySelectorAll('form[action$="/logout"]').forEach(function (form) {
     form.addEventListener('submit', function () { submitting = true; });
