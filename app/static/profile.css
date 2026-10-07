@@ -97,6 +97,23 @@
 .key-needed svg { flex-shrink:0; margin-top:2px; }
 .key-needed p { margin:0; color:inherit; font-size:inherit; }
 .key-needed .text-link { font-size:inherit; gap:4px; }
+/* Advanced: one effort slider per agent. A row is marked once it leaves the default. */
+#advanced .profile-section-icon { background:#EEF3F8; border-color:#D9E4EF; color:#365F86; }
+.effort-intro { margin:0 0 18px; font-size:12px; line-height:1.7; }
+.effort-all { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 24px; }
+html:not(.js) .effort-all { display:none; }
+.effort-all>span { margin-right:4px; font-size:11px; font-weight:600; color:var(--ink); }
+.effort-all button { padding:6px 11px; border:1px solid var(--line); border-radius:20px; background:white; color:var(--ink); font:inherit; font-size:11px; cursor:pointer; transition:border-color 160ms,background 160ms; }
+.effort-all button:hover { border-color:#DCB5A7; background:#FFF8F4; }
+.effort-group { min-width:0; margin:0 0 22px; padding:0; border:0; }
+.effort-group:last-of-type { margin-bottom:0; }
+.effort-group legend { padding:0; margin-bottom:6px; font:9px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.effort-group legend span { margin-left:8px; color:#8F9AA7; letter-spacing:.04em; text-transform:none; }
+.effort-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,48%); align-items:center; gap:8px 26px; padding:13px 0; border-top:1px solid #EDF0F4; }
+.effort-row .hint { margin-top:3px; }
+.effort-row input[type=range] { background:none; cursor:pointer; }
+.effort-row output { min-width:112px; padding:7px 8px; font-size:11px; white-space:nowrap; }
+.effort-row.is-set output { border-color:#E8B9A9; background:#FFF4ED; color:#97442D; font-weight:600; }
 .profile-signout { padding:7px 2px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
 .profile-signout h3 { font-size:14px; margin-bottom:5px; }
 .profile-signout p { font-size:12px; }
@@ -139,6 +156,7 @@
   .profile-form-footer { padding:16px 20px; }
   .profile-field-grid { grid-template-columns:1fr; gap:21px; }
   .profile-swatches>.hint { flex-basis:100%; margin:3px 0 0; }
+  .effort-row { grid-template-columns:1fr; }
 }
 @media(max-width:400px) {
   .app-shell .topbar .logo-word { display:none; }

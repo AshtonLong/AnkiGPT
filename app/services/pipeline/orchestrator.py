@@ -30,6 +30,7 @@ from . import planner as planner_mod
 from . import reconcile as reconcile_mod
 from . import workers as workers_mod
 from .cache import DBCache, NullCache, make_key
+from .efforts import user_efforts
 from .parallel import Job, run_jobs
 from .routing import ChatResult, LLMClient
 from .strategies import DEFAULT_STRATEGY, PROMPT_VERSION
@@ -124,7 +125,7 @@ def _build_context(deck):
     cfg = current_app.config
     settings = dict(deck.settings_json or {})
     settings.setdefault("card_style", deck.card_style)
-    client = LLMClient(cfg, openrouter_key_for(deck.user))
+    client = LLMClient(cfg, openrouter_key_for(deck.user), user_efforts(deck.user))
     cache = DBCache(enabled=bool(cfg.get("PIPELINE_CACHE_ENABLED", True)))
     if not cfg.get("PIPELINE_CACHE_ENABLED", True):
         cache = NullCache()
@@ -234,7 +235,8 @@ def _phase_cheatsheet(ctx):
         jobs.append(Job(
             id=node.id,
             fn=(lambda m=messages: cheatsheet_mod.write_cheat_sheet(ctx.client, m)),
-            cache_key=make_key("cheatsheet", model, cheatsheet_mod.CHEATSHEET_PROMPT_VERSION, messages),
+            cache_key=make_key("cheatsheet", model, cheatsheet_mod.CHEATSHEET_PROMPT_VERSION, messages,
+                               *ctx.client.effort_key("cheatsheet")),
             meta={"role": "cheatsheet", "model": model},
         ))
 
@@ -462,7 +464,8 @@ def _phase_figures(ctx):
         node = tracer.task("figures", f"Read figure on p.{fig.page}", strategy="vision",
                            unit_ids=[idx] if idx is not None else [], model=ctx.client.model_for("vision"))
         nodes[fig.id] = node
-        key = make_key("vision", ctx.client.model_for("vision"), figures_mod.VISION_PROMPT_VERSION, fig.hash, context[:6000])
+        key = make_key("vision", ctx.client.model_for("vision"), figures_mod.VISION_PROMPT_VERSION, fig.hash, context[:6000],
+                       *ctx.client.effort_key("vision"))
         # Tracer commits expire ORM attributes. Resolve image data here, while
         # the DB session is available; pool threads must never load Figure rows.
         image_bytes, mime = bytes(fig.image), fig.mime or "image/png"
@@ -577,7 +580,7 @@ def _worker_job_for(ctx, task, node, siblings, figure_payload=None):
     messages = workers_mod.build_worker_messages(task, units, ctx.settings, ctx.card_style, siblings=siblings,
                                                 figure=figure_payload)
     model = ctx.client.model_for("worker")
-    key = make_key("worker", model, workers_mod.WORKER_PROMPT_VERSION, messages)
+    key = make_key("worker", model, workers_mod.WORKER_PROMPT_VERSION, messages, *ctx.client.effort_key("worker"))
     return Job(
         id=node.id,
         fn=(lambda m=messages, t=task: {**workers_mod.run_worker(ctx.client, m, t.target_cards), "messages": m}),
@@ -692,7 +695,8 @@ def _run_critic(ctx, phase, entries):
                 unit_ids=list(entry["task"].unit_idxs), model=ctx.client.model_for("critic"), target_cards=len(batch),
                 parent=tracer.phase_nodes.get(phase),
             )
-            key = make_key("critic", ctx.client.model_for("critic"), critic_mod.CRITIC_PROMPT_VERSION, dicts, hash_text(source_text))
+            key = make_key("critic", ctx.client.model_for("critic"), critic_mod.CRITIC_PROMPT_VERSION, dicts, hash_text(source_text),
+                           *ctx.client.effort_key("cold_reader", "judge"))
             batches[node.id] = {"node": node, "cards": batch}
             jobs.append(Job(
                 id=node.id,
@@ -845,7 +849,8 @@ def _phase_coverage(ctx):
         prompts = [critic_mod.card_prompt(_card_dict(c)) for c in cards_by_unit.get(sid, [])]
         node = tracer.task("coverage", f"Audit coverage · {u.title[:90]}", unit_ids=[u.idx],
                            model=ctx.client.model_for("reconcile"))
-        key = make_key("coverage", ctx.client.model_for("reconcile"), reconcile_mod.COVERAGE_PROMPT_VERSION, hash_text(u.text), prompts)
+        key = make_key("coverage", ctx.client.model_for("reconcile"), reconcile_mod.COVERAGE_PROMPT_VERSION, hash_text(u.text), prompts,
+                       *ctx.client.effort_key("coverage"))
         nodes[node.id] = {"node": node, "unit": u}
         jobs.append(Job(id=node.id, fn=(lambda unit=u, p=prompts: reconcile_mod.audit_unit(ctx.client, unit, p)),
                         cache_key=key, meta={"role": "reconcile", "model": ctx.client.model_for("reconcile")}))
