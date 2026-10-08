@@ -41,6 +41,7 @@ desktop-specific sits behind one switch, called **desktop mode** in this documen
 - Generating in the background after the window is closed (no tray icon).
 - Sending cards straight into Anki through AnkiConnect.
 - A model picker in the UI. Models are changed through a settings file (section 5.9).
+  One was added after version 1: the AI model panel in section 5.5.
 - Moving a web account's decks into the desktop app, or syncing between the two.
 - Several profiles on one Windows account.
 - An in-app backup and restore screen.
@@ -289,19 +290,22 @@ one helper so desktop says "Settings" and web still says "My profile".
 ### 5.5 The Settings page
 
 Same URL as the profile page (`/auth/profile`), rendered from its own template in desktop
-mode. It has four panels:
+mode. It has five panels:
 
 1. **OpenRouter API key.** The existing panel and behaviour, unchanged: save, replace,
    remove, last four characters shown, never displayed again. The link to
    `openrouter.ai/keys` opens in the user's browser.
-2. **Advanced.** One reasoning-effort slider per agent, the same panel the web profile
-   page has. Added after version 1; the defaults the sliders show come from
-   `settings.env` (section 5.9).
-3. **Your data.** Plain statements: decks are stored on this computer at the shown path;
+2. **AI model.** The model picker, the same panel the web profile page has: the listed
+   models, grouped by the company that makes them. Added after version 1. The model
+   marked Default is `OPENROUTER_MODEL`, which `settings.env` (section 5.9) can set.
+3. **Advanced.** One reasoning-effort slider per agent, the same panel the web profile
+   page has, with the levels the picked model takes. Added after version 1; the defaults
+   the sliders show come from `settings.env` (section 5.9).
+4. **Your data.** Plain statements: decks are stored on this computer at the shown path;
    source material and cards are sent to OpenRouter under the user's key when generating,
    improving or coaching; nothing is sent to an AnkiGPT server; the app contacts GitHub
    to check for updates.
-4. **About.** App version.
+5. **About.** App version.
 
 Display name, bio, avatar colour, email and password are not shown on desktop.
 
@@ -348,14 +352,16 @@ produced are reused from the cache, while mapping and planning are paid for agai
 ### 5.9 Advanced settings file
 
 The model and pipeline settings are environment variables today, and a desktop user has
-no environment to set. Until there is a settings UI, the backend reads
+no environment to set. For what the Settings page does not cover, the backend reads
 `data\settings.env` if it exists and applies only these keys: `OPENROUTER_MODEL`,
 `OPENROUTER_MODEL_*`, `OPENROUTER_REASONING_*`, `OPENROUTER_EMBEDDING_MODEL`,
 `OPENROUTER_TEMPERATURE`, `OPENROUTER_TIMEOUT_SECONDS`, `OPENROUTER_MAX_TOKENS`,
 `PIPELINE_*` and `MAX_SOURCE_CHARS`. Any other key is ignored and logged.
 
 This is also the escape hatch if the built-in default model (`openai/gpt-6-luna`) is
-retired by the provider before an update ships.
+retired by the provider before an update ships. A user who picked another model in
+Settings is not affected by `OPENROUTER_MODEL` or `OPENROUTER_MODEL_*`: their pick runs
+every role until they change it.
 
 ### 5.10 The entry point
 

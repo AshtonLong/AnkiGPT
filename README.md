@@ -83,7 +83,8 @@ Open [localhost:5000](http://127.0.0.1:5000), create an account, and paste your
 OpenRouter API key under **My profile**. Then choose **New deck**.
 The workspace requires sign-in; the landing page has a public illustrative sample.
 **My profile** also manages your display name, bio, avatar color, email, and password,
-and under **Advanced** how much reasoning effort each AI agent uses.
+under **AI model** which model writes your cards, and under **Advanced** how much
+reasoning effort each AI agent uses.
 
 ### Docker
 
@@ -101,6 +102,8 @@ persists its SQLite database and uploads in the `ankigpt-data` volume.
 - **Input:** text and text-based PDFs; no OCR workflow. Defaults: 50 MB upload limit
   and 400,000 source characters. Longer sources are truncated with a warning.
 - **Models:** the configured default is `openai/gpt-6-luna`, with per-role overrides.
+  Each user can pick another under **AI model**: `anthropic/claude-haiku-5.5` is the
+  other one listed. All of them run through OpenRouter.
   Model access and charges depend on your OpenRouter account. Repeated tasks can use
   cached results, but a rerun is not guaranteed to cost nothing.
 - **Cost:** AnkiGPT itself is free. Each user saves their own OpenRouter API key

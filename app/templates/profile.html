@@ -44,7 +44,8 @@
         <a href="#api-key">{{ icon('key', 17) }} OpenRouter API key <span>02</span></a>
         <a href="#email">{{ icon('mail', 17) }} Email address <span>03</span></a>
         <a href="#password">{{ icon('shield', 17) }} Password & security <span>04</span></a>
-        <a href="#advanced">{{ icon('gauge', 17) }} Advanced <span>05</span></a>
+        <a href="#model">{{ icon('cpu', 17) }} AI model <span>05</span></a>
+        <a href="#advanced">{{ icon('gauge', 17) }} Advanced <span>06</span></a>
       </nav>
       <p class="profile-private">{{ icon('lock', 15) }} Your profile is just for you.<br>No public profile. No distractions.</p>
     </aside>
@@ -112,7 +113,8 @@
           <div class="profile-form-footer"><span class="profile-save-state" data-save-state aria-live="polite"></span><button class="btn" type="submit">Update password {{ icon('arrow-right', 15) }}</button></div>
         </form>
       </section>
-      {% with number = '05' %}{% include 'partials/advanced_settings.html' %}{% endwith %}
+      {% with number = '05' %}{% include 'partials/model_settings.html' %}{% endwith %}
+      {% with number = '06' %}{% include 'partials/advanced_settings.html' %}{% endwith %}
       <div class="profile-signout"><div><h3>See you next session.</h3><p>Your decks will be here when you get back.</p></div><form action="{{ url_for('auth.logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" type="submit">{{ icon('logout', 16) }} Sign out</button></form></div>
     </div>
   </div>

@@ -1,5 +1,6 @@
 {# The desktop app's Settings page. It is served at the profile URL in desktop mode, where
-   there is no account: the OpenRouter key and the advanced settings are all there is to edit. #}
+   there is no account: the OpenRouter key, the model and the advanced settings are all there
+   is to edit. #}
 {% extends "base.html" %}
 {% from "partials/ui.html" import icon %}
 {% block title %}Settings · AnkiGPT{% endblock %}
@@ -29,9 +30,10 @@
       </div>
       <nav class="profile-section-nav" aria-label="Settings sections">
         <a href="#api-key">{{ icon('key', 17) }} OpenRouter API key <span>01</span></a>
-        <a href="#advanced">{{ icon('gauge', 17) }} Advanced <span>02</span></a>
-        <a href="#your-data">{{ icon('shield', 17) }} Your data <span>03</span></a>
-        <a href="#about">{{ icon('info', 17) }} About <span>04</span></a>
+        <a href="#model">{{ icon('cpu', 17) }} AI model <span>02</span></a>
+        <a href="#advanced">{{ icon('gauge', 17) }} Advanced <span>03</span></a>
+        <a href="#your-data">{{ icon('shield', 17) }} Your data <span>04</span></a>
+        <a href="#about">{{ icon('info', 17) }} About <span>05</span></a>
       </nav>
     </aside>
 
@@ -60,10 +62,12 @@
         </form>
       </section>
 
-      {% with number = '02' %}{% include 'partials/advanced_settings.html' %}{% endwith %}
+      {% with number = '02' %}{% include 'partials/model_settings.html' %}{% endwith %}
+
+      {% with number = '03' %}{% include 'partials/advanced_settings.html' %}{% endwith %}
 
       <section class="profile-panel" id="your-data" aria-labelledby="your-data-title">
-        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('shield', 21) }}</span><div><h2 id="your-data-title">Your data</h2><p>Where your decks live, and what leaves this computer.</p></div><span class="profile-section-number">03</span></div>
+        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('shield', 21) }}</span><div><h2 id="your-data-title">Your data</h2><p>Where your decks live, and what leaves this computer.</p></div><span class="profile-section-number">04</span></div>
         <ul class="settings-facts">
           <li>{{ icon('cards', 18) }}<div><b>Your decks are stored on this computer.</b><p>Decks, cards and your key are kept in this folder:</p><code class="settings-path">{{ data_dir }}</code></div></li>
           <li>{{ icon('upload', 18) }}<div><b>Your material goes to OpenRouter, under your key.</b><p>Source material and cards are sent to OpenRouter when you generate, improve or coach.</p></div></li>
@@ -73,7 +77,7 @@
       </section>
 
       <section class="profile-panel" id="about" aria-labelledby="about-title">
-        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('info', 21) }}</span><div><h2 id="about-title">About</h2><p>The copy of AnkiGPT installed on this computer.</p></div><span class="profile-section-number">04</span></div>
+        <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('info', 21) }}</span><div><h2 id="about-title">About</h2><p>The copy of AnkiGPT installed on this computer.</p></div><span class="profile-section-number">05</span></div>
         <div class="settings-about">
           <span class="logo-mark" aria-hidden="true"></span>
           <div><b>AnkiGPT</b><p>Version <span class="settings-version">{{ app_version or 'unknown' }}</span></p></div>

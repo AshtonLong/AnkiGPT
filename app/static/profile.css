@@ -87,7 +87,7 @@
 .profile-key-status.is-saved svg { color:var(--green); }
 .profile-key-status.is-missing { border-color:#EDC8BC; background:#FFF4F0; color:#A13A2A; }
 .profile-key-status.is-missing svg { color:#A13A2A; }
-.profile-fields .hint .text-link { font-size:inherit; }
+.profile-fields .hint .text-link,.profile-security-note .text-link { font-size:inherit; }
 /* Prompts to add a key: the sidebar card and the note above "Plan & generate". */
 .key-note { display:block; transition:border-color 200ms,box-shadow 200ms; }
 .key-note:hover { border-color:#E8B9A9; box-shadow:0 6px 20px #D14A2D14; }
@@ -97,6 +97,35 @@
 .key-needed svg { flex-shrink:0; margin-top:2px; }
 .key-needed p { margin:0; color:inherit; font-size:inherit; }
 .key-needed .text-link { font-size:inherit; gap:4px; }
+/* AI model: the picker, one group per company, with the company's mark on each model. */
+#model .profile-section-icon { background:#EEF3F8; border-color:#D9E4EF; color:#365F86; }
+.model-menu { display:grid; gap:18px; margin:0 0 20px; }
+.model-group { display:grid; gap:8px; min-width:0; margin:0; padding:0; border:0; }
+.model-group legend { padding:0; margin-bottom:8px; font:9px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.model-option { display:block; position:relative; margin:0!important; cursor:pointer; }
+.model-option input { position:absolute; width:1px; height:1px; opacity:0; }
+.model-option-body { display:flex; align-items:center; gap:14px; padding:13px 15px; border:1px solid var(--line); border-radius:10px; background:white; transition:background 160ms,border-color 160ms; }
+.model-option:hover .model-option-body { border-color:#DCB5A7; }
+.model-option input:checked+.model-option-body { border-color:var(--accent); background:var(--accent-soft); }
+.model-option input:focus-visible+.model-option-body { outline:3px solid #D14A2D70; outline-offset:3px; }
+.model-logo { display:grid; place-items:center; width:38px; height:38px; flex-shrink:0; border:1px solid var(--line); border-radius:10px; background:white; color:var(--ink); }
+.model-logo-anthropic { background:#F4EEE6; border-color:#E6DACB; color:#191919; }
+.model-logo-other { color:var(--muted); }
+.model-option-text { display:grid; gap:3px; min-width:0; font-weight:400; }
+.model-option-text b { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ink); }
+.model-option-text>span { font-size:12px; color:var(--muted); }
+.model-option-text code { font:10px var(--mono); color:#8F9AA7; overflow-wrap:anywhere; }
+.model-default { padding:2px 7px; border:1px solid var(--line); border-radius:20px; background:white; font:8px var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.model-check { display:grid; place-items:center; width:22px; height:22px; flex-shrink:0; margin-left:auto; border:1px solid var(--line); border-radius:50%; background:white; color:transparent; }
+.model-option input:checked+.model-option-body .model-check { border-color:var(--accent); background:var(--accent); color:white; }
+/* The model a run will use, above "Plan & generate" and above the effort sliders. */
+.run-model,.effort-model { display:flex; align-items:center; gap:9px; font-size:12px; color:var(--muted); }
+.run-model { margin:4px 0 14px; }
+.run-model .model-logo,.effort-model .model-logo { width:26px; height:26px; border-radius:7px; }
+.run-model b,.effort-model b { font-weight:600; color:var(--ink); }
+.run-model .text-link { margin-left:auto; font-size:inherit; }
+.effort-model { margin:0 0 20px; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--bg); line-height:1.6; }
+.effort-model .text-link { font-size:inherit; margin-left:4px; }
 /* Advanced: one effort slider per agent. A row is marked once it leaves the default. */
 #advanced .profile-section-icon { background:#EEF3F8; border-color:#D9E4EF; color:#365F86; }
 .effort-intro { margin:0 0 18px; font-size:12px; line-height:1.7; }

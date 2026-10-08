@@ -29,6 +29,7 @@ from ..services.deckgen import improve_card, regenerate_source
 from ..services.export import export_deck as export_deck_file
 from ..services.pdf import extract_pdf_text
 from ..services.pipeline import progress_for
+from ..services.pipeline.catalog import active_model
 from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach_cards, read_review_stats
 from ..services.pipeline.cheatsheet import INLINE_RE, MATH_GROUPS, sheet_blocks
 from ..services.pipeline.figures import extract_figures, number_figures
@@ -261,6 +262,7 @@ def preview_deck(deck_id):
     figures = Figure.query.filter_by(deck_id=deck.id).order_by(Figure.page, Figure.id).limit(6).all()
     return render_template(
         "deck_preview.html", deck=deck, figure_count=figure_count, figures=figures, has_api_key=_has_api_key(),
+        model=active_model(get_actor(), current_app.config),
     )
 
 

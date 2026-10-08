@@ -22,6 +22,7 @@ from ..credentials import openrouter_key_for
 from ..llm import extract_json, is_terminal_error
 from ..validators import is_valid_cloze, normalize_math, normalize_text
 from . import critic as critic_mod
+from .catalog import user_model
 from .efforts import user_efforts
 from .routing import LLMClient
 
@@ -162,7 +163,7 @@ def coach_cards(deck_id, card_ids=None):
     cards = [c for c in query.all() if (card_ids or (c.review_stats_json or {}).get("struggling"))]
     if not cards:
         return {"cards": 0, "rewritten": 0, "split": 0, "kept": 0}
-    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user))
+    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user), user_model(deck.user))
     phase = PipelineTask(deck_id=deck_id, seq=0, phase="coach", kind="phase", label="Coach struggling cards",
                          status="running", started_at=utcnow())
     db.session.add(phase)
