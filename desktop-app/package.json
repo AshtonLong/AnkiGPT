@@ -1,7 +1,7 @@
 {
   "name": "ankigpt-desktop",
   "productName": "AnkiGPT",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Turn PDFs and notes into editable Anki flashcards, on your own computer.",
   "author": "AshtonLong",
   "homepage": "https://github.com/AshtonLong/AnkiGPT",
