@@ -114,13 +114,29 @@ again; the page only tells you which key is saved by its last four characters. P
 new key to replace it, or choose **Remove key**. OpenRouter charges you for what your
 decks use, and the run trace shows the recorded cost of each run.
 
+### AI model
+
+**My profile → AI model** is the model picker. It lists the models you can use, grouped
+by the company that makes them:
+
+| Company | Model | Reasoning effort it takes |
+|---|---|---|
+| OpenAI | GPT-6 Luna (`openai/gpt-6-luna`), the default | Off, Low, Medium, High, Extra high, Max |
+| Anthropic | Claude Haiku 5.5 (`anthropic/claude-haiku-5.5`) | Low, Medium, High, Extra high, Max |
+
+Pick one and choose **Save model**. From your next run it does everything: generating a
+deck, regenerating a unit, **AI improve** and the coach. Every model runs through
+OpenRouter on the one key you saved, and OpenRouter bills each at its own rate. The
+brief page names the model a deck is about to be written by, above **Plan & generate**.
+
 ### Advanced: how hard each agent thinks
 
 A deck is built by several AI agents, and **My profile → Advanced** has a slider for
-each one. Move a slider to set that agent's reasoning effort: **Minimal**, **Low**,
-**Medium**, **High** or **Extra high**. More effort means more careful work, and a
-slower and costlier run. A slider left on **Default** follows the app's own setting,
-which is shown beside it.
+each one. Move a slider to set that agent's reasoning effort. The stops are the levels
+your model takes, listed in the table above and at the top of the panel, so they change
+when you pick another model. More effort means more careful work, and a slower and
+costlier run. A slider left on **Default** follows the app's own setting, which is
+shown beside it.
 
 | Agent | What it does |
 |---|---|
@@ -140,8 +156,10 @@ which is shown beside it.
 The last seven are the review agents: each check a card goes through after it is written
 has its own slider. **Set all** moves every slider at once, **Save effort** stores your
 choices, and **Reset to defaults** clears them. Changes apply from your next run, and to
-your account only. Some models have fewer effort levels than the slider; OpenRouter
-then uses the nearest level the model has.
+your account only. An effort you set under one model is kept when you switch. If the new
+model has no such level, the agent uses the next level up that it has (its highest, if
+there is none above), and the slider shows that level. So **Off** under GPT-6 Luna
+becomes **Low** under Claude Haiku 5.5, which cannot have reasoning turned off.
 
 ## Troubleshooting
 

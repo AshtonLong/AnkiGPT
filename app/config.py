@@ -16,7 +16,8 @@ def _env_int(name, default):
 DEV_SECRET_KEY = "dev-secret"
 
 # GPT-6 Luna: 1M context, structured outputs, tools, vision, cheap. Every pipeline
-# role defaults to it; override a single role with OPENROUTER_MODEL_<ROLE>.
+# role defaults to it; override a single role with OPENROUTER_MODEL_<ROLE>. A user can
+# pick another model for their own runs (see services.pipeline.catalog).
 DEFAULT_MODEL = "openai/gpt-6-luna"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 
@@ -42,8 +43,9 @@ class Config:
     OPENROUTER_MODEL_RECONCILE = os.getenv("OPENROUTER_MODEL_RECONCILE", "")
     OPENROUTER_MODEL_VISION = os.getenv("OPENROUTER_MODEL_VISION", "")
     OPENROUTER_EMBEDDING_MODEL = os.getenv("OPENROUTER_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
-    # Reasoning effort per role (sent as OpenRouter's normalized `reasoning.effort`).
-    # Empty disables the parameter for models that don't support it.
+    # Reasoning effort per role (sent as OpenRouter's normalized `reasoning.effort`, as
+    # a level the model in use takes). Empty disables the parameter for models that
+    # don't support it.
     OPENROUTER_REASONING_PLANNER = os.getenv("OPENROUTER_REASONING_PLANNER", "medium")
     OPENROUTER_REASONING_MAPPER = os.getenv("OPENROUTER_REASONING_MAPPER", "low")
     # The cheat sheet decides what reaches the deck at all, so it gets more thought.

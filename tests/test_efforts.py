@@ -6,11 +6,12 @@ from app.extensions import db as _db
 from app.models import Card, Deck, User
 from app.services import deckgen
 from app.services import llm as llm_module
+from app.services.pipeline.catalog import efforts_for
 from app.services.pipeline.efforts import AGENT_GROUPS, user_efforts
 from app.services.pipeline import reconcile
 from app.services.pipeline.cache import make_key
 from app.services.pipeline.feedback import coach_cards
-from app.services.pipeline.routing import AGENT_ROLES, EFFORT_LEVELS, LLMClient, ROLES
+from app.services.pipeline.routing import AGENT_ROLES, LLMClient, ROLES
 
 from conftest import FakeLLM, fake_embeddings, fake_response, register
 
@@ -27,6 +28,8 @@ the light reactions, releasing oxygen.
 
 Cellular respiration oxidises glucose to release energy stored as ATP. It happens in the
 mitochondria of eukaryotic cells and consumes oxygen."""
+# The sliders' stops for the default model, GPT-6 Luna: Off, Low, Medium, High, Extra high, Max.
+STOPS = len(efforts_for("openai/gpt-6-luna"))
 
 
 def _save(client, **stops):
@@ -53,8 +56,8 @@ def test_an_agent_follows_its_role_until_the_user_sets_it():
     # A caller that names only the role still gets the role's effort.
     assert client.reasoning_for("critic") == "low"
 
-    client = LLMClient(DEFAULTS, efforts={"judge": "high", "worker": "minimal"})
-    assert client.reasoning_for("judge") == "high" and client.reasoning_for("worker") == "minimal"
+    client = LLMClient(DEFAULTS, efforts={"judge": "high", "worker": "none"})
+    assert client.reasoning_for("judge") == "high" and client.reasoning_for("worker") == "none"
     assert client.reasoning_for("cold_reader") == "low" and client.reasoning_for("planner") == "medium"
 
 
@@ -96,7 +99,7 @@ def test_profile_has_a_slider_for_every_agent_on_its_default(client):
     html = client.get("/auth/profile").get_data(as_text=True)
     assert 'id="advanced"' in html and 'href="#advanced"' in html
     for agent in AGENT_ROLES:
-        assert f'name="effort_{agent}" min="0" max="{len(EFFORT_LEVELS)}" step="1" value="0"' in html, agent
+        assert f'name="effort_{agent}" min="0" max="{STOPS}" step="1" value="0"' in html, agent
     # The planner's default is medium, the judge's low.
     assert 'data-default-label="Default · Medium" aria-describedby="effort_planner-hint"' in html
     assert 'data-default-label="Default · Low" aria-describedby="effort_judge-hint"' in html
@@ -108,12 +111,13 @@ def test_only_the_agents_moved_off_default_are_saved(client, app):
     register(client)
     response = _save(client, judge=4, coverage=5, worker=0, cold_reader=1)
     assert response.status_code == 303 and response.location.endswith("/auth/profile#advanced")
-    assert _saved(app) == {"cold_reader": "minimal", "judge": "high", "coverage": "xhigh"}
+    assert _saved(app) == {"cold_reader": "none", "judge": "high", "coverage": "xhigh"}
 
     html = client.get("/auth/profile").get_data(as_text=True)
     assert "Your effort settings are saved." in html
-    assert 'name="effort_judge" min="0" max="5" step="1" value="4"' in html
+    assert 'name="effort_judge" min="0" max="6" step="1" value="4"' in html
     assert '<output for="effort_judge">High</output>' in html
+    assert '<output for="effort_cold_reader">Off</output>' in html
     assert '<output for="effort_coverage">Extra high</output>' in html
     assert '<output for="effort_worker">Default · Low</output>' in html
 
@@ -131,7 +135,7 @@ def test_reset_puts_every_agent_back_on_its_default(client, app):
     assert _saved(app) is None
 
 
-@pytest.mark.parametrize("bad", ["6", "-1", "high", "", "1.5"])
+@pytest.mark.parametrize("bad", ["7", "-1", "high", "", "1.5"])
 def test_a_value_the_sliders_never_offer_is_rejected_and_nothing_changes(client, app, bad):
     register(client)
     _save(client, judge=4)
@@ -145,7 +149,7 @@ def test_efforts_are_private_to_each_account(client, app):
     _save(client, judge=5)
     client.post("/auth/logout")
     register(client, email="b@example.com")
-    assert 'name="effort_judge" min="0" max="5" step="1" value="0"' in client.get("/auth/profile").get_data(as_text=True)
+    assert 'name="effort_judge" min="0" max="6" step="1" value="0"' in client.get("/auth/profile").get_data(as_text=True)
     assert _saved(app, "b@example.com") is None
 
 
@@ -190,8 +194,8 @@ def test_a_run_sends_each_agent_the_effort_its_owner_chose(client, app, monkeypa
         reconcile.resolve_clusters(LLMClient(app.config, "sk-or-server", user_efforts(user)), [[0, 1]], twins)
 
     assert sent == {
-        "document_map": {"minimal"}, "planner": {"xhigh"}, "anki_cards": {"medium"},
-        "cold_answers": {"minimal"}, "critic_verdicts": {"high"}, "duplicate_resolution": {"medium"},
+        "document_map": {"none"}, "planner": {"xhigh"}, "anki_cards": {"medium"},
+        "cold_answers": {"none"}, "critic_verdicts": {"high"}, "duplicate_resolution": {"medium"},
         "coverage_audit": {"xhigh"}, "backfill_review": {"low"}, "improved_basic_card": {"low"},
         "diagnosed_cards": {"high"},
     }

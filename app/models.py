@@ -26,6 +26,9 @@ class User(UserMixin, db.Model):
     # Reasoning effort per agent, for the agents the user moved off the default; see
     # services.pipeline.efforts.
     agent_efforts_json = db.Column(db.JSON)
+    # The OpenRouter id of the model the user picked, or NULL while they follow the
+    # server's default; see services.pipeline.catalog.
+    openrouter_model = db.Column(db.String(100))
     # Throttles reset emails so the form can't be used to spam an inbox.
     reset_requested_at = db.Column(db.DateTime)
 

@@ -125,6 +125,18 @@ task. The status page polls `/decks/<id>/progress.json` and renders the tree liv
 what the planner decided, which workers are in flight, what the critic dropped, tokens
 and cost per phase. The editor's **Run insights** panel shows the same after the fact.
 
+### The model a run uses
+
+`pipeline/catalog.py` lists the models a user can pick, each under the company that
+makes it, with the `reasoning.effort` levels it takes (copied from
+`reasoning.supported_efforts` in OpenRouter's model list). The server's
+`OPENROUTER_MODEL` is the default. A user's pick under **My profile → AI model** is
+stored in `User.openrouter_model` and runs every role of that user's runs; with no pick,
+the roles follow the server's configuration, per-role overrides included. Every model is
+called through OpenRouter under its OpenRouter id, so adding one is an entry in
+`MODELS`, plus a logo in `company_logo` (`templates/partials/ui.html`) when its company
+is new.
+
 ### Reasoning effort per agent
 
 Each call is made by one of twelve agents. Most are a role; the critic role runs the
@@ -134,12 +146,16 @@ reconcile role runs the duplicate resolver and the coverage auditor
 model and its default effort from its role's configuration. A user can set the effort
 of any single agent under **My profile → Advanced** (`pipeline/efforts.py`); only the
 agents they moved are stored, in `User.agent_efforts_json`, and those win for that
-user's runs.
+user's runs. The sliders offer the levels of the user's model, and every effort, a
+user's or a role's default, is fitted to the model it is sent to
+(`catalog.fit_effort`): a level the model lacks becomes the next one up that it has, or
+its highest when there is none above. A model the catalog does not list is sent what
+was asked for.
 
 ### Content-addressed cache
 
 Cheat-sheet, worker, critic, vision, coverage and back-fill review results are cached on a hash of
-(role, model, prompt version, inputs), plus the reasoning effort of any agent its user
+(role, model, prompt version, inputs), plus the reasoning effort, as sent, of any agent its user
 moved off the default. A cache hit avoids a provider call for that task. Mapping, planning, embeddings,
 and changed inputs can still incur calls; a repeated deck is not guaranteed to be free.
 The cache is database-wide, not scoped to an individual user.
@@ -161,6 +177,7 @@ app/
       reconcile.py      coverage audit + back-fill review, embedding clusters
       feedback.py       Anki review import + coach
       routing.py        role -> model client, and each agent's reasoning effort
+      catalog.py        the models a user can pick, and the effort levels each takes
       efforts.py        the effort each user set per agent (the Advanced panel)
       cache.py          content-addressed cache
       parallel.py       thread-pool fan-out
@@ -178,7 +195,8 @@ tests/                  unit, route, privacy, database, and scripted pipeline te
 ## Data model
 
 - `User` — credentials, display name, bio, avatar color, deck ownership, the
-  user's encrypted OpenRouter API key, and the reasoning effort they set per agent.
+  user's encrypted OpenRouter API key, the model they picked, and the reasoning effort
+  they set per agent.
 - `Deck` — source, settings (`settings_json`), and the run (`run_json`: plan with its
   figure decisions, phase, totals, stats, last error). Status: `draft → processing → (planned →) processing → ready | failed`.
 - `Source` — one **unit** of the document map (kind, density, pages, prerequisites, skip).

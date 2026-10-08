@@ -1,0 +1,30 @@
+{# The AI model panel: the model picker, grouped by the company that makes each model.
+   Shared by the profile page and the desktop Settings page, which pass their own `number`. #}
+{% from "partials/ui.html" import icon, company_logo %}
+<section class="profile-panel" id="model" aria-labelledby="model-title">
+  <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('cpu', 21) }}</span><div><h2 id="model-title">AI model</h2><p>The model that reads your material and writes your cards.</p></div><span class="profile-section-number">{{ number }}</span></div>
+  <form method="post" action="{{ url_for('auth.profile', _anchor='model') }}" data-profile-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="model">
+    <div class="profile-fields">
+      <div class="model-menu" role="radiogroup" aria-labelledby="model-title">
+        {% for group in model_groups %}
+        <fieldset class="model-group">
+          <legend>{{ group.name }}</legend>
+          {% for model in group.models %}
+          <label class="model-option">
+            <input type="radio" name="model" value="{{ model.id }}" {% if model.checked %}checked{% endif %}>
+            <span class="model-option-body">
+              <span class="model-logo model-logo-{{ group.company or 'other' }}">{{ company_logo(group.company, 20) }}</span>
+              <span class="model-option-text"><b>{{ model.name }}{% if model.is_default %} <span class="model-default">Default</span>{% endif %}</b><span>{{ model.blurb }}</span>{% if model.name != model.id %}<code>{{ model.id }}</code>{% endif %}</span>
+              <span class="model-check">{{ icon('check', 14) }}</span>
+            </span>
+          </label>
+          {% endfor %}
+        </fieldset>
+        {% endfor %}
+      </div>
+      <p class="profile-security-note">{{ icon('info', 16) }} <span>Every model runs through OpenRouter on your one key, and OpenRouter bills each at its own rate. Each model has its own range of reasoning effort, so the sliders under <a class="text-link" href="#advanced">Advanced</a> follow the model you pick.</span></p>
+    </div>
+    <div class="profile-form-footer"><span class="profile-save-state" data-save-state aria-live="polite"></span><button class="btn primary" type="submit">Save model {{ icon('arrow-right', 15) }}</button></div>
+  </form>
+</section>

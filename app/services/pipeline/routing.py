@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass, field
 
 from .. import llm as llm_module
+from .catalog import EFFORT_LEVELS, fit_effort
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,8 @@ AGENT_ROLES = {
     "cold_reader": "critic", "judge": "critic", "gatekeeper": "critic", "improver": "critic", "coach": "critic",
     "merger": "reconcile", "coverage": "reconcile",
 }
-# The values a user can pick for OpenRouter's `reasoning.effort`, lowest first. OpenRouter
-# maps a level a model lacks to the nearest one it has.
-EFFORT_LEVELS = ("minimal", "low", "medium", "high", "xhigh")
+# EFFORT_LEVELS, the values of OpenRouter's `reasoning.effort`, lives in pipeline.catalog
+# with the levels each model takes.
 
 
 @dataclass
@@ -59,16 +59,18 @@ class ChatResult:
 class LLMClient:
     """Resolves roles to models and performs calls. Built once per generation run.
 
-    `api_key` is the key of the user the run belongs to (see services.credentials), and
-    `efforts` the reasoning effort that user set per agent (see pipeline.efforts).
+    `api_key` is the key of the user the run belongs to (see services.credentials),
+    `efforts` the reasoning effort that user set per agent (see pipeline.efforts), and
+    `model` the model that user picked (see pipeline.catalog), which then runs every
+    role. Without one, the roles follow the server's configuration.
     """
 
-    def __init__(self, config, api_key="", efforts=None):
+    def __init__(self, config, api_key="", efforts=None, model=None):
         get = config.get if hasattr(config, "get") else (lambda k, d=None: getattr(config, k, d))
         self.api_key = api_key
         self.site_url = get("OPENROUTER_SITE_URL", "")
         self.app_name = get("OPENROUTER_APP_NAME", "AnkiGPT")
-        self.default_model = get("OPENROUTER_MODEL", "openai/gpt-6-luna")
+        self.default_model = model or get("OPENROUTER_MODEL", "openai/gpt-6-luna")
         self.embedding_model = get("OPENROUTER_EMBEDDING_MODEL", "openai/text-embedding-3-small")
         self.max_retries = int(get("OPENROUTER_MAX_RETRIES", 2))
         self.backoff_seconds = float(get("OPENROUTER_RETRY_BACKOFF_SECONDS", 1.5))
@@ -84,7 +86,7 @@ class LLMClient:
         self.models = {}
         self.reasoning = {}
         for role in ROLES:
-            self.models[role] = get(f"OPENROUTER_MODEL_{role.upper()}", "") or self.default_model
+            self.models[role] = model or get(f"OPENROUTER_MODEL_{role.upper()}", "") or self.default_model
             self.reasoning[role] = (get(f"OPENROUTER_REASONING_{role.upper()}", "") or "").strip() or None
         self.efforts = {
             agent: effort for agent, effort in (efforts or {}).items()
@@ -95,19 +97,26 @@ class LLMClient:
         return self.models.get(role, self.default_model)
 
     def reasoning_for(self, agent):
-        """The effort an agent thinks at: the user's own, else its role's default."""
-        return self.efforts.get(agent) or self.reasoning.get(AGENT_ROLES.get(agent, agent))
+        """The effort an agent thinks at: the user's own, else its role's default, as a
+        level the model it runs on takes."""
+        role = AGENT_ROLES.get(agent, agent)
+        return fit_effort(self.efforts.get(agent), self.model_for(role)) or self.default_reasoning(role)
+
+    def default_reasoning(self, role):
+        """The effort a role's agents think at until the user sets their own."""
+        return fit_effort(self.reasoning.get(role), self.model_for(role))
 
     def effort_key(self, *agents):
         """Cache-key parts for a result these agents produce.
 
         A result made at one effort must not answer a run at another. Only an agent the
         user moved off its default adds anything, so results cached at the defaults keep
-        the keys they already have.
+        the keys they already have. Efforts are compared as sent, so two settings the
+        model takes as the same level share their results.
         """
         moved = [
-            f"{agent}={self.efforts[agent]}" for agent in agents
-            if agent in self.efforts and self.efforts[agent] != self.reasoning.get(AGENT_ROLES[agent])
+            f"{agent}={self.reasoning_for(agent)}" for agent in agents
+            if agent in self.efforts and self.reasoning_for(agent) != self.default_reasoning(AGENT_ROLES[agent])
         ]
         return ("effort:" + ",".join(moved),) if moved else ()
 

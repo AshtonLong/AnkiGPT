@@ -28,7 +28,8 @@ Everything in the [user guide](user-guide.md) applies, with these differences:
 - **No account.** There is nothing to sign up for or sign in to. Decks belong to this
   computer.
 - **Settings instead of My profile.** Add your OpenRouter key under **Settings**
-  (`Ctrl+,`). The page also has the **Advanced** panel, where you set
+  (`Ctrl+,`). The page also has the [AI model](user-guide.md#ai-model) picker and the
+  **Advanced** panel, where you set
   [how hard each agent thinks](user-guide.md#advanced-how-hard-each-agent-thinks), and
   shows where your data is stored and the app version.
 - **Export saves a file.** **Export deck** opens a Save dialog in your Downloads folder.
@@ -78,9 +79,10 @@ Everything is kept in `%APPDATA%\AnkiGPT`, which you can open with
 
 ### Advanced settings
 
-Reasoning effort is set per agent under **Settings → Advanced**. There is no model
-picker yet. To change the model or the pipeline settings, create
-`%APPDATA%\AnkiGPT\data\settings.env` and restart the app:
+The model is picked under **Settings → AI model**, and reasoning effort is set per
+agent under **Settings → Advanced**. To change the app's default model, use a model the
+picker does not list, give one role its own model, or change the pipeline settings,
+create `%APPDATA%\AnkiGPT\data\settings.env` and restart the app:
 
 ```ini
 # Use a different model for everything, and a stronger one for the planner.
@@ -88,6 +90,11 @@ OPENROUTER_MODEL=openai/gpt-6-luna
 OPENROUTER_MODEL_PLANNER=openai/gpt-6-luna
 PIPELINE_MAX_WORKERS=4
 ```
+
+`OPENROUTER_MODEL` here is the model the picker marks **Default**. If the picker does
+not list it, it appears first, under **Set for this app**. A model you pick in the
+picker runs every agent, so the `OPENROUTER_MODEL_*` lines only apply while the picker
+is on the default.
 
 Only these keys are read: `OPENROUTER_MODEL`, `OPENROUTER_MODEL_*`,
 `OPENROUTER_REASONING_*`, `OPENROUTER_EMBEDDING_MODEL`, `OPENROUTER_TEMPERATURE`,

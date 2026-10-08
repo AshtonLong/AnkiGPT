@@ -3,7 +3,7 @@ from flask import Blueprint, current_app, render_template
 bp = Blueprint("legal", __name__)
 
 # Bump when the text of any legal page changes.
-LEGAL_UPDATED = "October 5, 2026"
+LEGAL_UPDATED = "October 7, 2026"
 
 
 @bp.app_context_processor

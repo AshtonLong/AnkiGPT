@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/ui.html" import icon, stepper %}
+{% from "partials/ui.html" import icon, stepper, company_logo %}
 {% block title %}Configure · {{ deck.title }} · AnkiGPT{% endblock %}
 {% block content %}
 {% set s = deck.settings_json or {} %}
@@ -103,6 +103,7 @@
       <p><b>Add your OpenRouter API key to generate.</b> AnkiGPT is free; your own key pays OpenRouter for the AI that writes these cards. <a class="text-link" href="{{ url_for('auth.profile', _anchor='api-key') }}">Add it in {{ settings_page }} {{ icon('arrow-right', 13) }}</a></p>
     </div>
     {% endif %}
+    <p class="run-model"><span class="model-logo model-logo-{{ model.company or 'other' }}">{{ company_logo(model.company, 15) }}</span><span>Written by <b>{{ model.name }}</b></span><a class="text-link" href="{{ url_for('auth.profile', _anchor='model') }}">Change model</a></p>
     <button type="submit" class="btn primary lg block">{{ icon('zap') }} Plan &amp; generate</button>
     <p class="note">{{ icon('clock', 14) }} You can leave the next page while your deck builds.</p>
   </form>

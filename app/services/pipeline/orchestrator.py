@@ -33,6 +33,7 @@ from . import planner as planner_mod
 from . import reconcile as reconcile_mod
 from . import workers as workers_mod
 from .cache import DBCache, NullCache, make_key
+from .catalog import user_model
 from .efforts import user_efforts
 from .parallel import Job, run_jobs
 from .routing import ChatResult, LLMClient
@@ -131,7 +132,7 @@ def _build_context(deck):
     cfg = current_app.config
     settings = dict(deck.settings_json or {})
     settings.setdefault("card_style", deck.card_style)
-    client = LLMClient(cfg, openrouter_key_for(deck.user), user_efforts(deck.user))
+    client = LLMClient(cfg, openrouter_key_for(deck.user), user_efforts(deck.user), user_model(deck.user))
     cache = DBCache(enabled=bool(cfg.get("PIPELINE_CACHE_ENABLED", True)))
     if not cfg.get("PIPELINE_CACHE_ENABLED", True):
         cache = NullCache()
