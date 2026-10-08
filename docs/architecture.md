@@ -23,8 +23,10 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
    - **Cheat sheet** (optional, off by default) — with **Make a cheat sheet first**
      ticked, each live unit is rewritten as the section of a cheat sheet a student could
      bring into the exam: every examinable concept in its barest form, edge cases
-     included, in plain language. A concept keeps at most one example, and only one the
-     source gives; nothing is added from outside the source. The unit's text is then
+     included, in plain language. It is built from first principles: every fundamental
+     law, assumption, defining equation and underlying cause the source states is kept,
+     ahead of the results that follow from it and tied to them. A concept keeps at most
+     one example, and only one the source gives; nothing is added from outside the source. The unit's text is then
      *replaced* by that section, so the planner sizes, workers write from, the critic
      judges against, and the coverage audit back-fills from the cheat sheet alone;
      nothing later can re-inflate what it cut. One cached call per unit, in parallel. A
