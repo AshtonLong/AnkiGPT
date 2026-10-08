@@ -32,7 +32,9 @@ Turn on **Make a cheat sheet first** when the full source would be information
 overload. Before any cards are planned, the source is boiled down to what you would fit
 on a cheat sheet you were allowed to bring into the exam: every concept in its barest
 form, with its edge cases, and without the background, repetition, and academic padding.
-A concept keeps at most one example, and only if your source gives one; nothing is
+The sheet is built from first principles: every fundamental law, assumption and
+underlying reason your source states is kept, and each result is tied to the one it
+comes from. A concept keeps at most one example, and only if your source gives one; nothing is
 added that your source does not say. Diagrams from a PDF that earn cards stay on the
 sheet. Cards are written from that alone. Expect fewer, higher-yield cards; detail the cheat sheet leaves
 out gets no card, and the coverage audit will not add it back. It is off by default and
