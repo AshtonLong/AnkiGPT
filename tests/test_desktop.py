@@ -494,10 +494,10 @@ def test_a_database_with_no_recorded_version_is_backed_up(data_dir):
 
 
 # --------------------------------------------------------------- settings page
-def test_settings_page_has_the_key_advanced_data_and_about_panels(client, app, data_dir):
+def test_settings_page_has_the_key_model_advanced_data_and_about_panels(client, app, data_dir):
     html = client.get("/auth/profile").get_data(as_text=True)
     assert "<title>Settings · AnkiGPT</title>" in html
-    for panel in ('id="api-key"', 'id="advanced"', 'id="your-data"', 'id="about"'):
+    for panel in ('id="api-key"', 'id="model"', 'id="advanced"', 'id="your-data"', 'id="about"'):
         assert panel in html
     assert str(data_dir) in html
     assert "sent to OpenRouter" in html and "Nothing is sent to an AnkiGPT server" in html
@@ -541,6 +541,38 @@ def test_agent_effort_is_set_and_reset_from_settings(client, app):
     client.post("/auth/profile", data={"section": "advanced", "action": "reset"})
     with app.app_context():
         assert User.query.one().agent_efforts_json is None
+
+
+def test_the_model_is_picked_from_settings(client, app):
+    saved = client.post("/auth/profile", data={"section": "model", "model": "anthropic/claude-haiku-5.5"})
+    assert saved.status_code == 303 and saved.headers["Location"].endswith("/auth/profile#model")
+    with app.app_context():
+        assert User.query.one().openrouter_model == "anthropic/claude-haiku-5.5"
+    html = client.get("/auth/profile").get_data(as_text=True)
+    assert 'name="model" value="anthropic/claude-haiku-5.5" checked' in html
+    assert "Claude Haiku 5.5 is now your model." in html
+
+    rejected = client.post("/auth/profile", data={"section": "model", "model": "vendor/unlisted"})
+    assert rejected.status_code == 422 and b"Choose one of the models listed" in rejected.data
+
+
+def test_a_model_set_in_settings_env_leads_the_picker_and_can_be_left_and_returned_to(data_dir):
+    data_dir.mkdir(parents=True)
+    (data_dir / "settings.env").write_text("OPENROUTER_MODEL=vendor/next-model\n", encoding="utf-8")
+    application = launch(data_dir)
+    client = application.test_client()
+    html = client.get("/auth/profile").get_data(as_text=True)
+    assert 'name="model" value="vendor/next-model" checked' in html and "<legend>Set for this app</legend>" in html
+    assert html.index('value="vendor/next-model"') < html.index('value="openai/gpt-6-luna"')
+    # Nothing is known about what it takes, so every level is offered.
+    assert 'name="effort_scale" value="none|minimal|low|medium|high|xhigh|max"' in html
+
+    client.post("/auth/profile", data={"section": "model", "model": "openai/gpt-6-luna"})
+    with application.app_context():
+        assert User.query.one().openrouter_model == "openai/gpt-6-luna"
+    client.post("/auth/profile", data={"section": "model", "model": "vendor/next-model"})
+    with application.app_context():
+        assert User.query.one().openrouter_model is None
 
 
 def test_a_default_set_in_settings_env_is_the_one_the_sliders_name(data_dir):

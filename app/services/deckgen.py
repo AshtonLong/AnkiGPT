@@ -11,6 +11,7 @@ from flask import current_app
 from ..extensions import db
 from ..models import Card, Deck, LLMRun, PipelineTask, Source, utcnow
 from .credentials import openrouter_key_for
+from .pipeline.catalog import user_model
 from .pipeline.efforts import user_efforts
 from .llm import extract_json, json_schema_format
 from .pipeline import critic as critic_mod
@@ -64,7 +65,7 @@ def regenerate_source(source_id, strategy=None):
     if not deck:
         return None
     settings = dict(deck.settings_json or {})
-    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user))
+    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user), user_model(deck.user))
     unit = _unit_from_source(source)
     # Reuse the strategy the planner chose for this unit when we can find it.
     previous = (
@@ -161,7 +162,7 @@ def improve_card(card_id):
     deck = db.session.get(Deck, card.deck_id)
     if not deck:
         return None
-    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user))
+    client = LLMClient(current_app.config, openrouter_key_for(deck.user), user_efforts(deck.user), user_model(deck.user))
     source = db.session.get(Source, card.source_id) if card.source_id else None
     grounding = ""
     if source:

@@ -1,12 +1,15 @@
 {# The Advanced panel: one reasoning-effort slider per agent. Shared by the profile page and
-   the desktop Settings page, which pass their own `number`. Stop 0 follows the default. #}
-{% from "partials/ui.html" import icon %}
+   the desktop Settings page, which pass their own `number`. Stop 0 follows the default; the
+   stops after it are the levels the user's model takes, which the form sends back as
+   `effort_scale`. #}
+{% from "partials/ui.html" import icon, company_logo %}
 <section class="profile-panel" id="advanced" aria-labelledby="advanced-title">
   <div class="profile-panel-heading"><span class="profile-section-icon">{{ icon('gauge', 21) }}</span><div><h2 id="advanced-title">Advanced</h2><p>How hard each AI agent thinks while it works on your decks.</p></div><span class="profile-section-number">{{ number }}</span></div>
   <form method="post" action="{{ url_for('auth.profile', _anchor='advanced') }}" data-profile-form data-effort-form data-effort-labels="{{ effort_labels|join('|') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="advanced">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="section" value="advanced"><input type="hidden" name="effort_scale" value="{{ effort_levels|join('|') }}">
     <div class="profile-fields">
       <p class="effort-intro">More effort means more careful work and a slower, costlier run. An agent left on <b>Default</b> follows the app's own setting. Changes apply from your next run.</p>
+      <p class="effort-model"><span class="model-logo model-logo-{{ effort_model.company or 'other' }}">{{ company_logo(effort_model.company, 15) }}</span><span>These are the levels <b>{{ effort_model.name }}</b> takes: {{ effort_labels|join(', ') }}. <a class="text-link" href="#model">Change model</a></span></p>
       <div class="effort-all" role="group" aria-label="Set every agent at once"><span>Set all</span>
         <button type="button" data-effort-all="0">Default</button>{% for label in effort_labels %}<button type="button" data-effort-all="{{ loop.index }}">{{ label }}</button>{% endfor %}
       </div>
