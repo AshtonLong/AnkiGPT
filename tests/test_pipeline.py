@@ -446,6 +446,14 @@ class TestCheatSheet:
         assert "edge cases" in system and "difficulty for its own sake" in system
         assert "only an example the source itself gives" in system
         assert "Never make one up" in system
+        # First principles: all of the source's, ahead of what follows from them, and
+        # protected from the cuts that would otherwise take them for background.
+        assert "The sheet is built from first principles." in system
+        assert "Every first principle the section states goes on the sheet, without exception" in system
+        assert "tie each result, formula, rule and step to the principle it comes from" in system
+        assert "is a first principle and not background" in system
+        assert "Only the source's first principles." in system
+        assert "Do not drop a concept, a first principle, a condition or an edge case" in system
         # The sheet's page typesets maths written the way the cards write it.
         assert r"Math: \( ... \) inline and \[ ... \] for a formula on a line of its own. Never $...$." in system
         # Deck settings stay out of the system prompt so it caches across decks.

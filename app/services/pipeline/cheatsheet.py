@@ -2,7 +2,8 @@
 
 Off unless the deck's `cheat_sheet` setting is on. Each live unit is rewritten as the
 section of a cheat sheet a student would be allowed to bring into the exam: every
-examinable concept in its barest form, in plain language. The orchestrator then
+examinable concept in its barest form, in plain language, built up from the first
+principles the source states. The orchestrator then
 *replaces* the unit's text with that section, so the planner sizes, the workers write
 from, the critic judges against and the coverage audit back-fills from the cheat sheet,
 never the full source. That is the point: nothing later in the run can re-inflate what
@@ -26,7 +27,7 @@ from ..llm import OpenRouterError, extract_json, json_schema_format
 
 logger = logging.getLogger(__name__)
 
-CHEATSHEET_PROMPT_VERSION = "cheatsheet-v3"
+CHEATSHEET_PROMPT_VERSION = "cheatsheet-v4"
 
 # Every line of a cheat sheet is examinable, whatever the mapper thought of the prose it
 # came from, so a condensed unit sits at the top of the density scale. Leaving the
@@ -43,13 +44,23 @@ CHEATSHEET_SCHEMA = json_schema_format(
     },
 )
 
-CHEATSHEET_SYSTEM = """Some professors let students bring a cheat sheet into the exam room: a page or two of notes, prepared in advance, that they may consult while they write the exam. Paper is limited, so nothing goes on it at length. A good sheet is the course with everything but its bare bones removed: every concept that could be examined is there, and each one is cut down to the fewest words that still say it correctly.
+CHEATSHEET_SYSTEM = """Some professors let students bring a cheat sheet into the exam room: a page or two of notes, prepared in advance, that they may consult while they write the exam. Paper is limited, so nothing goes on it at length. A good sheet is the course with everything but its bare bones removed: every concept that could be examined is there, each one is cut down to the fewest words that still say it correctly, and the fundamentals the course is built on are all there with what follows from them.
 
 You are writing that cheat sheet for a student, one section of their study material at a time. You are given one section of the source; return the part of the cheat sheet that covers it.
+
+FIRST PRINCIPLES
+The sheet is built from first principles. A first principle is something the rest of the section rests on and that the section does not derive from anything else: a fundamental law, an axiom or postulate, a defining equation, a core assumption or model, a conservation rule or other constraint, the underlying cause or mechanism of what happens. A student who has the first principles in front of them can rebuild a result they have forgotten and work a question they have never seen; a student who has only the results cannot.
+- Every first principle the section states goes on the sheet, without exception, whether the source gives it a whole slide or mentions it in passing.
+- State each one in full: the principle itself in one plain statement, with the conditions or assumptions under which it holds.
+- Put a principle before what follows from it, and tie each result, formula, rule and step to the principle it comes from wherever the source makes that link. A few words do it ("because ...", "follows from ..."), in the same bullet as the result.
+- The reason a rule holds or a thing happens, as the source gives it, is a first principle and not background. It stays on.
+- A derivation keeps the principle it starts from and the step that turns that principle into the result. The algebra in between stays off.
+- Only the source's first principles. Do not supply a principle, a reason or a derivation the source does not state, however well you know it.
 
 EVERYTHING, IN ITS BARE FORM
 The sheet is complete in breadth and minimal in depth: every examinable concept in the section gets its line, and none gets a paragraph. Ask of every concept what a student would lose marks for not having in front of them, and write only that. It usually comes to:
 - what the concept is: each term the student must know by name, defined in one plain statement
+- the first principle behind it: why it is true or why it happens, where the source says
 - formulas and laws, with what each symbol means, its units, and the conditions under which the formula holds
 - the steps of a process, mechanism or method, in order, one short line each
 - the difference between things that are easy to confuse, stated as the difference itself
@@ -64,10 +75,10 @@ A concept may keep one example, and only an example the source itself gives.
 
 WHAT STAYS OFF
 - every example beyond the one a concept keeps: further worked problems, repeated cases, practice questions
-- background, history, motivation and scene-setting
+- background, history, motivation and scene-setting. A first principle is none of these, even when the source presents it as an introduction
 - anecdotes, asides, author commentary and "interesting to note" details
 - repetition, recaps and signposting ("as we saw", "in the next section")
-- the intermediate steps of a derivation, unless reproducing the derivation is itself examinable
+- the intermediate steps of a derivation, unless reproducing the derivation is itself examinable. Where it starts and the step that gets to the result stay on
 - citations, references and administrative text
 - difficulty for its own sake: formal phrasing, hedging, jargon used as style, and notation heavier than the idea needs. None of it earns marks
 
@@ -79,14 +90,14 @@ A section may come with diagrams. They are listed before the section text, each 
 
 HOW TO WRITE IT
 - Use the plainest wording that is still exactly right. Keep the technical terms the student has to know, and say what each one means.
-- Short headings with terse bullets beneath them. One fact per bullet.
+- Short headings with terse bullets beneath them. One fact per bullet; a result and the principle it comes from count as one.
 - Every bullet must stand on its own as a complete statement: name its subject, spell out an abbreviation the first time it appears, and never lean on "it", "this", "the above" or on anything that is not on the sheet. The student's flashcards are written from this sheet and from nothing else, so a line that is cryptic here becomes a card nobody can answer.
 - Reproduce formulas, symbols, numbers, units and names exactly as the source gives them.
 - Math: \\( ... \\) inline and \\[ ... \\] for a formula on a line of its own. Never $...$.
 - Use only what the source states. Add nothing from outside knowledge, and do not correct or extend the source. A line the source does not support has no place on the sheet, however true it is.
 
 HOW MUCH
-The whole course has to fit on a page or two, and this section gets only its share. Get short by cutting the words around an idea, never by cutting the idea: wordy prose comes down to a small fraction of itself, and a dense table of definitions or formulas keeps nearly all of its content while losing its sentences. Do not drop a concept, a condition or an edge case to save space, and do not pad. Whatever is left off this sheet will not be studied. If the section holds nothing a student would be examined on, return an empty string.
+The whole course has to fit on a page or two, and this section gets only its share. Get short by cutting the words around an idea, never by cutting the idea: wordy prose comes down to a small fraction of itself, and a dense table of definitions or formulas keeps nearly all of its content while losing its sentences. Do not drop a concept, a first principle, a condition or an edge case to save space, and do not pad. Whatever is left off this sheet will not be studied. If the section holds nothing a student would be examined on, return an empty string.
 
 Return only JSON matching the schema."""
 
