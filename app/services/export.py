@@ -1,6 +1,8 @@
 import io
 import os
+import random
 import tempfile
+import uuid
 
 import genanki
 
@@ -150,13 +152,30 @@ def figure_media_name(figure_id):
     return f"ankigpt_fig_{figure_id}.png"
 
 
-def note_guid(deck_id, card_id):
-    """Stable per-card guid so review stats can be matched back after study.
+def new_note_guid():
+    """A random guid for a note, in the format Anki gives its own notes.
 
-    The "ankigpt" seed must never change: decks already in users' Anki collections
-    carry guids derived from it.
+    Anki finds a note by its guid alone: importing a note whose guid is already in the
+    collection overwrites that note where it sits, whichever deck it is in. So a guid
+    must never be worked out from anything two cards can share. It is drawn once, kept
+    on the card, and reused by every later export, which is what lets a re-export update
+    the notes in Anki and lets review stats be matched back after study.
+    """
+    return genanki.guid_for(uuid.uuid4().hex)
+
+
+def legacy_note_guid(deck_id, card_id):
+    """The guid exports used to derive from the database row ids.
+
+    SQLite hands the ids of deleted rows out again, and every database starts at 1, so a
+    new deck could carry the guids of a deck exported earlier and land on top of it in
+    Anki. Kept only so the export can tell these guids apart and replace them.
     """
     return genanki.guid_for("ankigpt", deck_id, card_id)
+
+
+def new_anki_deck_id():
+    return random.randrange(1 << 30, 1 << 31)
 
 
 def export_deck(deck_id):
@@ -170,8 +189,9 @@ def export_deck(deck_id):
     )
     if not cards:
         return None
-    deck_id_seed = int(f"{deck_id}001")
-    genanki_deck = genanki.Deck(deck_id_seed, deck.title)
+    if not deck.anki_deck_id:
+        deck.anki_deck_id = new_anki_deck_id()
+    genanki_deck = genanki.Deck(deck.anki_deck_id, deck.title)
     basic_model = build_basic_model()
     cloze_model = build_cloze_model()
 
@@ -182,7 +202,9 @@ def export_deck(deck_id):
         img = ""
         if card.figure_id and card.figure_id in figures:
             img = f"<div class='figure'><img src='{figure_media_name(card.figure_id)}'></div>"
-        guid = note_guid(deck_id, card.id)
+        guid = card.guid
+        if not guid or guid == legacy_note_guid(deck_id, card.id):
+            guid = new_note_guid()
         if card.type == "basic":
             note = genanki.Note(model=basic_model, fields=[img + sanitize(card.front), sanitize(card.back)], guid=guid)
         else:
