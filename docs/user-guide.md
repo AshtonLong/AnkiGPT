@@ -84,6 +84,12 @@ of the current search or filters. Figure media is included. Import the package i
 Anki to study. Basic cards use front/back fields; cloze cards use Anki deletion syntax,
 such as `{{c1::answer}}`. Anki can create several review cards from one cloze note.
 
+Every card keeps one note ID for life, so exporting a deck again and importing it
+updates the notes already in Anki instead of adding copies, and two different decks
+never share a note. Decks exported by version 0.6.0 or earlier are the exception: their
+note IDs could repeat from one deck to the next, so the next export gives those cards
+new ones, and Anki adds them as new notes beside the old ones.
+
 **Run insights** shows the document map, strategy distribution, and recorded phase
 costs. The library lets you permanently delete a whole deck; that differs from
 restorable card deletion in the editor.
