@@ -76,6 +76,9 @@ class Deck(db.Model):
     # Planner output and run-level bookkeeping (phase, summary, cost) live here so a
     # single row describes the current generation without a join.
     run_json = db.Column(db.JSON, nullable=False, default=dict)
+    # The deck's id inside exported packages, drawn at random by the first export. Not
+    # derived from `id`, which SQLite hands out again once a deck is deleted.
+    anki_deck_id = db.Column(db.BigInteger)
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
@@ -185,7 +188,8 @@ class Card(db.Model):
     source_quote = db.Column(db.Text)  # verbatim span the card was written from
     critic_json = db.Column(db.JSON)
     order_key = db.Column(db.Integer, default=0, index=True)
-    # Stable Anki note guid so review stats can be matched back after study.
+    # Stable Anki note guid, drawn at random by the first export, so a re-export updates
+    # the same note and review stats can be matched back after study.
     guid = db.Column(db.String(64), index=True)
     review_stats_json = db.Column(db.JSON)
     created_at = db.Column(db.DateTime, default=utcnow)
