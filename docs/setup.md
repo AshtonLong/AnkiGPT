@@ -110,7 +110,8 @@ volume, which is a different file from `instance/ankigpt.db` in a local checkout
 | `PROXY_FIX_HOPS` | `0` | Trust this many reverse-proxy hops of `X-Forwarded-*` headers (production compose sets `1`). |
 | `MAIL_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD`, `MAIL_FROM` | / `465` | SMTP for password-reset email. Unset, links are logged instead. |
 | `LEGAL_NAME` / `SUPPORT_EMAIL` / `LEGAL_JURISDICTION` | `AnkiGPT` / / `Canada` | Shown on the legal pages and footer. |
-| `UPLOAD_MAX_MB` / `UPLOAD_FOLDER` | `50` / `instance/uploads` | Uploads. |
+| `UPLOAD_MAX_MB` / `UPLOAD_FOLDER` | `50` / `instance/uploads` | Uploads (the size limit is for all files in one request together). |
+| `MAX_UPLOAD_FILES` | `20` | PDFs one deck can be built from; they are combined in the order the user sets. |
 | `GENERATION_IN_THREAD` | `true` | Run generation on a background thread (tests set `false` to run inline). |
 
 

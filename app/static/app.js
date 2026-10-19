@@ -647,6 +647,8 @@
           var to = parseInt(row.getAttribute('data-index'), 10) + (row.classList.contains('drop-after') ? 1 : 0);
           move(dragFrom, to > dragFrom ? to - 1 : to);
         }
+        // render() replaces the dragged row, so its dragend never reaches the list: reset here.
+        dragFrom = -1;
         render();
       });
       list.addEventListener('dragend', function () {

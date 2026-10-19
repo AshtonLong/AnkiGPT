@@ -2785,6 +2785,9 @@ dialog p {
 }
 
 .toast .t-ic {
+  width:18px;
+  height:18px;
+  flex:none;
   color:var(--muted)
 }
 
