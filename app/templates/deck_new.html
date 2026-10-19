@@ -15,7 +15,7 @@
   </div>
 
   <div class="create-layout">
-  <form method="post" enctype="multipart/form-data" class="panel form-card" id="new-deck-form" data-reveal style="--d:90">
+  <form method="post" enctype="multipart/form-data" class="panel form-card" id="new-deck-form" data-max-files="{{ config.MAX_UPLOAD_FILES }}" data-reveal style="--d:90">
     {% if form_error %}<div class="form-error" role="alert">{{ form_error }}</div>{% endif %}
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
@@ -83,18 +83,34 @@
 
     <div class="src-section" id="source-pdf" hidden>
       <label class="drop" id="drop">
-        <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf,.pdf">
+        <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf,.pdf" multiple>
         <div class="drop-idle">
           <div class="drop-ic">{{ icon('upload', 26) }}</div>
-          <b>Drop your PDF here, or <u>browse</u></b>
-          <small>Up to {{ config.UPLOAD_MAX_MB }} MB · text-based PDFs only (scans without OCR won't extract)</small>
-        </div>
-        <div class="file-chip">
-          <div class="fc-ic">{{ icon('file-text', 16) }}</div>
-          <div><b id="file-name"></b><small id="file-size"></small></div>
-          <button type="button" class="fc-x" id="file-clear" aria-label="Remove file">{{ icon('x', 14) }}</button>
+          <b class="drop-empty">Drop your PDFs here, or <u>browse</u></b>
+          <b class="drop-more">Drop more PDFs here, or <u>browse</u></b>
+          <small>Up to {{ config.MAX_UPLOAD_FILES }} files and {{ config.UPLOAD_MAX_MB }} MB in total · text-based PDFs only (scans without OCR won't extract)</small>
         </div>
       </label>
+      <div class="file-list-wrap" id="file-list-wrap" hidden>
+        <div class="label-row">
+          <span class="hint" id="file-summary"></span>
+          <span class="hint" id="file-order-hint">Drag or use the arrows to put them in order.</span>
+        </div>
+        <ol class="file-list" id="file-list" aria-label="PDFs to combine, in order"></ol>
+      </div>
+      <template id="file-row">
+        <li class="file-row" draggable="true">
+          <span class="fr-grip" aria-hidden="true">{{ icon('grip', 16) }}</span>
+          <span class="fr-n mono" aria-hidden="true"></span>
+          <div class="fc-ic">{{ icon('file-text', 16) }}</div>
+          <div class="fr-meta"><b></b><small></small></div>
+          <div class="fr-actions">
+            <button type="button" class="fc-x" data-move="-1">{{ icon('chevron-up', 14) }}</button>
+            <button type="button" class="fc-x" data-move="1">{{ icon('chevron-down', 14) }}</button>
+            <button type="button" class="fc-x" data-remove>{{ icon('x', 14) }}</button>
+          </div>
+        </li>
+      </template>
       <div class="grid-2" style="margin-top:1rem">
         <div class="field">
           <label for="page-start">Start page</label>
@@ -105,6 +121,7 @@
           <input type="number" id="page-end" name="page_end" value="{{ request.form.get('page_end', '') }}" min="1" placeholder="Last" inputmode="numeric">
         </div>
       </div>
+      <p class="hint" id="page-range-hint" hidden>With several PDFs, pages count through the combined document: if the first file has 12 pages, page 13 is the first page of the second.</p>
     </div>
 
     <button type="submit" class="btn primary lg block" style="margin-top:.5rem">

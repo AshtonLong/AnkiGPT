@@ -7,7 +7,7 @@ unit spans and figures can be attached to the unit they sit in.
 
 import re
 
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 
 from .chunking import clean_text
 
@@ -171,6 +171,34 @@ def _join_pages(pages, first_page_number):
         parts.append(page_text)
         pos += len(page_text)
     return "\n\n".join(parts), offsets
+
+
+class UnreadablePdf(Exception):
+    """One of the PDFs being combined could not be read; `index` says which."""
+
+    def __init__(self, index):
+        super().__init__(f"PDF {index + 1} could not be read")
+        self.index = index
+
+
+def combine_pdfs(paths, out_path):
+    """Write the PDFs at `paths` into `out_path` as one document, in the order given.
+
+    Returns the page count of each input, so callers can tell where each file starts.
+    Raises UnreadablePdf naming the first input that cannot be read.
+    """
+    writer = PdfWriter()
+    page_counts = []
+    for index, path in enumerate(paths):
+        try:
+            before = len(writer.pages)
+            writer.append(path)
+            page_counts.append(len(writer.pages) - before)
+        except Exception as exc:
+            raise UnreadablePdf(index) from exc
+    with open(out_path, "wb") as fh:
+        writer.write(fh)
+    return page_counts
 
 
 def extract_pdf_text(file_path, page_start=None, page_end=None):
