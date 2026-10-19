@@ -1144,6 +1144,11 @@ input[type=file]::file-selector-button {
   transition:transform 160ms
 }
 
+/* An option of the toggle above it, set in under it. */
+.toggle.sub-toggle {
+  margin:-6px 0 0 44px
+}
+
 .toggle input:checked+.tg {
   background:var(--accent)
 }
@@ -1446,6 +1451,81 @@ input[type=file]::file-selector-button {
   display:block;
   color:var(--muted);
   margin-top:2px
+}
+
+.plan-sheet {
+  padding:20px 24px;
+  margin-bottom:16px;
+  font-size:13px
+}
+
+.plan-sheet>.panel-head {
+  margin:-20px -24px 14px
+}
+
+.plan-sheet>.hint {
+  display:block;
+  margin:0 0 12px;
+  font-size:12px;
+  color:var(--muted)
+}
+
+.sheet-unit {
+  border-top:1px solid var(--line);
+  padding:10px 0
+}
+
+.sheet-unit:last-child {
+  padding-bottom:0
+}
+
+.sheet-unit summary {
+  cursor:pointer;
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 10px;
+  align-items:baseline
+}
+
+.sheet-unit summary small {
+  font-size:11px;
+  color:var(--muted)
+}
+
+.sheet-unit ul {
+  list-style:none;
+  margin:12px 0 4px;
+  padding:0;
+  display:grid;
+  gap:8px
+}
+
+.sheet-unit li {
+  display:grid;
+  grid-template-columns:160px 1fr;
+  gap:12px;
+  align-items:start
+}
+
+.sheet-unit li select {
+  width:100%;
+  font-size:12px;
+  padding:6px 8px
+}
+
+.sheet-unit li>span {
+  padding-top:5px
+}
+
+.sheet-unit li.supporting>span,.sheet-unit li.off>span {
+  color:var(--muted)
+}
+
+@media (max-width:640px) {
+  .sheet-unit li {
+    grid-template-columns:1fr;
+    gap:4px
+  }
 }
 
 .is-skipped {
@@ -4650,6 +4730,15 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
    On screen a displayed formula scrolls instead, so only one inside a line is scaled. */
 .sheet .tex:not([data-display]) .katex { font-size: calc(1.1em * var(--fit, 1)); }
 @media (max-width: 760px) { .sheet { padding: 20px; columns: 1; } }
+/* High-yield sheet: each line's tag says what the exam asks; supporting lines recede, and
+   what was left off sits folded under its section (and never goes to paper). */
+.sheet li .tag { font: 600 9.5px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--accent); background: var(--soft); padding: 1px 5px; border-radius: 3px; margin-right: 2px; vertical-align: 1px; }
+.sheet li.supporting { color: var(--muted); }
+.sheet li.supporting .tag { color: var(--muted); }
+.sheet .left-off { margin: 6px 0 4px; font-size: 12px; color: var(--muted); break-inside: avoid; }
+.sheet .left-off summary { cursor: pointer; }
+.sheet .left-off ul { margin: 4px 0 0; }
+.sheet .left-whole h2 { border-bottom-color: var(--line); color: var(--muted); }
 @media print {
   body { background: #fff; }
   /* Bullets, table headings and code spans are painted as backgrounds, which paper drops unless told. */
@@ -4662,4 +4751,5 @@ dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse
   /* Paper cannot scroll, so a displayed formula is scaled to fit as well. */
   .sheet .katex-display { overflow: visible; }
   .sheet .tex .katex { font-size: calc(1.1em * var(--fit, 1)); }
+  .sheet .left-off, .sheet .left-whole { display: none; }
 }

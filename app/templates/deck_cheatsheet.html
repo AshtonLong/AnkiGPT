@@ -11,15 +11,26 @@
 {% block content %}
 {% set kept_full = stats.get('kept_full') or [] %}
 {% set diagrams = stats.get('figures') or 0 %}
+{% macro left_off_list(left, open=False) %}
+<details class="left-off"{% if open %} open{% endif %}>
+  <summary>{{ left|length }} point{{ '' if left|length == 1 else 's' }} left off</summary>
+  <ul>{% for point in left %}<li>{{ point.text|sheet_inline }}</li>{% endfor %}</ul>
+</details>
+{% endmacro %}
 
 <div class="page-head sheet-head" data-reveal>
   <div>
     <span class="eyebrow">Cheat sheet</span>
     <h1>{{ deck.title }}</h1>
+    {% if stats.get('high_yield') %}
+    <p>Only what the exam asks you to do, from your source. Every line with a card tag got one card, and the cards were written from this page and nothing else.</p>
+    {% else %}
     <p>The bare bones of your source. Every card in this deck was written from this page and nothing else.</p>
+    {% endif %}
     <div class="meta">
       <span class="pill">{{ sections|length }} section{{ '' if sections|length == 1 else 's' }}</span>
       {% if diagrams %}<span class="pill warn">{{ icon('image', 12) }} {{ diagrams }} diagram{{ '' if diagrams == 1 else 's' }}</span>{% endif %}
+      {% if stats.get('high_yield') %}<span class="pill ok">{{ stats.get('core') or 0 }} core</span><span class="pill">{{ stats.get('supporting') or 0 }} supporting</span><span class="pill">{{ stats.get('left_off_count') or 0 }} left off</span>{% endif %}
       {% if stats.get('chars_in') %}<span class="pill">{{ '{:,}'.format(stats.chars_in) }} → {{ '{:,}'.format(stats.chars_out) }} chars</span>{% endif %}
     </div>
   </div>
@@ -30,7 +41,7 @@
 </div>
 
 <article class="panel sheet" data-reveal style="--d:60">
-  {% for unit, blocks in sections %}
+  {% for unit, blocks, left in sections %}
   <section class="sheet-section">
     <h2>{{ unit.title }}{% if unit.page_start %} <small>p.{{ unit.page_start }}{% if unit.page_end and unit.page_end != unit.page_start %}–{{ unit.page_end }}{% endif %}</small>{% endif %}</h2>
     {% if unit.idx in kept_full %}<p class="hint">This section could not be condensed, so it is shown in full.</p>{% endif %}
@@ -40,7 +51,7 @@
     {% elif block.type == 'list' %}
     <ul>
       {% for item in block['items'] %}
-      <li class="{{ 'sub' if item.sub }} {{ 'example' if item.example }} {{ 'numbered' if item.label }}">{% if item.label %}<span class="n">{{ item.label }}</span> {% endif %}{{ item.text|sheet_inline }}</li>
+      <li class="{{ 'sub' if item.sub }} {{ 'example' if item.example }} {{ 'numbered' if item.label }}{% if item.tag %} tagged{% if item.tag == 'supporting' %} supporting{% endif %}{% endif %}">{% if item.tag %}<span class="tag">{{ item.tag }}</span> {% endif %}{% if item.label %}<span class="n">{{ item.label }}</span> {% endif %}{{ item.text|sheet_inline }}</li>
       {% endfor %}
     </ul>
     {% elif block.type == 'table' %}
@@ -62,9 +73,20 @@
     <p class="{{ 'example' if block.example }}">{{ block.text|sheet_inline }}</p>
     {% endif %}
     {% endfor %}
+    {% if left %}{{ left_off_list(left) }}{% endif %}
   </section>
   {% else %}
   <div class="empty"><h3>Nothing on the sheet</h3><p>Every unit of this deck was skipped.</p></div>
   {% endfor %}
+  {% if left_whole %}
+  <section class="sheet-section left-whole">
+    <h2>Left off entirely</h2>
+    <p class="hint">Nothing in these sections was judged to be asked about on its own.</p>
+    {% for unit, left in left_whole %}
+    <h3>{{ unit.title }}</h3>
+    {{ left_off_list(left, open=True) }}
+    {% endfor %}
+  </section>
+  {% endif %}
 </article>
 {% endblock %}

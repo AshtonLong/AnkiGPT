@@ -41,6 +41,33 @@ out gets no card, and the coverage audit will not add it back. It is off by defa
 adds one model pass over the source. The run trace shows how far each unit was
 condensed.
 
+With the cheat sheet on, **High-yield only** goes further: it keeps only what the exam
+asks you to *do*. Every point in the source is sorted into one of three tiers:
+
+- **Core** is what an examiner would set a question on. Each core line is tagged with what
+  the question asks of you: *calculate*, *apply* (a method to carry out, such as how to
+  set up a case-study analysis), *explain*, *distinguish*, *define* or *recall*.
+- **Supporting** is background a core line can't be answered without, such as a constant
+  or a unit.
+- **Left off** is everything else: the particulars of case studies and worked examples,
+  history, background, extra examples. A case study keeps the method it teaches as a core
+  line; its details are left off.
+
+Each core line gets one card, shaped by its tag, so a calculation line gets a card that
+has you set up or work the calculation rather than name the formula. Supporting lines get
+no cards of their own. The planner's estimate is the number of core lines, and the plan
+is kept close to it. The coverage audit checks only the core lines. Your **Exam / context**
+brief steers the sorting: "calculation-heavy final, scenario questions" makes definitions
+and recall facts earn their place. Expect far fewer cards than either the full source or
+the plain cheat sheet gives.
+
+Nothing left off is thrown away. With **Review the plan before writing** on, the plan
+review lists every unit's lines and left-off points, each with its tier. Give a
+supporting or left-off line a card tag to bring it in, or choose **Leave off** to drop
+one. The unit's task gains or loses a card for each change, unless you have changed that
+task's count yourself. The cheat sheet page shows each line's tag, and lists what was left
+off under its section (left-off points are not printed).
+
 Once the plan exists, **Cheat sheet** (on the plan review, the finished run, and the
 deck editor) opens the sheet as a page with its diagrams in place and its formulas
 typeset. Read it to see exactly what your cards were written from, or choose **Print or
@@ -58,7 +85,8 @@ When plan review is enabled, inspect the document map and proposed tasks. Skip t
 change strategies, set each task's target (1–60 cards), or edit its worker notes.
 Figure tasks are listed with their image under the unit they belong to, and can be
 skipped or resized like any other; the figures the planner gave no cards are listed
-below the tasks with its reason. Keep at least one task, then choose **Run this plan**. **Re-plan** asks the planner
+below the tasks with its reason. On a high-yield deck, the **High-yield sheet** panel
+lists each unit's lines and left-off points so you can re-sort them (see above). Keep at least one task, then choose **Run this plan**. **Re-plan** asks the planner
 to produce another plan and can incur additional model calls.
 
 The run trace shows phase and task status, token usage, and recorded cost. You can

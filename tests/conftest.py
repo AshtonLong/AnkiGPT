@@ -126,6 +126,18 @@ class FakeLLM:
         first_sentence = " ".join(section.split()).split(". ")[0].rstrip(".")
         return fake_response(json.dumps({"cheat_sheet": f"- {first_sentence}."}))
 
+    # --- high-yield sheet: the first sentence is core, the second left off as context, a
+    # third (if any) supporting; a listed diagram goes under the same heading
+    def _high_yield_sheet(self, messages):
+        user = messages[-1]["content"]
+        section = user.split("\nSECTION: ", 1)[1].split("\n\n", 1)[1]
+        sentences = [s.strip().rstrip(".") for s in " ".join(section.split()).split(". ") if s.strip()]
+        tiers = [("core", "explain"), ("context", "recall"), ("supporting", "define")]
+        items = [{"text": f"{s}.", "tier": tier, "asks": asks} for s, (tier, asks) in zip(sentences, tiers)]
+        items += [{"text": line.split(" ", 2)[0] + " " + line.split(" ", 2)[1], "tier": "core", "asks": "recall"}
+                  for line in user.splitlines() if line.startswith("[[Figure ")]
+        return fake_response(json.dumps({"sections": [{"heading": "Key points", "items": items}]}))
+
     # --- phase 1
     def _planner(self, messages):
         self.planner_turn += 1

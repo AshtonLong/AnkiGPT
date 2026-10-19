@@ -20,7 +20,9 @@ interface with sample data, not results from a live AI run.*
    context, focus areas, exclusions, must-include terms, and approximate deck size.
    When the full source would be overload, switch on **Make a cheat sheet first** to
    write cards only from the bare bones you would bring into the exam, diagrams
-   included. You can read and print that sheet afterwards.
+   included. You can read and print that sheet afterwards. Add **High-yield only** to
+   keep just what the exam asks you to do (calculations, methods to apply, reasons,
+   distinctions) with one card per line, and bring back anything it left off at plan review.
 3. **Review the plan.** Optionally pause before writing to change strategies, adjust
    card budgets, edit worker notes, or skip tasks.
 4. **Make the cards yours.** Search, filter, edit, tag, restore, or AI-improve cards.

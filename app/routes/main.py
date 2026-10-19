@@ -31,10 +31,14 @@ from ..services.pdf import extract_pdf_text
 from ..services.pipeline import progress_for
 from ..services.pipeline.catalog import active_model
 from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach_cards, read_review_stats
-from ..services.pipeline.cheatsheet import INLINE_RE, MATH_GROUPS, sheet_blocks
+from ..services.chunking import hash_text
+from ..services.pipeline.cheatsheet import (
+    ASKS, EMPTY_REASON, INLINE_RE, LEFT_OFF, MATH_GROUPS, SUPPORTING, high_yield, retier, sheet_blocks, sheet_lines,
+    yield_counts, yield_target,
+)
 from ..services.pipeline.figures import extract_figures, number_figures
-from ..services.pipeline.planner import Plan
-from ..services.pipeline.strategies import text_strategies
+from ..services.pipeline.planner import MAX_TASK_CARDS, Plan, PlanTask
+from ..services.pipeline.strategies import DEFAULT_STRATEGY, text_strategies
 from ..services.pipeline.trace import PHASES, phases_for
 from ..services.validators import is_valid_cloze
 from ..tasks import dispatch_generation
@@ -224,6 +228,8 @@ def _read_settings_form(deck):
         except ValueError:
             settings["target_cards"] = None
     settings["cheat_sheet"] = request.form.get("cheat_sheet") == "on"
+    # High-yield is a kind of cheat sheet, so it means nothing without one.
+    settings["high_yield"] = settings["cheat_sheet"] and request.form.get("high_yield") == "on"
     settings["review_plan"] = request.form.get("review_plan") == "on"
     settings["use_figures"] = "on" in request.form.getlist("use_figures") if "use_figures" in request.form else True
     settings["card_style"] = deck.card_style
@@ -336,6 +342,7 @@ def plan_deck(deck_id):
             flash("This deck is not waiting for plan review.", "error")
             return redirect(url_for("main.status", deck_id=deck.id))
         kept = []
+        untouched = set()  # tasks whose card count the student left as planned
         for task in plan.tasks:
             if request.form.get(f"skip_{task.id}") == "on":
                 continue
@@ -343,6 +350,8 @@ def plan_deck(deck_id):
                 target = int(request.form.get(f"target_{task.id}") or task.target_cards)
             except ValueError:
                 target = task.target_cards
+            if target == task.target_cards:
+                untouched.add(task.id)
             task.target_cards = max(1, min(60, target))
             strategy = request.form.get(f"strategy_{task.id}") or task.strategy
             # A figure task has one way of writing its cards, and no text task has it.
@@ -350,6 +359,8 @@ def plan_deck(deck_id):
                 task.strategy = strategy
             task.notes = (request.form.get(f"notes_{task.id}") or task.notes or "")[:1500]
             kept.append(task)
+        if high_yield(deck.settings_json):
+            kept = _apply_sheet_review(run, plan, units, kept, untouched)
         if not kept:
             flash("Keep at least one task, or re-plan.", "error")
             return redirect(url_for("main.plan_deck", deck_id=deck.id))
@@ -368,11 +379,93 @@ def plan_deck(deck_id):
         ((numbers[fid], figures[fid], reason) for fid, reason in plan.figure_skips.items() if fid in figures),
         key=lambda row: row[0],
     )
+    sheet_rows = _sheet_review_rows(run, units) if high_yield(deck.settings_json) else []
     return render_template(
         "deck_plan.html", deck=deck, plan=plan, units=units, unit_by_idx=unit_by_idx, run=run,
         strategies=text_strategies(), figure_count=len(figures), figures=figures, figure_numbers=numbers,
-        figures_left_out=left_out,
+        figures_left_out=left_out, sheet_rows=sheet_rows, tier_choices=TIER_CHOICES,
     )
+
+
+# What a line of a high-yield sheet can be set to on the plan review.
+TIER_CHOICES = [*((ask, f"Card · {ask}") for ask in ASKS), (SUPPORTING, "Supporting"), (LEFT_OFF, "Leave off")]
+REVIEW_EMPTIED_REASON = "Every line was left off at plan review."
+
+
+def _sheet_review_rows(run, units):
+    """The high-yield sheet as the plan review lists it: [(unit, lines, left off)], where
+    `lines` is [(line number, tag, text)] and `left off` is [(index, point)]. A unit the
+    planner skipped has no task to write its lines, so it is not listed; one the sheet
+    found nothing to ask about is, since a point brought back gives it one."""
+    left_off = ((run.get("cheat_sheet") or {}).get("left_off")) or {}
+    rows = []
+    for unit in units:
+        if unit.skipped and unit.skip_reason != EMPTY_REASON:
+            continue
+        lines = [] if unit.skipped else sheet_lines(unit.text)
+        items = list(enumerate(left_off.get(str(unit.idx)) or []))
+        if lines or items:
+            rows.append((unit, lines, items))
+    return rows
+
+
+def _tier_choice(name):
+    value = (request.form.get(name) or "").strip().lower()
+    return value if value in dict(TIER_CHOICES) else None
+
+
+def _apply_sheet_review(run, plan, units, kept, untouched):
+    """Re-sort the high-yield sheet as the student set it on the plan review, and keep the
+    plan in step: a unit's task gains or loses a card for each core line it gains or loses
+    (unless the student set that task's count), a unit with nothing left is skipped, and a
+    left-off unit that gets a line back gets a task. Returns the tasks to run."""
+    stats = dict(run.get("cheat_sheet") or {})
+    left_all = dict(stats.get("left_off") or {})
+    for unit, lines, items in _sheet_review_rows(run, units):
+        line_choices = {}
+        for n, tag, _text in lines:
+            choice = _tier_choice(f"tier_{unit.idx}_{n}")
+            if choice and choice != tag:
+                line_choices[n] = choice
+        left_choices = {}
+        for i, _item in items:
+            choice = _tier_choice(f"left_{unit.idx}_{i}")
+            if choice and choice != LEFT_OFF:
+                left_choices[i] = choice
+        if not line_choices and not left_choices:
+            continue
+        before = 0 if unit.skipped else (yield_target(unit.text) or 0)
+        text, left = retier("" if unit.skipped else unit.text, [item for _i, item in items], line_choices, left_choices)
+        if left:
+            left_all[str(unit.idx)] = left
+        else:
+            left_all.pop(str(unit.idx), None)
+        after = yield_target(text) or 0
+        if not text:
+            # Its lines are all in `left_off` now; nothing reads a skipped unit's text.
+            unit.skipped = True
+            unit.skip_reason = plan.skips[unit.idx] = REVIEW_EMPTIED_REASON
+            kept = [t for t in kept if any(i not in plan.skips for i in t.unit_idxs)]
+            continue
+        unit.text, unit.hash = text, hash_text(text)
+        if unit.skipped:
+            unit.skipped, unit.skip_reason = False, None
+            plan.skips.pop(unit.idx, None)
+            kept.append(PlanTask(
+                id=max([t.id for t in plan.tasks] + [t.id for t in kept] + [0]) + 1, unit_idxs=[unit.idx],
+                strategy=DEFAULT_STRATEGY, target_cards=max(1, min(MAX_TASK_CARDS, after)), origin="review",
+                notes="Lines brought back onto the sheet at plan review.",
+            ))
+            continue
+        task = next((t for t in kept if not t.figure_id and unit.idx in t.unit_idxs), None)
+        if task is not None and task.id in untouched:
+            task.target_cards = max(1, min(MAX_TASK_CARDS, task.target_cards + after - before))
+    live = [u for u in units if not u.skipped]
+    counts = [yield_counts(u.text) for u in live]
+    stats.update(left_off=left_all, core=sum(c for c, _s in counts), supporting=sum(s for _c, s in counts),
+                 left_off_count=sum(len(v) for v in left_all.values()))
+    run["cheat_sheet"] = stats
+    return kept
 
 
 def _insights(deck):
@@ -486,10 +579,14 @@ def cheat_sheet(deck_id):
         return redirect(url_for("main.deck_editor", deck_id=deck.id))
     figures = Figure.query.filter_by(deck_id=deck.id).all()
     numbers = number_figures(figures)
-    units = Source.query.filter_by(deck_id=deck.id, skipped=False).order_by(Source.idx).all()
+    stats = deck.run_json["cheat_sheet"]
+    units = Source.query.filter_by(deck_id=deck.id).order_by(Source.idx).all()
+    # A high-yield sheet keeps what it left off, so the page can show it under its section.
+    left_off = stats.get("left_off") or {}
     return render_template(
-        "deck_cheatsheet.html", deck=deck, stats=deck.run_json["cheat_sheet"],
-        sections=[(unit, sheet_blocks(unit.text)) for unit in units],
+        "deck_cheatsheet.html", deck=deck, stats=stats,
+        sections=[(unit, sheet_blocks(unit.text), left_off.get(str(unit.idx)) or []) for unit in units if not unit.skipped],
+        left_whole=[(unit, left_off[str(unit.idx)]) for unit in units if unit.skipped and left_off.get(str(unit.idx))],
         figures={numbers[fig.id]: fig for fig in figures},
     )
 
