@@ -536,28 +536,124 @@
       ta.addEventListener('input', update); update();
     }
 
-    if (drop && fileInput) {
-      var nameEl = doc.getElementById('file-name'), sizeEl = doc.getElementById('file-size'), clear = doc.getElementById('file-clear');
-      function reflect() {
-        var f = fileInput.files && fileInput.files[0];
-        drop.classList.toggle('has-file', !!f);
-        if (f) { nameEl.textContent = f.name; sizeEl.textContent = fmtBytes(f.size) + ' · PDF'; }
+    // PDFs can be picked or dropped a few at a time; they build up into one list the user
+    // can put in order. The file input always mirrors that list, in that order, and the
+    // server combines the files into one document in the order it receives them.
+    var list = doc.getElementById('file-list'), rowTpl = doc.getElementById('file-row');
+    if (drop && fileInput && list && rowTpl) {
+      var wrap = doc.getElementById('file-list-wrap'), summary = doc.getElementById('file-summary');
+      var orderHint = doc.getElementById('file-order-hint'), rangeHint = doc.getElementById('page-range-hint');
+      var maxFiles = parseInt(form.getAttribute('data-max-files'), 10) || 20;
+      var files = [], dragFrom = -1;
+      var isPdf = function (f) { return f.type === 'application/pdf' || /\.pdf$/i.test(f.name); };
+      var same = function (a, b) { return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified; };
+
+      function sync() {
+        var dt = new DataTransfer();
+        files.forEach(function (f) { dt.items.add(f); });
+        fileInput.files = dt.files;
       }
-      fileInput.addEventListener('change', reflect);
+      // focusIndex/focusSel put keyboard focus back on the row a button acted on, since
+      // re-rendering replaces the button that had it.
+      function render(focusIndex, focusSel) {
+        list.textContent = '';
+        files.forEach(function (f, i) {
+          var row = rowTpl.content.firstElementChild.cloneNode(true);
+          row.setAttribute('data-index', i);
+          $('.fr-n', row).textContent = (i + 1) + '.';
+          $('.fr-meta b', row).textContent = f.name;
+          $('.fr-meta small', row).textContent = fmtBytes(f.size) + ' · PDF';
+          var up = $('[data-move="-1"]', row), down = $('[data-move="1"]', row);
+          up.disabled = i === 0; down.disabled = i === files.length - 1;
+          up.setAttribute('aria-label', 'Move ' + f.name + ' up');
+          down.setAttribute('aria-label', 'Move ' + f.name + ' down');
+          $('[data-remove]', row).setAttribute('aria-label', 'Remove ' + f.name);
+          list.appendChild(row);
+        });
+        var n = files.length, total = files.reduce(function (sum, f) { return sum + f.size; }, 0);
+        wrap.hidden = !n;
+        drop.classList.toggle('has-file', !!n);
+        summary.textContent = n > 1 ? n + ' PDFs · ' + fmtBytes(total) + ' · combined in this order' : n ? fmtBytes(total) : '';
+        orderHint.hidden = n < 2;
+        if (rangeHint) rangeHint.hidden = n < 2;
+        if (focusIndex == null) return;
+        var target = list.children[Math.min(focusIndex, n - 1)];
+        if (!target) { fileInput.focus(); return; }
+        var btn = $(focusSel || '[data-remove]', target);
+        (btn && !btn.disabled ? btn : $('[data-remove]', target)).focus();
+      }
+      function add(picked) {
+        var skipped = 0, over = 0;
+        Array.prototype.forEach.call(picked, function (f) {
+          if (!isPdf(f)) { skipped++; return; }
+          if (files.some(function (g) { return same(f, g); })) return;
+          if (files.length >= maxFiles) { over++; return; }
+          files.push(f);
+        });
+        if (skipped) toast(skipped === 1 ? 'Only PDF files are supported.' : skipped + ' files were skipped: only PDFs are supported.', 'error');
+        if (over) toast('Up to ' + maxFiles + ' PDFs can be combined into one deck.', 'error');
+        sync(); render();
+      }
+      function move(from, to) {
+        if (to < 0 || to >= files.length || from === to) return;
+        files.splice(to, 0, files.splice(from, 1)[0]);
+        sync();
+      }
+
+      // A new pick replaces the input's files, so fold it into the list rather than lose the rest.
+      fileInput.addEventListener('change', function () { add(fileInput.files || []); });
       ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-over'); }); });
       ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('is-over'); }); });
       drop.addEventListener('drop', function (e) {
-        var files = e.dataTransfer && e.dataTransfer.files;
-        if (!files || !files.length) return;
-        if (files[0].type !== 'application/pdf' && !/\.pdf$/i.test(files[0].name)) { toast('Only PDF files are supported.', 'error'); return; }
-        try { fileInput.files = files; } catch (err) { /* older browsers */ }
-        reflect();
+        var dropped = e.dataTransfer && e.dataTransfer.files;
+        if (dropped && dropped.length) add(dropped);
       });
-      if (clear) clear.addEventListener('click', function (e) {
-        e.preventDefault(); e.stopPropagation();
-        fileInput.value = ''; reflect();
+
+      list.addEventListener('click', function (e) {
+        var btn = e.target.closest('button'), row = e.target.closest('.file-row');
+        if (!btn || !row) return;
+        var i = parseInt(row.getAttribute('data-index'), 10);
+        if (btn.hasAttribute('data-remove')) {
+          files.splice(i, 1); sync(); render(i);
+          return;
+        }
+        var step = btn.getAttribute('data-move');
+        move(i, i + parseInt(step, 10));
+        render(i + parseInt(step, 10), '[data-move="' + step + '"]');
       });
-      reflect();
+      // Rows reorder by dragging too; the arrows above are the keyboard way to do the same.
+      list.addEventListener('dragstart', function (e) {
+        var row = e.target.closest('.file-row');
+        if (!row) return;
+        dragFrom = parseInt(row.getAttribute('data-index'), 10);
+        row.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(dragFrom));
+      });
+      list.addEventListener('dragover', function (e) {
+        if (dragFrom < 0) return;
+        e.preventDefault();
+        var row = e.target.closest('.file-row');
+        $$('.file-row', list).forEach(function (r) { r.classList.remove('drop-before', 'drop-after'); });
+        if (!row) return;
+        var rect = row.getBoundingClientRect();
+        row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
+      });
+      list.addEventListener('drop', function (e) {
+        if (dragFrom < 0) return;
+        e.preventDefault();
+        var row = e.target.closest('.file-row');
+        if (row) {
+          var to = parseInt(row.getAttribute('data-index'), 10) + (row.classList.contains('drop-after') ? 1 : 0);
+          move(dragFrom, to > dragFrom ? to - 1 : to);
+        }
+        render();
+      });
+      list.addEventListener('dragend', function () {
+        dragFrom = -1;
+        $$('.file-row', list).forEach(function (r) { r.classList.remove('is-dragging', 'drop-before', 'drop-after'); });
+      });
+      render();
     }
   })();
 

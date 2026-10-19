@@ -27,7 +27,7 @@ from ..models import Card, Deck, Figure, LLMRun, PipelineTask, Source
 from ..services.credentials import openrouter_key_for
 from ..services.deckgen import improve_card, regenerate_source
 from ..services.export import export_deck as export_deck_file
-from ..services.pdf import extract_pdf_text
+from ..services.pdf import UnreadablePdf, combine_pdfs, extract_pdf_text
 from ..services.pipeline import progress_for
 from ..services.pipeline.catalog import active_model
 from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach_cards, read_review_stats
@@ -136,6 +136,7 @@ def new_deck():
         text_input = request.form.get("text_input", "").strip()
         source_text = ""
         page_offsets = []
+        source_files = []
         figures = []
         if source_type == "text":
             source_text = text_input
@@ -148,33 +149,56 @@ def new_deck():
                 return invalid("Page numbers must be whole numbers starting at 1.")
             if start and end and end < start:
                 return invalid("End page must be the same as or after the start page.")
-            pdf_file = request.files.get("pdf_file")
-            if not pdf_file or not pdf_file.filename:
+            # Several PDFs (a run of lectures, say) are combined into one document in the
+            # order the form lists them, and the page range then counts across all of them.
+            pdf_files = [f for f in request.files.getlist("pdf_file") if f and f.filename]
+            if not pdf_files:
                 return invalid("PDF file is required. Choose your PDF to continue.")
+            max_files = current_app.config["MAX_UPLOAD_FILES"]
+            if len(pdf_files) > max_files:
+                return invalid(f"Upload up to {max_files} PDFs at a time.")
             allowed = current_app.config["ALLOWED_UPLOAD_EXTENSIONS"]
-            ext = pdf_file.filename.rsplit(".", 1)[-1].lower() if "." in pdf_file.filename else ""
-            if ext not in allowed:
-                return invalid("Only PDF files are supported.")
-            # Never trust the client filename. Store under a server-generated name to
-            # prevent path traversal and cross-user collisions.
-            safe_name = f"{uuid.uuid4().hex}_{secure_filename(pdf_file.filename)}"
-            upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
-            pdf_file.save(upload_path)
+            for pdf_file in pdf_files:
+                ext = pdf_file.filename.rsplit(".", 1)[-1].lower() if "." in pdf_file.filename else ""
+                if ext not in allowed:
+                    return invalid("Only PDF files are supported.")
+            upload_paths = []
             try:
-                start = _parse_page(request.form.get("page_start"))
-                end = _parse_page(request.form.get("page_end"))
-                source_text, _total_pages, page_offsets = extract_pdf_text(upload_path, start, end)
-                if current_app.config.get("PIPELINE_FIGURES_ENABLED", True):
-                    figures = extract_figures(upload_path, start, end, max_figures=current_app.config.get("PIPELINE_MAX_FIGURES", 24))
-            except Exception:
-                current_app.logger.exception("PDF extraction failed for %s", safe_name)
-                source_text = ""
+                # Never trust the client filename. Store under a server-generated name to
+                # prevent path traversal and cross-user collisions.
+                for pdf_file in pdf_files:
+                    safe_name = f"{uuid.uuid4().hex}_{secure_filename(pdf_file.filename)}"
+                    upload_paths.append(os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name))
+                    pdf_file.save(upload_paths[-1])
+                source_path = upload_paths[0]
+                if len(upload_paths) > 1:
+                    source_path = os.path.join(current_app.config["UPLOAD_FOLDER"], f"{uuid.uuid4().hex}_combined.pdf")
+                    upload_paths.append(source_path)
+                    try:
+                        page_counts = combine_pdfs(upload_paths[:-1], source_path)
+                    except UnreadablePdf as exc:
+                        current_app.logger.exception("PDF combine failed for file %d", exc.index + 1)
+                        return invalid(
+                            f"“{pdf_files[exc.index].filename}” could not be read as a PDF. "
+                            "Remove it or choose another copy to continue."
+                        )
+                    source_files = [
+                        {"name": pdf_file.filename, "pages": pages} for pdf_file, pages in zip(pdf_files, page_counts)
+                    ]
+                try:
+                    source_text, _total_pages, page_offsets = extract_pdf_text(source_path, start, end)
+                    if current_app.config.get("PIPELINE_FIGURES_ENABLED", True):
+                        figures = extract_figures(source_path, start, end, max_figures=current_app.config.get("PIPELINE_MAX_FIGURES", 24))
+                except Exception:
+                    current_app.logger.exception("PDF extraction failed for %s", os.path.basename(source_path))
+                    source_text = ""
             finally:
                 # Don't leave uploads accumulating on disk after extraction.
-                try:
-                    os.remove(upload_path)
-                except OSError:
-                    pass
+                for path in upload_paths:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
         else:
             return invalid("Choose a source type.")
         if not source_text:
@@ -199,7 +223,9 @@ def new_deck():
             status="draft",
             source_type=source_type,
             source_text=source_text,
-            settings_json={"page_offsets": page_offsets} if page_offsets else {},
+            settings_json={
+                key: value for key, value in (("page_offsets", page_offsets), ("source_files", source_files)) if value
+            },
             run_json={},
         )
         db.session.add(deck)

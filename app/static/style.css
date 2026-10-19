@@ -879,58 +879,158 @@ input[type=file]::file-selector-button {
   color:var(--accent)
 }
 
-.file-chip {
-  display:none;
-  align-items:center;
-  gap:12px;
-  text-align:left;
-  position:relative;
-  pointer-events:none
+.drop-more,
+.drop.has-file .drop-empty,
+.drop.has-file .drop-ic {
+  display:none
 }
 
-.file-chip small {
+.drop.has-file .drop-more {
+  display:block
+}
+
+.drop.has-file {
+  padding:18px 20px
+}
+
+.drop.has-file .drop-idle b {
+  margin-top:0
+}
+
+.source-files {
+  list-style:none;
+  margin:0;
+  padding:14px 24px;
+  border-bottom:1px solid var(--line);
+  display:grid;
+  gap:4px;
+  font-size:13px
+}
+
+.source-files .mono {
+  color:var(--muted);
+  font-size:12px
+}
+
+.file-list-wrap {
+  margin-top:12px
+}
+
+.file-list {
+  list-style:none;
+  margin:6px 0 0;
+  padding:0;
+  display:grid;
+  gap:8px
+}
+
+.file-row {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 8px 8px 6px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:white;
+  position:relative
+}
+
+.file-row.is-dragging {
+  opacity:.45
+}
+
+.file-row.drop-before::before,
+.file-row.drop-after::after {
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  height:2px;
+  border-radius:2px;
+  background:var(--accent)
+}
+
+.file-row.drop-before::before {
+  top:-6px
+}
+
+.file-row.drop-after::after {
+  bottom:-6px
+}
+
+.fr-grip {
+  color:var(--muted);
+  cursor:grab;
+  display:flex
+}
+
+.fr-n {
+  color:var(--muted);
+  font-size:12px;
+  min-width:1.6em;
+  text-align:right
+}
+
+.fr-meta {
+  flex:1;
+  min-width:0
+}
+
+.fr-meta b {
+  display:block;
+  font-size:14px;
+  overflow-wrap:anywhere
+}
+
+.fr-meta small {
   display:block;
   color:var(--muted);
   font-size:12px
 }
 
-.file-chip b {
-  font-size:14px;
-  overflow-wrap:anywhere
-}
-
-.file-chip>div:nth-child(2) {
-  flex:1;
-  min-width:0
+.fr-actions {
+  display:flex;
+  gap:4px
 }
 
 .fc-ic {
   background:var(--accent-soft);
-  padding:12px;
+  padding:10px;
   border-radius:8px;
-  color:var(--accent)
+  color:var(--accent);
+  display:flex
 }
 
 .fc-x {
   border:0;
   background:var(--soft);
+  color:var(--ink);
   border-radius:5px;
-  width:40px;
-  height:40px;
-  pointer-events:auto
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer
 }
 
-.has-file .file-chip {
-  display:flex
+.fc-x:hover:not(:disabled) {
+  background:var(--accent-soft);
+  color:var(--accent)
 }
 
-.has-file .drop-idle {
-  display:none
+.fc-x:disabled {
+  opacity:.35;
+  cursor:default
 }
 
-.has-file {
-  border-style:solid;
-  padding:20px
+.fc-x:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:2px
+}
+
+#page-range-hint {
+  margin:-.25rem 0 1rem
 }
 
 .create-layout {
@@ -4672,7 +4772,7 @@ dialog[open].is-closing { animation: dialog-out 160ms ease-in forwards; pointer-
 dialog[open].is-closing::backdrop { animation: backdrop-in 160ms ease-in reverse forwards; }
 .src-section:not([hidden]), .demo-answer:not([hidden]),
 [data-coach-before]:not([hidden]), [data-coach-after]:not([hidden]),
-.download-state:not([hidden]), .drop.has-file .drop-file,
+.download-state:not([hidden]), .file-list-wrap:not([hidden]),
 .faq-list details[open] p, .coach-original[open] p { animation: feedback-in 200ms ease-out; }
 .tile input:checked + .tile-body .tile-ic { transform: translateY(-2px); }
 .faq-list summary span { transition: transform 180ms ease; }
