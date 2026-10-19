@@ -141,6 +141,11 @@ class FakeLLM:
                   for line in user.splitlines() if line.startswith("[[Figure ")]
         return fake_response(json.dumps({"sections": [{"heading": "Key points", "items": items}]}))
 
+    # --- high-yield ranking across the document: keeps every core point
+    def _high_yield_ranking(self, messages):
+        ids = [int(line.split("]")[0][1:]) for line in messages[-1]["content"].splitlines() if line.startswith("[")]
+        return fake_response(json.dumps({"scores": [{"id": i, "score": 5} for i in ids]}))
+
     # --- phase 1
     def _planner(self, messages):
         self.planner_turn += 1
