@@ -32,6 +32,20 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
      nothing later can re-inflate what it cut. One cached call per unit, in parallel. A
      unit whose call fails keeps its full text; a unit with nothing exam-critical is
      skipped; an entirely empty sheet fails the run before anything is replaced.
+   - **High-yield** (`high_yield`, only with the cheat sheet) — a different writer
+     (`cheatsheet.HIGH_YIELD_SYSTEM`, structured output) sorts each unit's points into
+     core, supporting and context. Each line of the unit's text then starts with a tag:
+     the thing the exam asks for a core line (`[calculate]`, `[apply]`, `[explain]`,
+     `[distinguish]`, `[define]`, `[recall]`), or `[supporting]`. Context points are
+     kept beside the sheet in `run_json["cheat_sheet"]["left_off"]`. The tags then drive
+     the rest of the run. `heuristic_target` sizes a tagged unit at one card per core
+     line plus one per three supporting lines. The planner is told to plan one task per
+     unit at that count, and its runaway ceiling is 1.3x the estimate instead of 2.5x.
+     Workers get a brief that shapes each card by its line's tag. The coverage audit
+     sees only the core lines (`cheatsheet.core_text`), and its back-fill may add at
+     most 20% instead of 40%. On the plan review, `cheatsheet.retier` applies the
+     student's re-sorting to the unit text, and the route adjusts the matching task's
+     target.
 
      The sheet keeps the source's diagrams. The writer is told what each diagram in
      its section shows and places a `[[Figure N]]` marker line for it; a diagram it

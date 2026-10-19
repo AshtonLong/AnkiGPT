@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass, field
 
 from ..llm import extract_json, json_schema_format, run_tool_loop, tool_spec
-from .cheatsheet import FIGURE_LINE_RE
+from .cheatsheet import FIGURE_LINE_RE, high_yield, yield_target
 from .strategies import DEFAULT_STRATEGY, FIGURE_STRATEGY, get_strategy, strategy_catalog, text_strategies
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,11 @@ MAX_UNITS_PER_TASK = 4
 MAX_TASK_CARDS = 60
 MAX_FIGURE_CARDS = 12
 READ_UNIT_CAP = 9000
+# How far over its estimate a plan may go before it is pulled back. A high-yield estimate
+# counts the lines the exam asks about, so it is close to the deck's real size and the
+# ceiling sits close to it; elsewhere it is a rough guess and the ceiling is a runaway guard.
+CEILING_FACTOR = 2.5
+HIGH_YIELD_CEILING_FACTOR = 1.3
 
 
 @dataclass
@@ -131,11 +136,22 @@ def _sizing_chars(unit):
 
 
 def heuristic_target(unit, strategy_key=DEFAULT_STRATEGY):
-    """Cards a unit 'deserves' from its size and density; the planner's starting point."""
+    """Cards a unit 'deserves' from its size and density; the planner's starting point.
+    A high-yield sheet section says what it is worth outright: a card per core line."""
+    tagged = yield_target(unit.text)
+    if tagged is not None:
+        return max(1, min(45, tagged))
     strategy = get_strategy(strategy_key)
     density_factor = {1: 0.35, 2: 0.6, 3: 1.0, 4: 1.35, 5: 1.7}.get(int(unit.density or 3), 1.0)
     raw = (_sizing_chars(unit) / 1000.0) * strategy.cards_per_1k_chars * density_factor
     return max(2, min(45, int(round(raw))))
+
+
+def ceiling_factor(settings):
+    """How far over its estimate a plan for a deck with these settings may go."""
+    if high_yield(settings) and not requested_cards(settings):
+        return HIGH_YIELD_CEILING_FACTOR
+    return CEILING_FACTOR
 
 
 def suggest_budget(units, requested=None, figures=None):
@@ -221,19 +237,40 @@ def _planner_user_message(units, settings, budget, doc_meta, figures=None):
     card_style = settings.get("card_style") or "auto"
     live = [u for u in units if not u.skipped]
     figures = figures or []
-    # A condensed unit reads like a recap; tell the planner it is the material itself.
-    cheat_sheet_note = [
-        "The unit texts are an exam cheat sheet already condensed from the student's material (kind and summary "
-        "describe the original). Every line was kept because it is examinable: do not skip a unit for being terse "
-        "or looking like a recap, and size each task to cover its whole unit. A line starting [[Figure N]] is a "
-        "diagram kept on the sheet, not text to write cards from: its cards, if it earns any, come from its figure "
-        "task, and a figure you give no cards is taken off the sheet."
-    ] if settings.get("cheat_sheet") else []
+    figure_line_note = (
+        "A line starting [[Figure N]] is a diagram kept on the sheet, not text to write cards from: its cards, if it "
+        "earns any, come from its figure task, and a figure you give no cards is taken off the sheet."
+    )
+    if high_yield(settings):
+        cheat_sheet_note = [
+            "The unit texts are a high-yield exam sheet already cut down from the student's material (kind and summary "
+            "describe the original). Only what the exam asks about is left, and each line starts with a tag saying "
+            "what the exam asks the student to do with it: [calculate], [apply], [explain], [distinguish], [define] "
+            "and [recall] mark core lines, and [supporting] marks background a core line needs. Plan one card per core "
+            "line and none for supporting lines: a unit's suggested cards is exactly that count, so use it as the "
+            "task's target_cards. One task per unit: do not run a second strategy over a unit, since every core line "
+            "is already one card. Do not skip a unit that has core lines. " + figure_line_note
+        ]
+    elif settings.get("cheat_sheet"):
+        # A condensed unit reads like a recap; tell the planner it is the material itself.
+        cheat_sheet_note = [
+            "The unit texts are an exam cheat sheet already condensed from the student's material (kind and summary "
+            "describe the original). Every line was kept because it is examinable: do not skip a unit for being terse "
+            "or looking like a recap, and size each task to cover its whole unit. " + figure_line_note
+        ]
+    else:
+        cheat_sheet_note = []
     if requested_cards(settings):
         budget_line = (
             f"The student asked for about {budget} cards in total, figures included, across {len(live)} live units. "
             "That is the size of deck they want: stay close to it, and go over only for content that would otherwise "
             "be left out."
+        )
+    elif high_yield(settings):
+        budget_line = (
+            f"Suggested overall budget: about {budget} cards across {len(live)} live units"
+            + (", figures included" if figures else "")
+            + ". It counts the core lines of the sheet, so it is close to the right size: stay within about 15% of it."
         )
     else:
         budget_line = (
@@ -580,7 +617,7 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         return structured, transcript, calls
     if not plan.summary and final_text:
         plan.summary = final_text[:2000]
-    _finalize(units, plan, figures)
+    _finalize(units, plan, figures, ceiling_factor(settings))
     return plan, transcript, calls
 
 
@@ -684,15 +721,15 @@ def plan_structured(client, units, settings, doc_meta, budget, figures=None):
             target = 0
         _decide_figure(plan, figure, target, notes=entry.get("notes") or "", reason=entry.get("notes") or "")
     plan.summary = (data.get("summary") or "")[:2000]
-    _finalize(units, plan, figures)
+    _finalize(units, plan, figures, ceiling_factor(settings))
     return plan, result
 
 
-def plan_heuristic(units, budget, figures=None):
+def plan_heuristic(units, budget, figures=None, settings=None):
     """No-model plan: one general task per live unit, and the vision pass's advice on
     each figure. Used if the planner role fails."""
     plan = Plan(budget=budget, mode="heuristic", summary="Default plan: one general-coverage task per unit.")
-    _finalize(units, plan, figures)
+    _finalize(units, plan, figures, ceiling_factor(settings))
     return plan
 
 
@@ -704,7 +741,7 @@ def _uncovered(units, plan):
     return [u.idx for u in units if not u.skipped and u.idx not in plan.skips and u.idx not in covered]
 
 
-def _finalize(units, plan, figures=None):
+def _finalize(units, plan, figures=None, factor=CEILING_FACTOR):
     """Enforce invariants: every live unit is covered, every figure is decided, counts
     are bounded."""
     by_idx = {u.idx: u for u in units}
@@ -722,9 +759,9 @@ def _finalize(units, plan, figures=None):
         next_id += 1
     settle_figures(units, plan, figures)
     plan.tasks = plan.tasks[:MAX_TASKS]
-    # A runaway guard, not a budget: the planner may go well over its estimate, and only a
-    # plan beyond 2.5x of it is pulled back.
-    ceiling = max(20, int(plan.budget * 2.5)) if plan.budget else None
+    # A runaway guard, not a budget: the planner may go over its estimate, and only a plan
+    # beyond `factor` times it is pulled back.
+    ceiling = max(20, int(plan.budget * factor)) if plan.budget else None
     if ceiling:
         total = sum(t.target_cards for t in plan.tasks)
         if total > ceiling:

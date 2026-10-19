@@ -50,6 +50,9 @@ PHASE_WEIGHTS = {
 # runaway guard, not a quota: what keeps the back-fill honest is the review each of its
 # cards has to pass (`_review_backfill`).
 BACKFILL_SHARE = 0.4
+# A high-yield deck is audited against its core lines only, each of which was planned a
+# card already, so a gap there is a card a worker skipped, not new material.
+BACKFILL_SHARE_HIGH_YIELD = 0.2
 
 
 # ------------------------------------------------------------------ public entry
@@ -243,23 +246,33 @@ def _phase_cheatsheet(ctx):
     model = ctx.client.model_for("cheatsheet")
     live = [u for u in ctx.units if not u.skipped]
     figures = _sheet_figures(ctx)
+    high_yield = cheatsheet_mod.high_yield(ctx.settings)
+    if high_yield:
+        build, write = cheatsheet_mod.build_high_yield_messages, cheatsheet_mod.write_high_yield_sheet
+        prompt_version = cheatsheet_mod.HIGH_YIELD_PROMPT_VERSION
+    else:
+        build, write = cheatsheet_mod.build_messages, cheatsheet_mod.write_cheat_sheet
+        prompt_version = cheatsheet_mod.CHEATSHEET_PROMPT_VERSION
     nodes = {}
     jobs = []
     for u in live:
         figs = figures.get(u.idx, [])
-        messages = cheatsheet_mod.build_messages(u, ctx.units, ctx.settings, ctx.doc_meta, figures=figs)
+        messages = build(u, ctx.units, ctx.settings, ctx.doc_meta, figures=figs)
         node = tracer.task("cheatsheet", (u.title or f"Unit {u.idx + 1}")[:150], unit_ids=[u.idx], model=model)
         nodes[node.id] = {"node": node, "unit": u, "messages": messages, "figures": figs}
         jobs.append(Job(
             id=node.id,
-            fn=(lambda m=messages: cheatsheet_mod.write_cheat_sheet(ctx.client, m)),
-            cache_key=make_key("cheatsheet", model, cheatsheet_mod.CHEATSHEET_PROMPT_VERSION, messages,
-                               *ctx.client.effort_key("cheatsheet")),
+            fn=(lambda m=messages: write(ctx.client, m)),
+            cache_key=make_key("cheatsheet", model, prompt_version, messages, *ctx.client.effort_key("cheatsheet")),
             meta={"role": "cheatsheet", "model": model},
         ))
 
     stats = {"units": len(live), "condensed": 0, "emptied": 0, "failed": 0, "chars_in": 0, "chars_out": 0,
              "figures": 0, "kept_full": []}
+    if high_yield:
+        # How the writer sorted the points, and the ones it left off, by unit, so the
+        # sheet page can show them and the plan review can bring one back.
+        stats.update(high_yield=True, core=0, supporting=0, left_off_count=0, left_off={})
 
     def on_start(job):
         tracer.start(nodes[job.id]["node"])
@@ -275,17 +288,25 @@ def _phase_cheatsheet(ctx):
             stats["figures"] += len(figs)
             unit.text = cheatsheet_mod.place_figures(unit.text, figs)
             tracer.log_call(node, "cheatsheet", None, messages=entry["messages"], error=res.error,
-                            prompt_version=cheatsheet_mod.CHEATSHEET_PROMPT_VERSION)
+                            prompt_version=prompt_version)
             tracer.finish(node, status="failed", error=format_generation_error(res.error))
             return
         value = res.value or {}
         sheet = cheatsheet_mod.place_figures(value.get("cheat_sheet") or "", figs)
+        left_off = value.get("left_off") or []
+        core, supporting = cheatsheet_mod.yield_counts(sheet)
         before = unit.chars
         cr = ChatResult(content=value.get("content") or "", message={}, usage=res.usage or {},
                         model=value.get("model") or node.model)
-        tracer.log_call(node, "cheatsheet", cr, messages=entry["messages"],
-                        prompt_version=cheatsheet_mod.CHEATSHEET_PROMPT_VERSION, parsed={"cheat_sheet": sheet},
-                        cached=res.cached)
+        parsed = {"cheat_sheet": sheet, **({"left_off": left_off} if high_yield else {})}
+        tracer.log_call(node, "cheatsheet", cr, messages=entry["messages"], prompt_version=prompt_version,
+                        parsed=parsed, cached=res.cached)
+        if high_yield:
+            stats["core"] += core
+            stats["supporting"] += supporting
+            stats["left_off_count"] += len(left_off)
+            if left_off:
+                stats["left_off"][str(unit.idx)] = left_off
         if sheet:
             unit.text = sheet
             unit.density = max(int(unit.density or 3), cheatsheet_mod.CHEATSHEET_DENSITY)
@@ -294,15 +315,21 @@ def _phase_cheatsheet(ctx):
             stats["chars_out"] += len(sheet)
             stats["figures"] += len(figs)
             node.label = f"{node.label} · {before:,} → {len(sheet):,} chars"
+            if high_yield:
+                node.label += f" · {core} core, {supporting} supporting, {len(left_off)} left off"
             if figs:
                 node.label += f" · {len(figs)} diagram{'s' if len(figs) != 1 else ''}"
         else:
             unit.skipped = True
-            unit.skip_reason = "Nothing exam-critical to put on the cheat sheet."
+            unit.skip_reason = cheatsheet_mod.EMPTY_REASON
             stats["emptied"] += 1
             node.label = f"{node.label} · nothing exam-critical, skipped"
-        tracer.finish(node, status="cached" if res.cached else "done",
-                      result={"chars_in": before, "chars_out": len(sheet), "figures": len(figs)})
+            if left_off:
+                node.label += f" · {len(left_off)} left off"
+        result = {"chars_in": before, "chars_out": len(sheet), "figures": len(figs)}
+        if high_yield:
+            result.update(core=core, supporting=supporting, left_off=len(left_off))
+        tracer.finish(node, status="cached" if res.cached else "done", result=result)
 
     results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
                        abort_on=_abort_on)
@@ -310,7 +337,8 @@ def _phase_cheatsheet(ctx):
     failed = stats["failed"]
     error = f"{failed} of {len(live)} units could not be condensed and were kept in full." if failed else None
     tracer.set_run(cheat_sheet=stats)
-    tracer.end_phase("cheatsheet", status="failed" if failed else "done", error=error, result=stats)
+    tracer.end_phase("cheatsheet", status="failed" if failed else "done", error=error,
+                     result={k: v for k, v in stats.items() if k != "left_off"})
     logger.info("Deck %s cheat sheet: %s units, %s -> %s chars, %s emptied, %s failed", ctx.deck.id, len(live),
                 stats["chars_in"], stats["chars_out"], stats["emptied"], failed)
     if live and not any(not u.skipped for u in ctx.units):
@@ -353,7 +381,7 @@ def _phase_plan(ctx):
             raise
         logger.warning("Planner failed (%s); using heuristic plan", exc)
         tracer.log_call(node, "planner", None, error=exc, prompt_version=planner_mod.PLAN_PROMPT_VERSION)
-        plan = planner_mod.plan_heuristic(ctx.units, budget, figures)
+        plan = planner_mod.plan_heuristic(ctx.units, budget, figures, ctx.settings)
     for i, call in enumerate(calls):
         tracer.log_call(
             node, "planner", call, prompt_version=planner_mod.PLAN_PROMPT_VERSION,
@@ -396,7 +424,7 @@ def _drop_uncarded_diagrams(ctx, plan, figures):
         unit.text = cheatsheet_mod.remove_figures(unit.text, dropped)
         if not unit.text:
             unit.skipped = True
-            unit.skip_reason = plan.skips[unit.idx] = "Nothing exam-critical to put on the cheat sheet."
+            unit.skip_reason = plan.skips[unit.idx] = cheatsheet_mod.EMPTY_REASON
     plan.tasks[:] = [t for t in plan.tasks if any(i not in plan.skips for i in t.unit_idxs)]
     stats = dict(ctx.tracer.get_run().get("cheat_sheet") or {})
     stats["figures"] = max(0, int(stats.get("figures") or 0) - len(dropped))
@@ -951,15 +979,21 @@ def _phase_coverage(ctx):
     live_units = [u for u in ctx.units if not u.skipped and u.idx in covered and (u.density or 3) >= 2]
     cards_by_unit = _cards_by_unit(ctx)
     model = ctx.client.model_for("reconcile")
+    high_yield = cheatsheet_mod.high_yield(ctx.settings)
     nodes = {}
     jobs = []
     for u in live_units:
+        # A high-yield unit owes a card to each core line and to nothing else on it, so
+        # only those lines are audited. A unit kept in full has no tags and is audited whole.
+        source = cheatsheet_mod.core_text(u.text) if high_yield and cheatsheet_mod.yield_target(u.text) is not None else None
+        if source == "":
+            continue
         lines = _card_lines(cards_by_unit.get(u.idx, []))
         node = tracer.task("coverage", f"Audit coverage · {u.title[:90]}", unit_ids=[u.idx], model=model)
-        key = make_key("coverage", model, reconcile_mod.COVERAGE_PROMPT_VERSION, hash_text(u.text), lines,
-                       *ctx.client.effort_key("coverage"))
+        key = make_key("coverage", model, reconcile_mod.COVERAGE_PROMPT_VERSION, hash_text(u.text if source is None else source),
+                       lines, *ctx.client.effort_key("coverage"))
         nodes[node.id] = {"node": node, "unit": u}
-        jobs.append(Job(id=node.id, fn=(lambda unit=u, c=lines: reconcile_mod.audit_unit(ctx.client, unit, c)),
+        jobs.append(Job(id=node.id, fn=(lambda unit=u, c=lines, s=source: reconcile_mod.audit_unit(ctx.client, unit, c, s)),
                         cache_key=key, meta={"role": "reconcile", "model": model}))
 
     # A deck the student sized themselves is back-filled only for what an examiner would
@@ -998,7 +1032,10 @@ def _phase_coverage(ctx):
     candidates = rejected = filled = 0
     if gap_tasks:
         kept_total = Card.query.filter_by(deck_id=ctx.deck.id, status="ok").count()
-        gap_cap = max(6, int(kept_total * BACKFILL_SHARE))
+        if high_yield:
+            gap_cap = max(3, int(kept_total * BACKFILL_SHARE_HIGH_YIELD))
+        else:
+            gap_cap = max(6, int(kept_total * BACKFILL_SHARE))
         total_target = sum(t.target_cards for t in gap_tasks)
         if total_target > gap_cap:
             scale = gap_cap / float(total_target)

@@ -542,7 +542,7 @@ class TestCheatSheet:
         assert example["sub"] and example["example"]
         assert blocks[2]["number"] == 2
         assert blocks[3]["items"] == [
-            {"text": "Measure the rate. Repeat at each [S].", "label": "1.", "sub": False, "example": False}]
+            {"text": "Measure the rate. Repeat at each [S].", "label": "1.", "sub": False, "example": False, "tag": None}]
         assert blocks[4]["rows"] == [["Inhibitor", "Km"], ["Competitive", "rises"]]
         assert blocks[6]["text"] == "Holds only at steady state, with [S] far above [E]."
         assert cheatsheet.sheet_blocks("") == []

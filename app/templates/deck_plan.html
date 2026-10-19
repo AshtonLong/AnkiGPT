@@ -5,6 +5,11 @@
 {% set doc = run.get('doc_meta') or {} %}
 {% set live_units = units|rejectattr('skipped')|list %}
 {% set total_target = plan.tasks|sum(attribute='target_cards') %}
+{% macro tier_select(name, current) %}
+<div class="select-wrap"><select name="{{ name }}" aria-label="What this line is">
+  {% for value, label in tier_choices %}<option value="{{ value }}" {% if value == current %}selected{% endif %}>{{ label }}</option>{% endfor %}
+</select></div>
+{% endmacro %}
 
 {{ stepper(3) }}
 
@@ -85,6 +90,31 @@
         {% endfor %}
       </ul>
     </details>
+    {% endif %}
+
+    {% if sheet_rows %}
+    {% set sheet = run.get('cheat_sheet') or {} %}
+    <section class="panel plan-sheet">
+      <div class="panel-head">
+        <span class="panel-title">{{ icon('sheet') }} High-yield sheet</span>
+        <span class="counter"><b>{{ sheet.get('core') or 0 }}</b> core · {{ sheet.get('supporting') or 0 }} supporting · {{ sheet.get('left_off_count') or 0 }} left off</span>
+      </div>
+      <p class="hint">Each line with a card tag gets one card. To bring a supporting or left-off line in, give it a card tag; to drop a line, choose Leave off. Its unit's task gains or loses a card for each, unless you changed that task's count yourself.</p>
+      {% for unit, lines, items in sheet_rows %}
+      {% set core = lines|rejectattr(1, 'equalto', 'supporting')|list|length %}
+      <details class="sheet-unit">
+        <summary><b>{{ unit.title }}</b><small>{% if unit.skipped %}left off entirely · {% endif %}{{ core }} core · {{ lines|length - core }} supporting · {{ items|length }} left off</small></summary>
+        <ul>
+          {% for n, tag, text in lines %}
+          <li class="{{ 'supporting' if tag == 'supporting' else 'core' }}">{{ tier_select('tier_%d_%d'|format(unit.idx, n), tag) }}<span>{{ text|sheet_inline }}</span></li>
+          {% endfor %}
+          {% for i, point in items %}
+          <li class="off">{{ tier_select('left_%d_%d'|format(unit.idx, i), 'off') }}<span>{{ point.text|sheet_inline }}</span></li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endfor %}
+    </section>
     {% endif %}
 
     <div class="plan-foot panel">
