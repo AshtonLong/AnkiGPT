@@ -37,7 +37,7 @@ from ..services.pipeline.cheatsheet import (
     yield_counts, yield_target,
 )
 from ..services.pipeline.figures import extract_figures, number_figures
-from ..services.pipeline.planner import MAX_TASK_CARDS, Plan, PlanTask
+from ..services.pipeline.planner import MAX_TASK_CARDS, Plan, PlanTask, counts_cards
 from ..services.pipeline.strategies import DEFAULT_STRATEGY, text_strategies
 from ..services.pipeline.trace import PHASES, phases_for
 from ..services.validators import is_valid_cloze
@@ -378,7 +378,8 @@ def plan_deck(deck_id):
                 target = task.target_cards
             if target == task.target_cards:
                 untouched.add(task.id)
-            task.target_cards = max(1, min(60, target))
+            # Left empty, a task keeps no count: its writer decides what its material earns.
+            task.target_cards = max(1, min(60, target)) if target > 0 else 0
             strategy = request.form.get(f"strategy_{task.id}") or task.strategy
             # A figure task has one way of writing its cards, and no text task has it.
             if not task.figure_id and strategy in text_strategies():
@@ -386,7 +387,7 @@ def plan_deck(deck_id):
             task.notes = (request.form.get(f"notes_{task.id}") or task.notes or "")[:1500]
             kept.append(task)
         if high_yield(deck.settings_json):
-            kept = _apply_sheet_review(run, plan, units, kept, untouched)
+            kept = _apply_sheet_review(run, plan, units, kept, untouched, counts_cards(deck.settings_json))
         if not kept:
             flash("Keep at least one task, or re-plan.", "error")
             return redirect(url_for("main.plan_deck", deck_id=deck.id))
@@ -440,11 +441,11 @@ def _tier_choice(name):
     return value if value in dict(TIER_CHOICES) else None
 
 
-def _apply_sheet_review(run, plan, units, kept, untouched):
+def _apply_sheet_review(run, plan, units, kept, untouched, counted):
     """Re-sort the high-yield sheet as the student set it on the plan review, and keep the
-    plan in step: a unit's task gains or loses a card for each core line it gains or loses
-    (unless the student set that task's count), a unit with nothing left is skipped, and a
-    left-off unit that gets a line back gets a task. Returns the tasks to run."""
+    plan in step: a task with a count gains or loses a card for each core line its unit
+    gains or loses (unless the student set that count here), a unit with nothing left is
+    skipped, and a left-off unit that gets a line back gets a task. Returns the tasks to run."""
     stats = dict(run.get("cheat_sheet") or {})
     left_all = dict(stats.get("left_off") or {})
     for unit, lines, items in _sheet_review_rows(run, units):
@@ -479,12 +480,12 @@ def _apply_sheet_review(run, plan, units, kept, untouched):
             plan.skips.pop(unit.idx, None)
             kept.append(PlanTask(
                 id=max([t.id for t in plan.tasks] + [t.id for t in kept] + [0]) + 1, unit_idxs=[unit.idx],
-                strategy=DEFAULT_STRATEGY, target_cards=max(1, min(MAX_TASK_CARDS, after)), origin="review",
+                strategy=DEFAULT_STRATEGY, target_cards=max(1, min(MAX_TASK_CARDS, after)) if counted else 0, origin="review",
                 notes="Lines brought back onto the sheet at plan review.",
             ))
             continue
         task = next((t for t in kept if not t.figure_id and unit.idx in t.unit_idxs), None)
-        if task is not None and task.id in untouched:
+        if task is not None and task.target_cards and task.id in untouched:
             task.target_cards = max(1, min(MAX_TASK_CARDS, task.target_cards + after - before))
     live = [u for u in units if not u.skipped]
     counts = [yield_counts(u.text) for u in live]

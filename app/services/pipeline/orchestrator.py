@@ -50,9 +50,6 @@ PHASE_WEIGHTS = {
 # runaway guard, not a quota: what keeps the back-fill honest is the review each of its
 # cards has to pass (`_review_backfill`).
 BACKFILL_SHARE = 0.4
-# A high-yield deck is audited against its core lines only, each of which was planned a
-# card already, so a gap there is a card a worker skipped, not new material.
-BACKFILL_SHARE_HIGH_YIELD = 0.2
 
 
 # ------------------------------------------------------------------ public entry
@@ -176,7 +173,7 @@ def _run(deck, resume_from_plan=False):
             # that had not happened yet, and let each follow the vision pass.
             if "figures" not in tracer.phase_nodes:
                 _phase_figures(ctx)
-            planner_mod.settle_figures(ctx.units, ctx.plan, _plan_figures(ctx))
+            planner_mod.settle_figures(ctx.units, ctx.plan, _plan_figures(ctx), planner_mod.counts_cards(ctx.settings))
     else:
         tracer.clear()
         tracer.set_run(
@@ -334,6 +331,8 @@ def _phase_cheatsheet(ctx):
     results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
                        abort_on=_abort_on)
     _raise_if_terminal(results)
+    if high_yield:
+        _rank_core_points(ctx, stats)
     failed = stats["failed"]
     error = f"{failed} of {len(live)} units could not be condensed and were kept in full." if failed else None
     tracer.set_run(cheat_sheet=stats)
@@ -349,6 +348,93 @@ def _phase_cheatsheet(ctx):
         )
 
 
+def _rank_core_points(ctx, stats):
+    """The high-yield sheet's second look. Each section was sorted on its own, against
+    which nearly every section has a point that looks core; here every core point of the
+    document is rated against all the others, and the ones an exam would not ask lose
+    their card (supporting) or come off the sheet (left off). A batch that fails leaves
+    its points as the writer sorted them."""
+    tracer = ctx.tracer
+    points = cheatsheet_mod.core_points(ctx.units)
+    model = ctx.client.model_for("cheatsheet")
+    batches = [points[i:i + cheatsheet_mod.RANK_BATCH] for i in range(0, len(points), cheatsheet_mod.RANK_BATCH)]
+    nodes = {}
+    jobs = []
+    for k, batch in enumerate(batches, start=1):
+        part = (k, len(batches)) if len(batches) > 1 else None
+        messages = cheatsheet_mod.build_rank_messages(batch, ctx.units, ctx.settings, ctx.doc_meta, part=part)
+        label = f"Rank {len(batch)} core points across the document" + (f" · part {k} of {len(batches)}" if part else "")
+        node = tracer.task("cheatsheet", label, model=model)
+        nodes[node.id] = {"node": node, "messages": messages}
+        jobs.append(Job(
+            id=node.id,
+            fn=(lambda m=messages: cheatsheet_mod.rank_core_points(ctx.client, m)),
+            cache_key=make_key("hy_rank", model, cheatsheet_mod.HIGH_YIELD_RANK_PROMPT_VERSION, messages,
+                               *ctx.client.effort_key("cheatsheet")),
+            meta={"role": "cheatsheet", "model": model},
+        ))
+    scores = {}
+
+    def on_start(job):
+        tracer.start(nodes[job.id]["node"])
+
+    def on_done(res):
+        entry = nodes[res.job.id]
+        node = entry["node"]
+        if not res.ok:
+            logger.warning("Deck %s ranking of core points failed: %s", ctx.deck.id, res.error)
+            tracer.log_call(node, "cheatsheet", None, messages=entry["messages"], error=res.error,
+                            prompt_version=cheatsheet_mod.HIGH_YIELD_RANK_PROMPT_VERSION)
+            tracer.finish(node, status="failed", error=format_generation_error(res.error))
+            return
+        value = res.value or {}
+        got = value.get("scores") or {}
+        scores.update(got)
+        cr = ChatResult(content=value.get("content") or "", message={}, usage=res.usage or {},
+                        model=value.get("model") or node.model)
+        tracer.log_call(node, "cheatsheet", cr, messages=entry["messages"],
+                        prompt_version=cheatsheet_mod.HIGH_YIELD_RANK_PROMPT_VERSION, parsed={"scores": got},
+                        cached=res.cached)
+        kept = sum(1 for s in got.values() if s >= cheatsheet_mod.RANK_KEEP)
+        node.label = f"{node.label} · {kept} kept"
+        tracer.finish(node, status="cached" if res.cached else "done", result={"scored": len(got), "kept": kept})
+
+    if jobs:
+        results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
+                           abort_on=_abort_on)
+        _raise_if_terminal(results)
+
+    left_off = stats["left_off"]
+    choices = cheatsheet_mod.ranked_choices(points, scores)
+    for unit in ctx.units:
+        if unit.skipped or cheatsheet_mod.yield_target(unit.text) is None:
+            continue  # skipped, or kept in full because its sheet failed
+        line_choices = dict(choices.get(unit.idx) or {})
+        after = [line_choices.get(n, tag) for n, tag, _text in cheatsheet_mod.sheet_lines(unit.text)]
+        if all(tag in (cheatsheet_mod.SUPPORTING, cheatsheet_mod.LEFT_OFF) for tag in after):
+            # No card left to write here, and a supporting line supports only its own
+            # unit's cards: the whole section comes off, where the plan review can still
+            # bring a line back.
+            line_choices = {n: cheatsheet_mod.LEFT_OFF for n, _tag, _text in cheatsheet_mod.sheet_lines(unit.text)}
+        if not line_choices:
+            continue
+        text, left = cheatsheet_mod.retier(unit.text, left_off.get(str(unit.idx)) or [], line_choices, {})
+        if left:
+            left_off[str(unit.idx)] = left
+        if text:
+            unit.text = text
+        else:
+            unit.skipped = True
+            unit.skip_reason = cheatsheet_mod.EMPTY_REASON
+            stats["emptied"] += 1
+    counts = [cheatsheet_mod.yield_counts(u.text) for u in ctx.units if not u.skipped]
+    before = len(points)
+    stats.update(core=sum(c for c, _s in counts), supporting=sum(s for _c, s in counts),
+                 left_off_count=sum(len(v) for v in left_off.values()),
+                 ranked={"core_before": before, "scored": len(scores)})
+    logger.info("Deck %s ranking: %s core points -> %s", ctx.deck.id, before, stats["core"])
+
+
 # ----------------------------------------------------------------------- plan
 def _phase_plan(ctx):
     tracer = ctx.tracer
@@ -358,7 +444,10 @@ def _phase_plan(ctx):
     node = tracer.task("plan", "Plan the work order", model=ctx.client.model_for("planner"))
     tracer.start(node)
     figures = _plan_figures(ctx)
-    budget = planner_mod.suggest_budget(ctx.units, planner_mod.requested_cards(ctx.settings), figures)
+    # On auto there is no budget at all: no count is worked out, so none can reach a
+    # model. A deck size the student set is theirs to give the planner.
+    requested = planner_mod.requested_cards(ctx.settings)
+    budget = planner_mod.suggest_budget(ctx.units, requested, figures) if requested else 0
     events = []
 
     def on_event(kind, payload):
@@ -972,6 +1061,13 @@ def _phase_coverage(ctx):
         tracer.phase("coverage", status="skipped")
         tracer.end_phase("coverage", status="skipped")
         return
+    if cheatsheet_mod.high_yield(ctx.settings):
+        # A high-yield deck is meant to leave things out. Its sheet was already cut to
+        # what an exam asks, and a core line a writer passed over is one it judged not to
+        # earn a card: a back-fill would only put those back.
+        tracer.phase("coverage", status="skipped")
+        tracer.end_phase("coverage", status="skipped", result={"reason": "high-yield deck"})
+        return
     tracer.phase("coverage")
     # Only audit units a text task of the plan covers: a unit the user (or planner) left
     # without one was skipped on purpose and must not be back-filled here.
@@ -979,27 +1075,21 @@ def _phase_coverage(ctx):
     live_units = [u for u in ctx.units if not u.skipped and u.idx in covered and (u.density or 3) >= 2]
     cards_by_unit = _cards_by_unit(ctx)
     model = ctx.client.model_for("reconcile")
-    high_yield = cheatsheet_mod.high_yield(ctx.settings)
     nodes = {}
     jobs = []
     for u in live_units:
-        # A high-yield unit owes a card to each core line and to nothing else on it, so
-        # only those lines are audited. A unit kept in full has no tags and is audited whole.
-        source = cheatsheet_mod.core_text(u.text) if high_yield and cheatsheet_mod.yield_target(u.text) is not None else None
-        if source == "":
-            continue
         lines = _card_lines(cards_by_unit.get(u.idx, []))
         node = tracer.task("coverage", f"Audit coverage · {u.title[:90]}", unit_ids=[u.idx], model=model)
-        key = make_key("coverage", model, reconcile_mod.COVERAGE_PROMPT_VERSION, hash_text(u.text if source is None else source),
-                       lines, *ctx.client.effort_key("coverage"))
+        key = make_key("coverage", model, reconcile_mod.COVERAGE_PROMPT_VERSION, hash_text(u.text), lines,
+                       *ctx.client.effort_key("coverage"))
         nodes[node.id] = {"node": node, "unit": u}
-        jobs.append(Job(id=node.id, fn=(lambda unit=u, c=lines, s=source: reconcile_mod.audit_unit(ctx.client, unit, c, s)),
+        jobs.append(Job(id=node.id, fn=(lambda unit=u, c=lines: reconcile_mod.audit_unit(ctx.client, unit, c)),
                         cache_key=key, meta={"role": "reconcile", "model": model}))
 
     # A deck the student sized themselves is back-filled only for what an examiner would
     # very likely ask; one left on auto also for the plausible questions.
     min_importance = 3 if planner_mod.requested_cards(ctx.settings) else 2
-    gap_tasks = []
+    gaps = []  # (unit idx, missing facts)
     scores = {}
 
     def on_start(job):
@@ -1017,30 +1107,32 @@ def _phase_coverage(ctx):
         tracer.finish(node, status="cached" if res.cached else "done", usage=res.usage, cached=res.cached,
                       result={"score": data.get("score"), "missing": len(missing), "facts": [m["fact"] for m in missing][:12]})
         if missing:
-            facts = "\n".join(f"- {m['fact']}" + (f" (source: \"{m['source_quote']}\")" if m.get("source_quote") else "") for m in missing[:14])
-            gap_tasks.append(planner_mod.PlanTask(
-                id=0, unit_idxs=[unit.idx], strategy=DEFAULT_STRATEGY, target_cards=min(12, len(missing)),
-                notes="Coverage gap-fill. Write cards ONLY for these facts the first pass missed, one card per fact, "
-                      "and leave out any fact a card the deck already has covers:\n" + facts,
-                origin="coverage",
-            ))
+            gaps.append((unit.idx, missing[:12]))
 
     results = run_jobs(jobs, max_workers=ctx.max_workers, cache=ctx.cache, on_start=on_start, on_done=on_done,
                        abort_on=_abort_on)
     _raise_if_terminal(results)
 
     candidates = rejected = filled = 0
-    if gap_tasks:
+    gap_tasks = []
+    if gaps:
+        # The runaway guard trims the facts each gap task is given, so no task is ever
+        # told a card count: it writes one card per fact it is shown, at most.
         kept_total = Card.query.filter_by(deck_id=ctx.deck.id, status="ok").count()
-        if high_yield:
-            gap_cap = max(3, int(kept_total * BACKFILL_SHARE_HIGH_YIELD))
-        else:
-            gap_cap = max(6, int(kept_total * BACKFILL_SHARE))
-        total_target = sum(t.target_cards for t in gap_tasks)
-        if total_target > gap_cap:
-            scale = gap_cap / float(total_target)
-            for t in gap_tasks:
-                t.target_cards = max(1, int(round(t.target_cards * scale)))
+        gap_cap = max(6, int(kept_total * BACKFILL_SHARE))
+        total = sum(len(missing) for _idx, missing in gaps)
+        scale = min(1.0, gap_cap / float(total))
+        counted = planner_mod.requested_cards(ctx.settings) is not None
+        for idx, missing in gaps:
+            missing = missing[:max(1, int(round(len(missing) * scale)))]
+            facts = "\n".join(f"- {m['fact']}" + (f" (source: \"{m['source_quote']}\")" if m.get("source_quote") else "")
+                              for m in missing)
+            gap_tasks.append(planner_mod.PlanTask(
+                id=0, unit_idxs=[idx], strategy=DEFAULT_STRATEGY, target_cards=len(missing) if counted else 0,
+                notes="Coverage gap-fill. Write cards ONLY for these facts the first pass missed, one card per fact, "
+                      "and leave out any fact a card the deck already has covers:\n" + facts,
+                origin="coverage",
+            ))
         written = _run_write_tasks(ctx, "coverage", gap_tasks, origin_tag="origin:coverage", after_existing=True)
         if cfg.get("PIPELINE_CRITIC_ENABLED", True):
             _run_critic(ctx, "coverage", written.values())

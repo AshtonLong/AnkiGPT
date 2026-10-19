@@ -34,11 +34,8 @@ MAX_UNITS_PER_TASK = 4
 MAX_TASK_CARDS = 60
 MAX_FIGURE_CARDS = 12
 READ_UNIT_CAP = 9000
-# How far over its estimate a plan may go before it is pulled back. A high-yield estimate
-# counts the lines the exam asks about, so it is close to the deck's real size and the
-# ceiling sits close to it; elsewhere it is a rough guess and the ceiling is a runaway guard.
+# How far over a deck size the student set a plan may go before it is pulled back.
 CEILING_FACTOR = 2.5
-HIGH_YIELD_CEILING_FACTOR = 1.3
 
 
 @dataclass
@@ -147,11 +144,13 @@ def heuristic_target(unit, strategy_key=DEFAULT_STRATEGY):
     return max(2, min(45, int(round(raw))))
 
 
-def ceiling_factor(settings):
-    """How far over its estimate a plan for a deck with these settings may go."""
-    if high_yield(settings) and not requested_cards(settings):
-        return HIGH_YIELD_CEILING_FACTOR
-    return CEILING_FACTOR
+def counts_cards(settings):
+    """Whether a run's models are told any card count. Only when the student set a deck
+    size: on auto, a number in a model's context (even one called an estimate) is a
+    target it writes towards, so no count is shown to the planner or to any writer. Each
+    writer writes a card for each point that earns one, and the plan's tasks carry a
+    target of 0, which means just that."""
+    return requested_cards(settings) is not None
 
 
 def suggest_budget(units, requested=None, figures=None):
@@ -171,11 +170,11 @@ def suggest_budget(units, requested=None, figures=None):
 PLANNER_SYSTEM = """You are the planning agent of a flashcard generator. Your job is to decide HOW a study document is turned into Anki cards, then delegate the writing to worker agents by spawning tasks. You do not write cards yourself.
 
 You have tools:
-- read_unit(unit_idx): read a unit's full text. Use it whenever the summary is not enough to choose a strategy or a card budget.
+- read_unit(unit_idx): read a unit's full text. Use it whenever the summary is not enough to choose a strategy{read_for}.
 - search_source(query): find where a term or topic appears across units.
-- spawn_task(unit_idxs, strategy, target_cards, notes): delegate a card-writing task. One task = one worker call that reads the listed units verbatim. Group only adjacent, closely related units (max {max_units} per task). You may spawn several tasks with different strategies over the same unit when it deserves it (e.g. definition_sweep + pitfall_edge_case).
+- spawn_task({spawn_args}): delegate a card-writing task. One task = one worker call that reads the listed units verbatim. Group only adjacent, closely related units (max {max_units} per task). You may spawn several tasks with different strategies over the same unit when it deserves it (e.g. definition_sweep + pitfall_edge_case).
 - skip_unit(unit_idx, reason): exclude a unit entirely (fluff, references, recap of earlier units, out of the student's focus).
-- spawn_figure_task(figure, target_cards, notes): delegate cards on one figure. Its image is shown on every card the task writes. Only offered when the document has figures.
+- spawn_figure_task({figure_args}): delegate cards on one figure. Its image is shown on every card the task writes. Only offered when the document has figures.
 - skip_figure(figure, reason): give a figure no cards.
 - finish_plan(summary): call this exactly once when every non-skipped unit is covered by at least one task.
 
@@ -185,15 +184,48 @@ Strategies (choose per task):
 Planning principles
 - Read first, then decide. Summaries can mislead; read any unit whose kind or density you are unsure about, and always read units marked figure_heavy or worked_example before assigning a strategy.
 - Match the strategy to the unit's real structure. Mixed units get `general`; dense glossaries get `definition_sweep`; equation-heavy text gets `formula_derivation`; processes get `mechanism_chain`; confusable siblings get `compare_contrast`.
-- Size each task to its content: `target_cards` is the number of high-value cards the material can honestly support. Dense units earn more; narrative earns fewer. The suggested overall budget is an estimate, not a limit: go above it where the material holds more examinable content than its size suggests, and below it where it holds less. Never pad.
+- {sizing}
 - Notes are instructions to the worker. Make them specific and local: "one card per symbol in the rate-law table", "contrast the three isotherm models on their assumptions", "ignore the historical aside". Mention the student's focus/exclusions where relevant.
 - Respect the student's focus and exclusions. Skip what they excluded; weight what they asked for.
 - Do not spawn tasks for skipped units. Do not duplicate coverage across tasks unless the strategies differ.
-- Figures, when the document has any, are listed under the document map with what a vision pass read off each one. Decide every figure. A figure earns cards only for what a student must recognise in the image or recall from it and that the text tasks of its unit will not already cover: usually one to three cards, often none. Skip a figure that repeats another figure, that only illustrates one worked example, or whose content the text states anyway. The vision pass's suggested count is advice, and a figure you leave undecided follows it.
+- Figures, when the document has any, are listed under the document map with what a vision pass read off each one. Decide every figure. A figure earns cards only for what a student must recognise in the image or recall from it and that the text tasks of its unit will not already cover: {figure_size}. Skip a figure that repeats another figure, that only illustrates one worked example, or whose content the text states anyway. The vision pass's {figure_advice} is advice, and a figure you leave undecided follows it.
 - Be decisive: aim to finish in as few turns as possible while still reading what you need."""
 
+# What PLANNER_SYSTEM says about card counts, with a deck size the student set and without.
+_COUNTED = {
+    "read_for": " or a card budget",
+    "spawn_args": "unit_idxs, strategy, target_cards, notes",
+    "figure_args": "figure, target_cards, notes",
+    "sizing": (
+        "Size each task to its content: `target_cards` is the number of high-value cards the material can honestly "
+        "support. Dense units earn more; narrative earns fewer. Never pad."
+    ),
+    "figure_size": "usually one to three cards, often none",
+    "figure_advice": "suggested count",
+}
+_UNCOUNTED = {
+    "read_for": "",
+    "spawn_args": "unit_idxs, strategy, notes",
+    "figure_args": "figure, notes",
+    "sizing": (
+        "Do not think in card counts: no task has one. A task says which material a worker covers and how, and the "
+        "worker writes a card for each point in it that earns one and nothing more. Carve the material into tasks by "
+        "its structure, never by how many cards you expect."
+    ),
+    "figure_size": "often it earns none",
+    "figure_advice": "judgement",
+}
 
-def _unit_listing(units, figures=None):
+
+def planner_system(counted):
+    """The planner's system prompt, with or without card counts."""
+    text = PLANNER_SYSTEM.replace("{catalog}", strategy_catalog()).replace("{max_units}", str(MAX_UNITS_PER_TASK))
+    for key, value in (_COUNTED if counted else _UNCOUNTED).items():
+        text = text.replace("{" + key + "}", value)
+    return text
+
+
+def _unit_listing(units, figures=None, counted=True):
     figure_counts = {}
     for f in figures or []:
         figure_counts[f.get("unit_idx")] = figure_counts.get(f.get("unit_idx"), 0) + 1
@@ -212,17 +244,22 @@ def _unit_listing(units, figures=None):
             f"[{u.idx}] {u.title!r} · kind={u.kind} · density={u.density} · {u.chars} chars{pages}{deps}"
             + (f" · {'; '.join(flags)}" if flags else "")
             + f"\n    summary: {u.summary or '(none)'}"
-            + f"\n    suggested cards: {heuristic_target(u)}"
+            + (f"\n    suggested cards: {heuristic_target(u)}" if counted else "")
         )
     return "\n".join(lines)
 
 
-def _figure_listing(figures):
+def _figure_listing(figures, counted=True):
     lines = []
     for f in figures:
         where = " · ".join(filter(None, [f"unit {f['unit_idx']}", f"p.{f['page']}" if f.get("page") else "", f.get("kind") or ""]))
+        suggested = int(f.get("suggested") or 0)
+        if counted:
+            advice = f"vision suggests {suggested} card(s)"
+        else:
+            advice = "vision: worth cards" if suggested else "vision: nothing beyond the text"
         lines.append(
-            f"F{f['number']}: {where} · vision suggests {int(f.get('suggested') or 0)} card(s)"
+            f"F{f['number']}: {where} · {advice}"
             + f"\n    caption: {' '.join((f.get('caption') or '(none)').split())}"
             + f"\n    adds beyond the text: {' '.join((f.get('adds') or '(not stated)').split())}"
         )
@@ -237,6 +274,7 @@ def _planner_user_message(units, settings, budget, doc_meta, figures=None):
     card_style = settings.get("card_style") or "auto"
     live = [u for u in units if not u.skipped]
     figures = figures or []
+    counted = counts_cards(settings)
     figure_line_note = (
         "A line starting [[Figure N]] is a diagram kept on the sheet, not text to write cards from: its cards, if it "
         "earns any, come from its figure task, and a figure you give no cards is taken off the sheet."
@@ -246,10 +284,12 @@ def _planner_user_message(units, settings, budget, doc_meta, figures=None):
             "The unit texts are a high-yield exam sheet already cut down from the student's material (kind and summary "
             "describe the original). Only what the exam asks about is left, and each line starts with a tag saying "
             "what the exam asks the student to do with it: [calculate], [apply], [explain], [distinguish], [define] "
-            "and [recall] mark core lines, and [supporting] marks background a core line needs. Plan one card per core "
-            "line and none for supporting lines: a unit's suggested cards is exactly that count, so use it as the "
-            "task's target_cards. One task per unit: do not run a second strategy over a unit, since every core line "
-            "is already one card. Do not skip a unit that has core lines. " + figure_line_note
+            "and [recall] mark core lines, and [supporting] marks background a core line needs. A worker writes one "
+            "card per core line and none for supporting lines"
+            + (": a unit's suggested cards is exactly that count, so use it as the task's target_cards. " if counted
+               else ". ")
+            + "One task per unit: do not run a second strategy over a unit, since every core line is already one "
+            "card. Do not skip a unit that has core lines. " + figure_line_note
         ]
     elif settings.get("cheat_sheet"):
         # A condensed unit reads like a recap; tell the planner it is the material itself.
@@ -260,28 +300,18 @@ def _planner_user_message(units, settings, budget, doc_meta, figures=None):
         ]
     else:
         cheat_sheet_note = []
-    if requested_cards(settings):
-        budget_line = (
+    if counted:
+        budget_line = [
             f"The student asked for about {budget} cards in total, figures included, across {len(live)} live units. "
             "That is the size of deck they want: stay close to it, and go over only for content that would otherwise "
             "be left out."
-        )
-    elif high_yield(settings):
-        budget_line = (
-            f"Suggested overall budget: about {budget} cards across {len(live)} live units"
-            + (", figures included" if figures else "")
-            + ". It counts the core lines of the sheet, so it is close to the right size: stay within about 15% of it."
-        )
+        ]
     else:
-        budget_line = (
-            f"Suggested overall budget: about {budget} cards across {len(live)} live units"
-            + (", figures included" if figures else "")
-            + ". It is an estimate from the size and density of the material, not a limit."
-        )
+        budget_line = []
     figure_block = [
         "",
         f"Figures ({len(figures)}), each read from its page image by a vision pass:",
-        _figure_listing(figures),
+        _figure_listing(figures, counted),
     ] if figures else []
     return "\n".join(
         [
@@ -292,11 +322,11 @@ def _planner_user_message(units, settings, budget, doc_meta, figures=None):
             f"Focus: {focus or 'all exam-useful material'}",
             f"Exclude: {exclude or 'none'}",
             f"Must-include terms: {glossary or 'none'}",
-            budget_line,
+            *budget_line,
             *cheat_sheet_note,
             "",
             f"Document map ({len(units)} units):",
-            _unit_listing(units, figures),
+            _unit_listing(units, figures, counted),
             *figure_block,
             "",
             "Plan the work. Read what you need, spawn tasks, skip what deserves skipping, "
@@ -306,7 +336,16 @@ def _planner_user_message(units, settings, budget, doc_meta, figures=None):
     )
 
 
-def _tools(with_figures=False):
+def _counted_tool(properties, required, counted, description):
+    """A tool's parameters, with a `target_cards` parameter only when counts are given."""
+    properties, required = dict(properties), list(required)
+    if counted:
+        properties["target_cards"] = {"type": "integer", "description": description}
+        required.insert(len(required) - 1, "target_cards")
+    return {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
+
+
+def _tools(with_figures=False, counted=True):
     tools = [
         tool_spec(
             "read_unit",
@@ -331,17 +370,14 @@ def _tools(with_figures=False):
         tool_spec(
             "spawn_task",
             "Delegate a card-writing task to a worker agent.",
-            {
-                "type": "object",
-                "properties": {
+            _counted_tool(
+                {
                     "unit_idxs": {"type": "array", "items": {"type": "integer"}, "description": "Adjacent, related unit indexes (1-4)."},
                     "strategy": {"type": "string", "enum": list(text_strategies().keys())},
-                    "target_cards": {"type": "integer", "description": "High-value cards this task should produce."},
                     "notes": {"type": "string", "description": "Specific instructions for the worker."},
                 },
-                "required": ["unit_idxs", "strategy", "target_cards", "notes"],
-                "additionalProperties": False,
-            },
+                ["unit_idxs", "strategy", "notes"], counted, "High-value cards this task should produce.",
+            ),
         ),
         tool_spec(
             "skip_unit",
@@ -359,16 +395,13 @@ def _tools(with_figures=False):
             tool_spec(
                 "spawn_figure_task",
                 "Delegate cards on one figure. The figure's image is shown on every card the task writes.",
-                {
-                    "type": "object",
-                    "properties": {
+                _counted_tool(
+                    {
                         "figure": {"type": "integer", "description": "Figure number from the listing (F3 is 3)."},
-                        "target_cards": {"type": "integer", "description": "Cards the figure earns beyond its unit's text cards."},
                         "notes": {"type": "string", "description": "What the worker should and should not ask about the figure."},
                     },
-                    "required": ["figure", "target_cards", "notes"],
-                    "additionalProperties": False,
-                },
+                    ["figure", "notes"], counted, "Cards the figure earns beyond its unit's text cards.",
+                ),
             ),
             tool_spec(
                 "skip_figure",
@@ -398,18 +431,20 @@ def _tools(with_figures=False):
 
 # ---------------------------------------------------------------------------- figures
 def _figure_task(task_id, figure, target, notes="", origin="planner"):
+    """`target` of 0 is a task with no count: its writer decides what the figure earns."""
+    target = max(1, min(MAX_FIGURE_CARDS, int(target))) if int(target or 0) > 0 else 0
     return PlanTask(
-        id=task_id, unit_idxs=[figure["unit_idx"]], strategy=FIGURE_STRATEGY,
-        target_cards=max(1, min(MAX_FIGURE_CARDS, int(target))), notes=(notes or "")[:1500], origin=origin,
-        figure_id=figure["id"],
+        id=task_id, unit_idxs=[figure["unit_idx"]], strategy=FIGURE_STRATEGY, target_cards=target,
+        notes=(notes or "")[:1500], origin=origin, figure_id=figure["id"],
     )
 
 
-def _decide_figure(plan, figure, target, notes="", origin="planner", reason=""):
-    """Record one ruling on a figure, replacing any earlier one. `target` of 0 skips it."""
+def _decide_figure(plan, figure, keep, target=0, notes="", origin="planner", reason=""):
+    """Record one ruling on a figure, replacing any earlier one: a task (`keep`), with
+    `target` cards or none given, or no cards with `reason`."""
     plan.tasks[:] = [t for t in plan.tasks if t.figure_id != figure["id"]]
     plan.figure_skips.pop(figure["id"], None)
-    if int(target or 0) <= 0:
+    if not keep:
         plan.figure_skips[figure["id"]] = (reason or "skipped by planner")[:400]
         return None
     task = _figure_task(max([t.id for t in plan.tasks] + [0]) + 1, figure, target, notes, origin)
@@ -417,9 +452,10 @@ def _decide_figure(plan, figure, target, notes="", origin="planner", reason=""):
     return task
 
 
-def settle_figures(units, plan, figures):
+def settle_figures(units, plan, figures, counted=True):
     """Every figure ends up with a task or a reason it has none. One the planner did not
-    rule on follows the vision pass; one in a skipped unit gets no cards, whoever asked."""
+    rule on follows the vision pass; one in a skipped unit gets no cards, whoever asked.
+    Without counts, a figure the vision pass found worth cards gets a task with none."""
     by_idx = {u.idx: u for u in units}
     known = {f["id"]: f for f in figures or []}
 
@@ -439,7 +475,7 @@ def settle_figures(units, plan, figures):
         if dead(figure["unit_idx"]):
             plan.figure_skips[figure["id"]] = "Its unit is skipped."
         elif int(figure.get("suggested") or 0) > 0:
-            _decide_figure(plan, figure, figure["suggested"], origin="auto",
+            _decide_figure(plan, figure, True, figure["suggested"] if counted else 0, origin="auto",
                            notes="Auto-assigned: the planner did not rule on this figure, so it follows the vision pass.")
         else:
             plan.figure_skips[figure["id"]] = "The vision pass found nothing in it worth a card beyond the text."
@@ -457,6 +493,7 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
     figure_by_number = {f["number"]: f for f in figures}
     plan = Plan(budget=budget)
     calls = []
+    counted = counts_cards(settings)
 
     def emit(kind, **payload):
         if on_event:
@@ -516,13 +553,15 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         if skipped:
             return {"error": f"Units {skipped} are skipped; unskip them first or leave them out."}
         strategy = args.get("strategy") if args.get("strategy") in text_strategies() else DEFAULT_STRATEGY
-        try:
-            target = int(args.get("target_cards") or 0)
-        except (TypeError, ValueError):
-            target = 0
-        if target <= 0:
-            target = sum(heuristic_target(by_idx[i], strategy) for i in idxs)
-        target = max(1, min(MAX_TASK_CARDS, target))
+        target = 0
+        if counted:
+            try:
+                target = int(args.get("target_cards") or 0)
+            except (TypeError, ValueError):
+                target = 0
+            if target <= 0:
+                target = sum(heuristic_target(by_idx[i], strategy) for i in idxs)
+            target = max(1, min(MAX_TASK_CARDS, target))
         if len(plan.tasks) >= MAX_TASKS:
             return {"error": f"Task limit ({MAX_TASKS}) reached; call finish_plan."}
         task = PlanTask(id=max([t.id for t in plan.tasks] + [0]) + 1, unit_idxs=sorted(idxs), strategy=strategy,
@@ -557,15 +596,17 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         idx = figure["unit_idx"]
         if idx in plan.skips or by_idx[idx].skipped:
             return {"error": f"Figure {figure['number']} sits in unit {idx}, which is skipped."}
-        try:
-            target = int(args.get("target_cards") or 0)
-        except (TypeError, ValueError):
-            target = 0
-        if target <= 0:
-            return {"error": "target_cards must be at least 1; call skip_figure to give a figure no cards."}
+        target = 0
+        if counted:
+            try:
+                target = int(args.get("target_cards") or 0)
+            except (TypeError, ValueError):
+                target = 0
+            if target <= 0:
+                return {"error": "target_cards must be at least 1; call skip_figure to give a figure no cards."}
         if len(plan.tasks) >= MAX_TASKS:
             return {"error": f"Task limit ({MAX_TASKS}) reached; call finish_plan."}
-        task = _decide_figure(plan, figure, target, notes=args.get("notes") or "")
+        task = _decide_figure(plan, figure, True, target, notes=args.get("notes") or "")
         emit("spawn", task=task.to_dict())
         return {"task_id": task.id, "ok": True, "tasks_so_far": len(plan.tasks)}
 
@@ -573,7 +614,7 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         figure = _figure_arg(args)
         if figure is None:
             return {"error": f"No figure {args.get('figure')}; use a number from the figure listing."}
-        _decide_figure(plan, figure, 0, reason=args.get("reason") or "")
+        _decide_figure(plan, figure, False, reason=args.get("reason") or "")
         emit("skip_figure", figure=figure["number"], reason=plan.figure_skips[figure["id"]])
         return {"ok": True}
 
@@ -594,9 +635,8 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         "finish_plan": finish_plan,
     }
 
-    system = PLANNER_SYSTEM.replace("{catalog}", strategy_catalog()).replace("{max_units}", str(MAX_UNITS_PER_TASK))
     messages = [
-        {"role": "system", "content": system},
+        {"role": "system", "content": planner_system(counted)},
         {"role": "user", "content": _planner_user_message(units, settings, budget, doc_meta, figures)},
     ]
 
@@ -605,7 +645,7 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         calls.append(result)
         return result.raw
 
-    final_text, transcript, turns, stopped = run_tool_loop(chat, messages, _tools(bool(figures)), handlers,
+    final_text, transcript, turns, stopped = run_tool_loop(chat, messages, _tools(bool(figures), counted), handlers,
                                                            max_turns=max_turns)
     plan.turns = turns
     if not plan.tasks and not stopped:
@@ -617,73 +657,68 @@ def plan_with_agent(client, units, settings, doc_meta, budget, max_turns=14, fig
         return structured, transcript, calls
     if not plan.summary and final_text:
         plan.summary = final_text[:2000]
-    _finalize(units, plan, figures, ceiling_factor(settings))
+    _finalize(units, plan, figures, counted)
     return plan, transcript, calls
 
 
-PLAN_SCHEMA = json_schema_format(
-    "work_order",
-    {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "summary": {"type": "string"},
-            "skips": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {"unit_idx": {"type": "integer"}, "reason": {"type": "string"}},
-                    "required": ["unit_idx", "reason"],
-                },
-            },
-            "tasks": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "unit_idxs": {"type": "array", "items": {"type": "integer"}},
-                        "strategy": {"type": "string", "enum": list(text_strategies().keys())},
-                        "target_cards": {"type": "integer"},
-                        "notes": {"type": "string"},
+def plan_schema(counted=True):
+    """The structured fallback's work order, with card counts or without."""
+    task = {
+        "unit_idxs": {"type": "array", "items": {"type": "integer"}},
+        "strategy": {"type": "string", "enum": list(text_strategies().keys())},
+        "notes": {"type": "string"},
+    }
+    figure = {"figure": {"type": "integer"}, "notes": {"type": "string"}}
+    if counted:
+        task["target_cards"] = figure["target_cards"] = {"type": "integer"}
+    else:
+        figure["cards"] = {"type": "boolean"}
+    return json_schema_format(
+        "work_order",
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "summary": {"type": "string"},
+                "skips": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {"unit_idx": {"type": "integer"}, "reason": {"type": "string"}},
+                        "required": ["unit_idx", "reason"],
                     },
-                    "required": ["unit_idxs", "strategy", "target_cards", "notes"],
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {"type": "object", "additionalProperties": False, "properties": task, "required": list(task)},
+                },
+                "figures": {
+                    "type": "array",
+                    "items": {"type": "object", "additionalProperties": False, "properties": figure, "required": list(figure)},
                 },
             },
-            "figures": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "figure": {"type": "integer"},
-                        "target_cards": {"type": "integer"},
-                        "notes": {"type": "string"},
-                    },
-                    "required": ["figure", "target_cards", "notes"],
-                },
-            },
+            "required": ["summary", "skips", "tasks", "figures"],
         },
-        "required": ["summary", "skips", "tasks", "figures"],
-    },
-)
+    )
 
 
 def plan_structured(client, units, settings, doc_meta, budget, figures=None):
     """Single-shot fallback: the whole work order as one structured output."""
+    counted = counts_cards(settings)
+    figure_entry = ("its number, target_cards (0 to give it no cards) and notes" if counted
+                    else "its number, `cards` (whether it gets any) and notes")
     system = (
-        PLANNER_SYSTEM.replace("{catalog}", strategy_catalog()).replace("{max_units}", str(MAX_UNITS_PER_TASK))
+        planner_system(counted)
         + "\n\nIn this mode you have no tools: return the complete work order as JSON (tasks, skips, figures, summary). "
-        "`figures` holds one entry per listed figure: its number, target_cards (0 to give it no cards) and notes; "
-        "leave it empty when no figures are listed."
+        f"`figures` holds one entry per listed figure: {figure_entry}; leave it empty when no figures are listed."
     )
     figures = list(figures or [])
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": _planner_user_message(units, settings, budget, doc_meta, figures)},
     ]
-    result = client.chat("planner", messages, response_format=PLAN_SCHEMA)
+    result = client.chat("planner", messages, response_format=plan_schema(counted))
     plan = Plan(budget=budget, mode="structured")
     by_idx = {u.idx: u for u in units}
     try:
@@ -704,9 +739,12 @@ def plan_structured(client, units, settings, doc_meta, budget, figures=None):
         if not idxs:
             continue
         strategy = t.get("strategy") if t.get("strategy") in text_strategies() else DEFAULT_STRATEGY
-        target = int(t.get("target_cards") or 0) or sum(heuristic_target(by_idx[i], strategy) for i in idxs)
-        plan.tasks.append(PlanTask(id=next_id, unit_idxs=sorted(set(idxs)), strategy=strategy,
-                                   target_cards=max(1, min(MAX_TASK_CARDS, target)), notes=(t.get("notes") or "")[:1500]))
+        target = 0
+        if counted:
+            target = int(t.get("target_cards") or 0) or sum(heuristic_target(by_idx[i], strategy) for i in idxs)
+            target = max(1, min(MAX_TASK_CARDS, target))
+        plan.tasks.append(PlanTask(id=next_id, unit_idxs=sorted(set(idxs)), strategy=strategy, target_cards=target,
+                                   notes=(t.get("notes") or "")[:1500]))
         next_id += 1
         if len(plan.tasks) >= MAX_TASKS:
             break
@@ -715,13 +753,17 @@ def plan_structured(client, units, settings, doc_meta, budget, figures=None):
         figure = figure_by_number.get(entry.get("figure")) if isinstance(entry, dict) else None
         if figure is None or len(plan.tasks) >= MAX_TASKS:
             continue
-        try:
-            target = int(entry.get("target_cards") or 0)
-        except (TypeError, ValueError):
-            target = 0
-        _decide_figure(plan, figure, target, notes=entry.get("notes") or "", reason=entry.get("notes") or "")
+        if counted:
+            try:
+                target = int(entry.get("target_cards") or 0)
+            except (TypeError, ValueError):
+                target = 0
+            keep = target > 0
+        else:
+            target, keep = 0, bool(entry.get("cards"))
+        _decide_figure(plan, figure, keep, target, notes=entry.get("notes") or "", reason=entry.get("notes") or "")
     plan.summary = (data.get("summary") or "")[:2000]
-    _finalize(units, plan, figures, ceiling_factor(settings))
+    _finalize(units, plan, figures, counted)
     return plan, result
 
 
@@ -729,7 +771,7 @@ def plan_heuristic(units, budget, figures=None, settings=None):
     """No-model plan: one general task per live unit, and the vision pass's advice on
     each figure. Used if the planner role fails."""
     plan = Plan(budget=budget, mode="heuristic", summary="Default plan: one general-coverage task per unit.")
-    _finalize(units, plan, figures, ceiling_factor(settings))
+    _finalize(units, plan, figures, counts_cards(settings))
     return plan
 
 
@@ -741,9 +783,9 @@ def _uncovered(units, plan):
     return [u.idx for u in units if not u.skipped and u.idx not in plan.skips and u.idx not in covered]
 
 
-def _finalize(units, plan, figures=None, factor=CEILING_FACTOR):
+def _finalize(units, plan, figures=None, counted=True):
     """Enforce invariants: every live unit is covered, every figure is decided, counts
-    are bounded."""
+    are bounded. Without counts, every task's target stays 0."""
     by_idx = {u.idx: u for u in units}
     for u in units:
         if u.skipped and u.idx not in plan.skips:
@@ -753,15 +795,15 @@ def _finalize(units, plan, figures=None, factor=CEILING_FACTOR):
         unit = by_idx[idx]
         plan.tasks.append(
             PlanTask(id=next_id, unit_idxs=[idx], strategy=DEFAULT_STRATEGY,
-                     target_cards=heuristic_target(unit), notes="Auto-assigned: the planner left this unit uncovered.",
-                     origin="auto")
+                     target_cards=heuristic_target(unit) if counted else 0,
+                     notes="Auto-assigned: the planner left this unit uncovered.", origin="auto")
         )
         next_id += 1
-    settle_figures(units, plan, figures)
+    settle_figures(units, plan, figures, counted)
     plan.tasks = plan.tasks[:MAX_TASKS]
-    # A runaway guard, not a budget: the planner may go over its estimate, and only a plan
-    # beyond `factor` times it is pulled back.
-    ceiling = max(20, int(plan.budget * factor)) if plan.budget else None
+    # A runaway guard on a deck size the student set: only a plan beyond CEILING_FACTOR
+    # times it is pulled back.
+    ceiling = max(20, int(plan.budget * CEILING_FACTOR)) if counted and plan.budget else None
     if ceiling:
         total = sum(t.target_cards for t in plan.tasks)
         if total > ceiling:

@@ -18,7 +18,7 @@ from .pipeline import critic as critic_mod
 from .pipeline import workers as workers_mod
 from .pipeline.document_map import Unit
 from .pipeline.orchestrator import format_generation_error, generate_deck  # noqa: F401
-from .pipeline.planner import PlanTask, heuristic_target
+from .pipeline.planner import PlanTask, counts_cards, heuristic_target
 from .pipeline.routing import LLMClient
 from .pipeline.strategies import DEFAULT_STRATEGY, FIGURE_STRATEGY
 from .validators import is_math_valid, is_valid_cloze, normalize_math, normalize_text
@@ -79,7 +79,8 @@ def regenerate_source(source_id, strategy=None):
                 chosen = t.strategy
                 break
     chosen = chosen or DEFAULT_STRATEGY
-    task = PlanTask(id=0, unit_idxs=[source.idx], strategy=chosen, target_cards=heuristic_target(unit, chosen),
+    target = heuristic_target(unit, chosen) if counts_cards(settings) else 0
+    task = PlanTask(id=0, unit_idxs=[source.idx], strategy=chosen, target_cards=target,
                     notes="Regeneration requested by the user for this unit.", origin="regenerate")
     node = PipelineTask(deck_id=deck.id, seq=0, phase="regenerate", kind="task", label=f"Regenerate · {unit.title[:100]}",
                         strategy=chosen, unit_ids=[source.idx], model=client.model_for("worker"),

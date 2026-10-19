@@ -208,10 +208,8 @@ COVERAGE_SYSTEM = """You audit flashcard coverage. You get one unit of source te
 Return only JSON."""
 
 
-def coverage_messages(unit, card_lines, source=None):
-    """`source` stands in for the unit's text when only part of it is owed cards."""
-    source = unit.text if source is None else source
-    source = source if len(source) <= COVERAGE_SOURCE_CAP else source[:COVERAGE_SOURCE_CAP] + "\n...[truncated]"
+def coverage_messages(unit, card_lines):
+    source = unit.text if len(unit.text) <= COVERAGE_SOURCE_CAP else unit.text[:COVERAGE_SOURCE_CAP] + "\n...[truncated]"
     cards = "\n".join(f"- {line}" for line in card_lines) or "(no cards)"
     return [
         {"role": "system", "content": COVERAGE_SYSTEM},
@@ -219,12 +217,11 @@ def coverage_messages(unit, card_lines, source=None):
     ]
 
 
-def audit_unit(client, unit, card_lines, source=None):
+def audit_unit(client, unit, card_lines):
     """Pure: returns {"score": int, "missing": [...], "usage": {...}}. `card_lines` is
-    every card the deck has from this unit, each as "question -> answer"; `source`, when
-    given, is the part of the unit that is audited instead of all of it."""
-    result = client.chat("reconcile", coverage_messages(unit, card_lines, source), response_format=COVERAGE_SCHEMA,
-                         max_tokens=5000, agent="coverage")
+    every card the deck has from this unit, each as "question -> answer"."""
+    result = client.chat("reconcile", coverage_messages(unit, card_lines), response_format=COVERAGE_SCHEMA, max_tokens=5000,
+                         agent="coverage")
     try:
         data = extract_json(result.content)
     except Exception:

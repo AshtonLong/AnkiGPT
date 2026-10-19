@@ -160,6 +160,10 @@ def test_planner_falls_back_to_structured_when_no_tools_used():
 
 
 # ------------------------------------------------------- figures in the plan
+# Card counts reach the planner only for a deck the student sized.
+COUNTED = {"target_cards": 30}
+
+
 def _figures():
     """Two pictures in unit 0, one in unit 2; the vision pass thinks the middle one adds nothing."""
     return [
@@ -174,7 +178,7 @@ def _figures():
 class TestFiguresInThePlan:
     def test_planner_is_shown_each_figure_and_given_the_tools(self):
         units = _units(3)
-        user = planner._planner_user_message(units, {}, 30, {}, _figures())
+        user = planner._planner_user_message(units, COUNTED, 30, {}, _figures())
         assert "Figures (3), each read from its page image by a vision pass:" in user
         assert "F1: unit 0 · p.3 · diagram · vision suggests 2 card(s)\n    caption: Cell membrane\n" in user
         assert "adds beyond the text: Nothing the text does not state." in user
@@ -201,7 +205,7 @@ class TestFiguresInThePlan:
             ]),
             fake_response(None, tool_calls=[tool_call("6", "finish_plan", {"summary": "done"})]),
         ])
-        plan, transcript, _calls = planner.plan_with_agent(client, units, {}, {}, budget=20, figures=_figures())
+        plan, transcript, _calls = planner.plan_with_agent(client, units, COUNTED, {}, budget=20, figures=_figures())
         figure_task, = plan.figure_tasks
         assert (figure_task.figure_id, figure_task.unit_idxs, figure_task.strategy) == (11, [0], "figure_recall")
         assert (figure_task.target_cards, figure_task.notes, figure_task.origin) == (1, "Only the channel proteins.", "planner")
@@ -216,7 +220,7 @@ class TestFiguresInThePlan:
 
     def test_an_undecided_figure_follows_the_vision_pass(self):
         units = _units(3, skipped=(2,))
-        plan = planner.plan_heuristic(units, 20, _figures())
+        plan = planner.plan_heuristic(units, 20, _figures(), COUNTED)
         auto, = plan.figure_tasks
         assert (auto.figure_id, auto.target_cards, auto.origin) == (11, 2, "auto")
         # Nothing is written from a skipped unit, its figure included.
@@ -242,7 +246,7 @@ class TestFiguresInThePlan:
     def test_a_figure_task_does_not_cover_its_unit(self):
         units = _units(1)
         plan = planner.Plan(budget=20)
-        planner._decide_figure(plan, _figures()[0], 2)
+        planner._decide_figure(plan, _figures()[0], True, 2)
         planner._finalize(units, plan, _figures()[:1])
         text, figure = plan.tasks
         assert (text.origin, text.figure_id) == ("auto", None) and figure.figure_id == 11
@@ -253,22 +257,20 @@ class TestFiguresInThePlan:
             {"unit_idxs": [0], "strategy": "definition_sweep", "target_cards": 4, "notes": ""},
         ], "figures": [{"figure": 1, "target_cards": 3, "notes": "labels"}, {"figure": 2, "target_cards": 0, "notes": "in the text"}]})
         client = FakeClient([fake_response("I would rather not."), fake_response(structured)])
-        plan, _t, _c = planner.plan_with_agent(client, units, {}, {}, budget=10, max_turns=3, figures=_figures()[:2])
+        plan, _t, _c = planner.plan_with_agent(client, units, COUNTED, {}, budget=10, max_turns=3, figures=_figures()[:2])
         assert plan.mode == "structured"
         assert [(t.figure_id, t.target_cards, t.notes) for t in plan.figure_tasks] == [(11, 3, "labels")]
         assert plan.figure_skips == {12: "in the text"}
 
-    def test_the_estimate_counts_figures_and_is_not_a_cap(self):
+    def test_a_deck_size_the_student_set_reaches_the_planner(self):
         units = _units(2)
         text_only = planner.suggest_budget(units)
         assert planner.suggest_budget(units, figures=_figures()) == text_only + 2  # the figure in unit 2 has no unit here
         # A number the student typed stands for the whole deck.
         assert planner.suggest_budget(units, 40, _figures()) == 40
-        auto = planner._planner_user_message(units, {}, text_only, {})
-        assert f"about {text_only} cards" in auto and "not a limit" in auto
         asked = planner._planner_user_message(units, {"target_cards": 40}, 40, {})
-        assert "The student asked for about 40 cards" in asked and "not a limit" not in asked
-        assert "estimate, not a limit" in planner.PLANNER_SYSTEM
+        assert "The student asked for about 40 cards" in asked and "suggested cards:" in asked
+        assert "target_cards" in planner.planner_system(True)
         assert planner.requested_cards({"target_cards": "auto"}) is None and planner.requested_cards({"target_cards": "25"}) == 25
 
     def test_a_diagram_line_on_the_sheet_is_not_sized_as_text(self):

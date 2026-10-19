@@ -20,10 +20,11 @@ High-yield mode (the deck's `high_yield` setting, on top of `cheat_sheet`) write
 different sheet: the writer sorts every point into core (the exam asks the student to do
 something with it), supporting (a core point needs it) and context (left off). Each line
 on the sheet starts with a tag, `[calculate]` ... `[recall]` for core and `[supporting]`,
-and that tag is what the rest of the run reads: the planner sizes a unit by its core
-lines, the workers shape each card by its line's tag, and the coverage audit checks only
-the core lines. The context points are kept beside the sheet (`left_off`), so the plan
-review can bring one back (`retier`).
+and that tag is what the rest of the run reads: the workers write one card per core line,
+shaped by its tag. Judged one section at a time, nearly every section has a point that
+looks core, so a second call then sees every core line of the document together and
+keeps only the ones an exam would ask (`rank_core_points`). The context points are kept
+beside the sheet (`left_off`), so the plan review can bring one back (`retier`).
 
 One call per unit and pure, so units are condensed in parallel and cached like workers.
 """
@@ -197,7 +198,7 @@ def write_cheat_sheet(client, messages):
 
 
 # ------------------------------------------------------------- high-yield sheet
-HIGH_YIELD_PROMPT_VERSION = "cheatsheet-hy-v1"
+HIGH_YIELD_PROMPT_VERSION = "cheatsheet-hy-v2"
 
 # What the exam asks a student to do with a core line, in the order the plan review lists
 # them. A line tagged with one of these gets a card; a `supporting` line is on the sheet
@@ -245,42 +246,49 @@ HIGH_YIELD_SCHEMA = json_schema_format(
     },
 )
 
-HIGH_YIELD_SYSTEM = """You are writing a high-yield exam sheet for a student, one section of their study material at a time. You are given one section of the source; return the part of the sheet that covers it.
+HIGH_YIELD_SYSTEM = """You are writing a high-yield exam sheet for a student, one section of their study material at a time. You are given one section of the source; return the part of the sheet that covers it. The material can be any subject: a science, mathematics, a programming language, a spoken language, history, law, medicine, a professional skill.
 
 WHAT AN EXAM ACTUALLY ASKS
-Most of a textbook chapter or a lecture deck is not what the exam asks about. The exam asks the student to do things: work a calculation, apply a method to a situation they have not seen, explain why something happens, tell two things apart, use the terms of the course correctly, and recall the few facts the course insists on. Case studies, stories, history, motivation and repeated examples are there to teach those things; they are rarely asked about themselves. A student who is asked in the exam how to set up a case-study analysis needs the method of setting it up, not the details of the case the lecture used.
+Most of what a textbook chapter or a set of lecture slides contains is there to teach, not to be tested. Exams ask the student to do things with the material: work out a quantity, carry out a method on a problem they have not seen, write or read code, produce or understand the language, explain why something holds, tell similar things apart, use the terms of the subject correctly, and recall the facts the subject is built on. Illustrations, stories, worked examples, sample data, background, history and motivation are there to teach those things; they are rarely what a question asks about. A student asked to solve a new problem needs the method a worked example demonstrated, not the numbers of that example.
 
-Every point you keep becomes a flashcard the student reviews for weeks, so a point has to earn its place. Go through the section and sort every examinable point into one of three tiers.
+Every point you keep as core becomes a flashcard the student reviews for weeks, so a point has to earn it. Go through the section and sort every point it makes into one of three tiers.
 
-CORE: an examiner would plausibly set a question that asks the student to do something with it. Give each core point the thing the exam asks (`asks`):
-- calculate: a formula or quantitative method the student must use. Write the formula, what each symbol means with its units, and when it applies.
-- apply: a method, procedure, framework or decision rule the student must carry out on a new situation: how to set up an analysis, how to choose an approach or test, the steps of a process. Write the steps in order, or the rule for choosing and its reason, as one point.
-- explain: a cause, mechanism or reason the student must be able to give: why something holds or happens.
-- distinguish: the difference between things that are easy to confuse, stated as the difference itself.
-- define: a term the student must know and use, in one plain statement.
-- recall: a specific fact, number, threshold, name or exception that the source stresses as one to know.
+CORE: an examiner would plausibly set a question that asks the student to do something with this point. Give each core point the thing such a question asks (`asks`):
+- calculate: work out a quantity with a formula, an equation or a quantitative method. Write the formula, what each symbol means with its units, and when it applies.
+- apply: carry out a method, procedure, rule or pattern on a new instance: solve a type of problem, write or trace code, build or transform a sentence, follow the steps of a process, choose an approach. Write the steps in order, or the rule and when it applies, as one point.
+- explain: give a cause, mechanism or reason: why something holds or happens.
+- distinguish: tell apart things that are easy to confuse, stated as the difference itself.
+- define: the meaning of a term, word, symbol, keyword or construct the student must know and use, in one plain statement.
+- recall: a specific fact that is itself what gets tested: the exception to a rule, a constant or threshold that calculations use, an irregular form, a date or name the subject is organised around.
 
-SUPPORTING: not asked on its own, but a core point cannot be answered without it: a constant, a unit, an assumption, a term used inside a core point. Keep supporting points few. Give each one the `asks` it would have if it were core.
+SUPPORTING: not asked on its own, but a core point cannot be answered without it, such as a constant, a unit or an assumption. Keep these few. Give each one the `asks` it would have if it were core.
 
-CONTEXT: everything else the section says that a student might be tempted to memorise: the particulars of case studies and worked examples (the company, the patient, the figures of one exercise), history, background, motivation, anecdotes, further examples of something already covered, and points the source mentions without stressing. Context points are left off the sheet. Give each one the `asks` it would have if it were core.
+CONTEXT: everything else, which is left off the sheet: the particulars of worked examples, illustrations, sample data and scenarios; statistics, figures and descriptive facts that illustrate a point rather than being the point; history, background, motivation, anecdotes and asides; further examples of something already covered; and points the source mentions in passing. Give each one the `asks` it would have if it were core.
 
-CASE STUDIES AND WORKED EXAMPLES
-- A case study or worked example usually teaches a method. When it does, the method is a core point (usually apply or calculate), stated in general terms a student can carry to a new case: the steps it takes and the decisions it makes, with their reasons, in the order the source takes them. Only a method the source shows; do not invent steps.
-- The particulars of the case are context. Keep a case's particulars as core only when the source presents the case itself as something to know, such as a landmark case or a named experiment the course builds on; then it is a recall point.
+THE BAR FOR RECALL AND DEFINE
+These two are where a sheet fills up with things no exam asks.
+- A fact is core only when knowing that fact is itself what an examiner would test. A statistic, a percentage, a date or a list of places that describes the state of things, or shows how large an effect is, illustrates a point: it is context, unless the source plainly marks it as something to memorise (it says so, stresses it, or builds later material on it).
+- A term is core when the student must use it or recognise it, not when it is named once in passing.
+- What counts as a fact worth recalling depends on the subject. In a spoken language the vocabulary and the forms are themselves examined; in a programming language, what a keyword, function or construct does; in history, the events the course is organised around. Judge by the subject in front of you, not by these examples.
+
+EXAMPLES, SCENARIOS AND PRACTICE
+- An example, scenario, worked problem or practice question usually teaches a method or shows a concept in use. When it does, the method or concept is the core point, stated in general terms the student can carry to a new instance: the steps and the decisions with their reasons, in the order the source takes them. Only a method the source shows; do not invent steps.
+- The particulars of the example (its names, numbers, data and story) are context. They are core only when the source presents that specific instance as something to know in itself, such as a landmark case, a canonical program or a set text; then the instance is a recall point.
+- If the method an example shows is already a core point in this section, the example adds nothing: its particulars are context and it gets no point of its own.
 
 FIRST PRINCIPLES
-A first principle the section states (a law, a defining equation, a core assumption, the cause behind a result) is what lets the student rebuild a result and work a question they have not seen. It is core (usually explain or calculate), with the conditions under which it holds.
+A first principle the section states (a law, a defining equation, an assumption a model rests on, a core rule of grammar or syntax, the cause behind a result) lets the student rebuild results and handle questions they have not seen. It is core (usually explain, calculate or apply), with the conditions under which it holds.
 
 HOW TO JUDGE
-- Judge by the student's exam context when it is given. If the exam is calculations and applied questions, a definition or a recall fact is core only when a question cannot be done without it.
-- Be strict. A typical section has a handful of core points; a section that is mostly narrative or case study may have one or none. When you are unsure whether an examiner would ask a point, make it supporting rather than core.
-- One point is one thing the exam could ask, and it becomes one card. Do not split one point into several, and do not join two independent points into one.
+- Judge by the student's exam context when it is given: a point is core only if that kind of exam would ask about it. When no context is given, judge by what exams in this subject usually ask.
+- Be strict. Many sections hold no core point at all, such as a slide that introduces a topic, recaps one or only shows an example, and few hold more than three. When you are unsure whether an examiner would ask about a point, it is not core: make it supporting if a core point needs it, and context otherwise.
+- One point is one thing an exam could ask, and it becomes one card. A sentence that states several facts (several items, places, dates or figures) is several points: judge each on its own, and usually most of them are context. Do not split one idea into several points either.
 - Edge cases that cost marks (the exception to a rule, a limit, a common mistake the source warns about) are core.
 
 HOW TO WRITE A POINT
 - Every point, in every tier, is a complete statement that stands on its own: name its subject, spell out an abbreviation the first time, and never lean on "it", "this" or "the above". A context point may be moved back onto the sheet by the student, and then it is all a card is written from.
 - Use the plainest wording that is still exactly right, and as few words as that takes. Keep the technical terms the student has to know.
-- Reproduce formulas, symbols, numbers, units and names exactly as the source gives them.
+- Reproduce formulas, symbols, code, numbers, units, names and words in another language exactly as the source gives them.
 - Math: \\( ... \\) inline. Never $...$.
 - Group points under short headings, in the order the source takes them.
 - Use only what the source states. Add nothing from outside knowledge, and do not correct or extend the source.
@@ -292,6 +300,59 @@ A section may come with diagrams, listed before the section text, each with a ma
 If the section holds nothing a student would be examined on, return the context points alone, or no sections at all.
 
 Return only JSON matching the schema."""
+
+# The second look, across the whole document. The writer saw one section at a time, so
+# against its own section almost every section has a point that looks core; this call
+# sees every core point of the course together and keeps the ones an exam would ask.
+HIGH_YIELD_RANK_PROMPT_VERSION = "cheatsheet-hy-rank-v1"
+# Points rated at least this are kept as core; a 3 becomes supporting; lower is left off.
+RANK_KEEP = 4
+RANK_SUPPORTING = 3
+# Core points per ranking call. Above this a document is ranked in parts, each with the
+# outline of the whole, so one call never has to hold an unbounded list.
+RANK_BATCH = 400
+# Room for the scores after the model's reasoning: the list is long.
+RANK_MAX_TOKENS = 32000
+
+HIGH_YIELD_RANK_SCHEMA = json_schema_format(
+    "high_yield_ranking",
+    {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "scores": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"id": {"type": "integer"}, "score": {"type": "integer"}},
+                    "required": ["id", "score"],
+                },
+            }
+        },
+        "required": ["scores"],
+    },
+)
+
+HIGH_YIELD_RANK_SYSTEM = """You are the last check on a high-yield exam sheet before flashcards are written from it. A writer went through the student's material one section at a time and marked the points below as core: points an examiner would ask about. Working one section at a time, it could not weigh a point against the rest of the course, so it kept too many. Every point that stays core becomes a flashcard the student reviews for weeks.
+
+You see every core point of the document at once, each with its id, the section it came from and what an exam would ask the student to do with it. Rate each point against the whole course:
+- 5: central. The material is built on it: a method, model, formula, rule or distinction it keeps returning to, or one the source marks as essential. Questions are set on points like this.
+- 4: examinable. An examiner could well set a question on it directly.
+- 3: useful but not asked on its own: background to a 4 or a 5, a consequence of one, or a finer detail of it.
+- 2: an illustration or a detail: a statistic, figure or descriptive fact that shows a point rather than being one, the particulars of an example or a scenario, a point named in passing.
+- 1: a repeat of another point (give its clearest, fullest statement the score and the others 1), or nothing an exam would ask.
+
+A point rated 4 or 5 gets a card. A 3 stays on the sheet without one, and a 1 or a 2 is taken off.
+
+HOW TO JUDGE
+- Compare across the whole course, not within a section. A section a single slide long has not earned a card just because its slide has a main point.
+- Use the student's exam context when it is given; otherwise judge by what exams in this subject usually ask.
+- What an exam tests depends on the subject: vocabulary and forms in a spoken language, what constructs do and how to use them in a programming language, methods and formulas in a quantitative subject, arguments and causes in the humanities. A point of the kind its subject examines can rate high even when it reads like a plain fact.
+- When the same idea appears in several sections (a recap, a repeated slide, a term defined again), rate its clearest statement and give the others 1.
+- Be strict. A point that is true and relevant is a 3; a 4 or a 5 is one you would expect to find on the paper.
+
+Give every id a score. Return only JSON matching the schema."""
 
 
 def high_yield(settings):
@@ -320,6 +381,72 @@ def write_high_yield_sheet(client, messages):
     sheet, left_off = render_high_yield(data)
     return {"cheat_sheet": sheet, "left_off": left_off, "usage": dict(result.usage), "content": result.content,
             "model": result.model}
+
+
+def core_points(units):
+    """[(id, unit, line number, tag, text)] for every core line of the live units, in
+    document order: what the ranking rates."""
+    points = []
+    for unit in units:
+        if unit.skipped:
+            continue
+        for n, tag, text in sheet_lines(unit.text):
+            if tag != SUPPORTING:
+                points.append((len(points), unit, n, tag, text))
+    return points
+
+
+def build_rank_messages(points, units, settings, doc_meta=None, part=None):
+    """`points` from `core_points` (or one batch of them); `part` is (k, n) when the
+    document is ranked in n batches."""
+    doc_meta = doc_meta or {}
+    outline = "\n".join(f"- {u.title}" for u in units if not u.skipped)
+    user = "\n".join([
+        f"Student context / exam: {settings.get('exam_context') or 'not given'}",
+        f"Focus: {settings.get('focus') or 'all exam-useful material'}",
+        f"Exclude: {settings.get('exclude') or 'none'}",
+        f"Subject: {doc_meta.get('subject') or 'unknown'}",
+        "",
+        "The whole document, section by section:",
+        outline,
+        "",
+        *([f"These are part {part[0]} of {part[1]} of the document's core points. The other parts are rated "
+           "separately, against the same course."] if part else []),
+        "Core points:",
+        *(f"[{pid}] ({unit.title}) {tag}: {text}" for pid, unit, _n, tag, text in points),
+    ])
+    return [
+        {"role": "system", "content": HIGH_YIELD_RANK_SYSTEM},
+        {"role": "user", "content": user},
+    ]
+
+
+def rank_core_points(client, messages):
+    """Pure: one call. Returns {"scores": {str(id): 1..5}, "usage", "content", "model"}.
+    A point the model gave no score is absent; the caller leaves it as it was."""
+    result = client.chat("cheatsheet", messages, response_format=HIGH_YIELD_RANK_SCHEMA, max_tokens=RANK_MAX_TOKENS)
+    if result.finish_reason == "length":
+        raise OpenRouterError("The ranking of the core points was cut off before it finished.")
+    data = extract_json(result.content)
+    scores = {}
+    for item in (data.get("scores") or []) if isinstance(data, dict) else []:
+        try:
+            scores[str(int(item["id"]))] = max(1, min(5, int(item["score"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return {"scores": scores, "usage": dict(result.usage), "content": result.content, "model": result.model}
+
+
+def ranked_choices(points, scores):
+    """{unit idx: {line number: new tag}} for the points the ranking demoted, ready for
+    `retier`: a 3 becomes supporting, lower is left off."""
+    choices = {}
+    for pid, unit, n, _tag, _text in points:
+        score = scores.get(str(pid))
+        if score is None or score >= RANK_KEEP:
+            continue
+        choices.setdefault(unit.idx, {})[n] = SUPPORTING if score >= RANK_SUPPORTING else LEFT_OFF
+    return choices
 
 
 def _one_line(value):
@@ -385,19 +512,6 @@ def yield_target(text):
     if not core and not supporting:
         return None
     return core + supporting // 3
-
-
-def core_text(text):
-    """A high-yield section cut to its headings and core lines: what the coverage audit
-    checks the cards against. Supporting lines and diagrams are not owed a card."""
-    kept = []
-    for line in (text or "").split("\n"):
-        tag = line_tag(line)
-        if HEADING_RE.match(line.strip()) or (tag and tag != SUPPORTING):
-            kept.append(line)
-    # A heading left with no core line under it goes too.
-    out = [line for i, line in enumerate(kept) if line_tag(line) or (i + 1 < len(kept) and line_tag(kept[i + 1]))]
-    return "\n".join(out)
 
 
 def sheet_lines(text):
