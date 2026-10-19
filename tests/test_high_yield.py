@@ -1,17 +1,18 @@
 """High-yield cheat sheet: only what the exam asks the student to do goes on the sheet,
-each line tagged with it, one card per core line, and what was left off can be brought
-back at plan review."""
+each line tagged with it, ranked against the whole document, one card per core line, and
+what was left off can be brought back at plan review."""
+
+import json
 
 import pytest
 
 from app.extensions import db as _db
-from app.models import Card, Deck, Source
-from app.services.pipeline import cheatsheet, planner
+from app.models import Card, Deck, PipelineTask, Source
+from app.services.pipeline import cheatsheet
 from app.services.pipeline.document_map import Unit
-from app.services.pipeline.planner import Plan, PlanTask
 from app.services.pipeline.workers import HIGH_YIELD_BRIEF
 
-from conftest import login
+from conftest import fake_response, login
 from test_deckgen import _generate, _install_fake, _make_deck
 
 # Three sentences in the first section, so the fake writer gives it a core line, a
@@ -51,7 +52,7 @@ class TestSheet:
                 {"text": "[[Figure 2]]", "tier": "core", "asks": "recall"},
                 {"text": "  ", "tier": "core", "asks": "define"},
             ]},
-            {"heading": "Case study", "items": [
+            {"heading": "Worked example", "items": [
                 {"text": "The 1986 Challenger seals failed in the cold.", "tier": "context", "asks": "nonsense"},
             ]},
             {"heading": "", "items": [{"text": "Set up a gas-law problem by\n listing knowns first.", "tier": "core", "asks": "apply"}]},
@@ -66,32 +67,24 @@ class TestSheet:
         ])
         assert left_off == [
             {"heading": "Ideal gas", "text": "Boyle first studied gases in 1662.", "asks": "recall"},
-            {"heading": "Case study", "text": "The 1986 Challenger seals failed in the cold.", "asks": "recall"},
+            {"heading": "Worked example", "text": "The 1986 Challenger seals failed in the cold.", "asks": "recall"},
         ]
         assert cheatsheet.render_high_yield({"sections": []}) == ("", [])
 
-    def test_a_section_is_worth_a_card_per_core_line(self):
+    def test_a_section_counts_its_core_and_supporting_lines(self):
         sheet = "\n".join([
             "### Gases",
             "- [calculate] Use PV = nRT.",
             "- [supporting] R is 8.314.",
             "- [supporting] T is in kelvin.",
             "- [supporting] P is in pascals.",
-            "### Units",
-            "- [supporting] 1 atm is 101,325 Pa.",
             "[[Figure 1]] A piston",
             "### Rules",
             "- [Distinguish] Isothermal keeps T fixed; adiabatic allows no heat flow.",
         ])
-        assert cheatsheet.yield_counts(sheet) == (2, 4)
-        assert cheatsheet.yield_target(sheet) == 3  # two core lines, plus one for four supporting lines
+        assert cheatsheet.yield_counts(sheet) == (2, 3)
+        assert cheatsheet.yield_target(sheet) == 3  # used only for a deck the student sized
         assert cheatsheet.yield_target("- A plain cheat-sheet line.") is None
-        # The audit only checks the core lines; a heading with none under it goes too.
-        assert cheatsheet.core_text(sheet) == "\n".join([
-            "### Gases", "- [calculate] Use PV = nRT.", "### Rules",
-            "- [Distinguish] Isothermal keeps T fixed; adiabatic allows no heat flow.",
-        ])
-        assert cheatsheet.core_text("### Only\n- [supporting] background") == ""
 
     def test_the_page_shows_each_line_s_tag_as_a_label(self):
         items = cheatsheet.sheet_blocks("### Gases\n- [calculate] Use PV = nRT.\n- [supporting] R is 8.314.\n- Plain line.")[1]["items"]
@@ -131,27 +124,53 @@ class TestSheet:
         assert not cheatsheet.high_yield({"high_yield": True})
         assert not cheatsheet.high_yield({"cheat_sheet": True})
 
+    def test_the_prompts_are_written_for_any_subject(self):
+        for prompt in (cheatsheet.HIGH_YIELD_SYSTEM, cheatsheet.HIGH_YIELD_RANK_SYSTEM):
+            assert "programming language" in prompt and "spoken language" in prompt
+            assert "case stud" not in prompt.lower() and "econom" not in prompt.lower()
+        # A fact is core only when the fact itself is what gets tested.
+        assert "A statistic, a percentage, a date or a list of places" in cheatsheet.HIGH_YIELD_SYSTEM
+        assert "is several points" in cheatsheet.HIGH_YIELD_SYSTEM
 
-# ---------------------------------------------------------------------- sizing
-class TestSizing:
-    def test_a_high_yield_unit_is_sized_by_its_core_lines_not_its_length(self):
-        long_line = "x" * 3000
-        tagged = _unit(f"- [explain] {long_line}\n- [recall] Short.\n- [supporting] Background.", density=5)
-        assert planner.heuristic_target(tagged) == 2
-        assert planner.heuristic_target(tagged, "definition_sweep") == 2
-        # The same length untagged is sized from its characters, as before.
-        assert planner.heuristic_target(_unit(f"- {long_line}", density=5)) > 10
 
-    def test_a_high_yield_plan_cannot_run_far_past_its_estimate(self):
-        def plan(settings):
-            units = [_unit("- [recall] A fact.", idx=i) for i in range(4)]
-            p = Plan(budget=100, tasks=[PlanTask(id=i + 1, unit_idxs=[i], strategy="general", target_cards=75) for i in range(4)])
-            return sum(t.target_cards for t in planner._finalize(units, p, factor=planner.ceiling_factor(settings)).tasks)
+# ------------------------------------------------------------------ the ranking
+class TestRanking:
+    def _units(self):
+        return [
+            _unit("### A\n- [explain] Central idea.\n- [recall] A statistic.\n- [define] A term.\n- [supporting] Background.", 0),
+            _unit("### B\n- [recall] Same central idea again.", 1),
+            _unit("Kept in full: no tags.", 2),
+        ]
 
-        assert plan(HIGH_YIELD) == 128  # 1.3x the estimate is 130, and each of 4 tasks rounds to 32
-        assert plan({"cheat_sheet": True}) == 248  # 2.5x: 250, each task 62
-        # A size the student typed is theirs, so the usual runaway guard applies.
-        assert planner.ceiling_factor({**HIGH_YIELD, "target_cards": 50}) == planner.CEILING_FACTOR
+    def test_every_core_point_of_the_document_is_rated_together(self):
+        units = self._units()
+        points = cheatsheet.core_points(units)
+        assert [(pid, unit.idx, n, tag) for pid, unit, n, tag, _t in points] == [
+            (0, 0, 1, "explain"), (1, 0, 2, "recall"), (2, 0, 3, "define"), (3, 1, 1, "recall")]
+        user = cheatsheet.build_rank_messages(points, units, {"exam_context": "Spanish 2 oral exam"}, {"subject": "Biology"})[1]["content"]
+        assert "[0] (Unit 0) explain: Central idea." in user and "[3] (Unit 1) recall: Same central idea again." in user
+        assert "Spanish 2 oral exam" in user and "- Unit 2" in user and "part 1 of" not in user
+        part = cheatsheet.build_rank_messages(points[:2], units, {}, part=(1, 2))[1]["content"]
+        assert "These are part 1 of 2" in part
+
+    def test_a_rating_below_four_loses_its_card(self):
+        points = cheatsheet.core_points(self._units())
+        choices = cheatsheet.ranked_choices(points, {"0": 5, "1": 2, "2": 3, "3": 1})
+        assert choices == {0: {2: "off", 3: "supporting"}, 1: {1: "off"}}
+        # A point the model gave no score keeps the writer's tier.
+        assert cheatsheet.ranked_choices(points, {"0": 5}) == {}
+
+
+def _ranking(scores):
+    """A ranking call that gives each listed point the score `scores` has for its text."""
+    def rank(messages):
+        out = []
+        for line in messages[-1]["content"].splitlines():
+            if line.startswith("["):
+                pid, text = int(line.split("]")[0][1:]), line.split(": ", 1)[1]
+                out.append({"id": pid, "score": scores.get(text, 5)})
+        return fake_response(json.dumps({"scores": out}))
+    return rank
 
 
 # ------------------------------------------------------------------- whole runs
@@ -173,31 +192,103 @@ def test_a_high_yield_run_writes_only_what_the_exam_asks(app, monkeypatch):
         assert "WHAT AN EXAM ACTUALLY ASKS" in sheets[0]["messages"][0]["content"]
         assert "Calculations final" in sheets[0]["messages"][1]["content"]
 
+        # Then one call rated the document's core points together.
+        rank, = [c for c in fake.calls if c["name"] == "high_yield_ranking"]
+        assert f"[0] (Unit 0) explain: {CORE_0}" in rank["messages"][1]["content"]
+        assert f"[1] (Unit 1) explain: {CORE_1}" in rank["messages"][1]["content"]
+        assert SUPPORTING_0 not in rank["messages"][1]["content"]
+
         units = Source.query.filter_by(deck_id=deck_id).order_by(Source.idx).all()
         assert units[0].text == f"### Key points\n- [explain] {CORE_0}\n- [supporting] {SUPPORTING_0}"
         assert units[1].text == f"### Key points\n- [explain] {CORE_1}"
         stats = deck.run_json["cheat_sheet"]
         assert (stats["high_yield"], stats["core"], stats["supporting"], stats["left_off_count"]) == (True, 2, 1, 2)
+        assert stats["ranked"] == {"core_before": 2, "scored": 2}
         assert stats["left_off"] == {
             "0": [{"heading": "Key points", "text": CONTEXT_0, "asks": "recall"}],
             "1": [{"heading": "Key points", "text": CONTEXT_1, "asks": "recall"}],
         }
 
-        # The planner was told to plan a card per core line and shown that count per unit.
+        # The planner is told how the sheet works, and no card count at all.
         brief = next(c for c in fake.calls if c["tools"])["messages"][1]["content"]
         assert "high-yield exam sheet" in brief and "One task per unit" in brief
-        assert brief.count("suggested cards: 1") == 2 and "stay within about 15%" in brief
+        assert "suggested cards" not in brief and "target_cards" not in brief and "cards in total" not in brief
 
         # Workers shape their cards by the tags; nothing downstream saw what was left off.
         writes = [c["messages"][-1]["content"] for c in fake.calls if c["name"] == "anki_cards"]
-        assert writes and all(HIGH_YIELD_BRIEF in w for w in writes)
-        later = [c for c in fake.calls if c["tools"] or c["name"] in ("anki_cards", "critic_verdicts", "coverage_audit")]
+        assert writes and all(HIGH_YIELD_BRIEF in w and "write about" not in w for w in writes)
+        later = [c for c in fake.calls if c["tools"] or c["name"] in ("anki_cards", "critic_verdicts")]
         assert all(CONTEXT_0 not in str(c["messages"]) and CONTEXT_1 not in str(c["messages"]) for c in later)
 
-        # The coverage audit only checks the core lines.
-        audits = [c["messages"][-1]["content"] for c in fake.calls if c["name"] == "coverage_audit"]
-        assert len(audits) == 2 and CORE_0 in audits[0] and SUPPORTING_0 not in audits[0]
+        # No back-fill: a high-yield deck is meant to leave things out.
+        assert not [c for c in fake.calls if c["name"] in ("coverage_audit", "backfill_review")]
+        coverage = PipelineTask.query.filter_by(deck_id=deck_id, kind="phase", phase="coverage").one()
+        assert coverage.status == "skipped" and coverage.result_json == {"reason": "high-yield deck"}
+        assert not [c for c in Card.query.filter_by(deck_id=deck_id).all() if "origin:coverage" in c.tags]
         assert Card.query.filter_by(deck_id=deck_id, status="ok").count() >= 1
+
+
+def test_the_ranking_demotes_what_the_whole_course_does_not_ask(app, monkeypatch):
+    fake = _install_fake(monkeypatch)
+    fake._high_yield_ranking = _ranking({CORE_1: 2})
+    deck_id = _make_deck(app, source_text=SOURCE, settings=HIGH_YIELD)
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        units = Source.query.filter_by(deck_id=deck_id).order_by(Source.idx).all()
+        # Unit 1's only core line was rated 2: it comes off, and the section with it.
+        assert units[1].skipped and units[1].skip_reason == cheatsheet.EMPTY_REASON
+        stats = _db.session.get(Deck, deck_id).run_json["cheat_sheet"]
+        assert stats["left_off"]["1"] == [
+            {"heading": "Key points", "text": CONTEXT_1, "asks": "recall"},
+            {"heading": "Key points", "text": CORE_1, "asks": "explain"},
+        ]
+        assert (stats["core"], stats["ranked"]["core_before"]) == (1, 2)
+        writes = [c["messages"][-1]["content"] for c in fake.calls if c["name"] == "anki_cards"]
+        assert writes and all(CORE_1 not in w for w in writes)
+        node = PipelineTask.query.filter_by(deck_id=deck_id, phase="cheatsheet", kind="task").order_by(
+            PipelineTask.seq.desc()).first()
+        assert node.label == "Rank 2 core points across the document · 1 kept"
+
+
+def test_a_section_left_with_only_supporting_lines_comes_off(app, monkeypatch):
+    fake = _install_fake(monkeypatch)
+    fake._high_yield_ranking = _ranking({CORE_0: 3})
+    deck_id = _make_deck(app, source_text=SOURCE, settings=HIGH_YIELD)
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        unit = Source.query.filter_by(deck_id=deck_id, idx=0).one()
+        # Its core line became supporting, so nothing in it gets a card: all of it is left
+        # off, where the plan review can still bring a line back.
+        assert unit.skipped
+        left = _db.session.get(Deck, deck_id).run_json["cheat_sheet"]["left_off"]["0"]
+        assert [p["text"] for p in left] == [CONTEXT_0, CORE_0, SUPPORTING_0]
+
+
+def test_a_long_document_is_ranked_in_parts(app, monkeypatch):
+    fake = _install_fake(monkeypatch)
+    monkeypatch.setattr(cheatsheet, "RANK_BATCH", 1)
+    deck_id = _make_deck(app, source_text=SOURCE, settings=HIGH_YIELD)
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        ranks = [c["messages"][1]["content"] for c in fake.calls if c["name"] == "high_yield_ranking"]
+        assert len(ranks) == 2 and "part 1 of 2" in ranks[0] and "part 2 of 2" in ranks[1]
+
+
+def test_a_failed_ranking_leaves_the_sheet_as_written(app, monkeypatch):
+    fake = _install_fake(monkeypatch)
+
+    def broken(messages):
+        return fake_response("not json at all")
+
+    fake._high_yield_ranking = broken
+    deck_id = _make_deck(app, source_text=SOURCE, settings=HIGH_YIELD)
+    with app.app_context():
+        assert _generate(app, monkeypatch, deck_id) == deck_id
+        assert _db.session.get(Deck, deck_id).status == "ready"
+        assert Source.query.filter_by(deck_id=deck_id, idx=1).one().text == f"### Key points\n- [explain] {CORE_1}"
+        node = PipelineTask.query.filter_by(deck_id=deck_id, phase="cheatsheet", kind="task").order_by(
+            PipelineTask.seq.desc()).first()
+        assert node.status == "failed" and node.label.startswith("Rank 2 core points")
 
 
 def test_a_section_with_nothing_the_exam_asks_is_left_off_whole(app, monkeypatch):
@@ -206,7 +297,7 @@ def test_a_section_with_nothing_the_exam_asks_is_left_off_whole(app, monkeypatch
 
     def writer(messages):
         if "SECTION: Unit 1" in messages[-1]["content"]:
-            return __import__("conftest").fake_response(
+            return fake_response(
                 '{"sections": [{"heading": "Case", "items": [{"text": "A runner burns 2,600 kcal.", "tier": "context", "asks": "recall"}]}]}')
         return original(messages)
 
@@ -240,9 +331,9 @@ def test_high_yield_is_only_saved_with_a_cheat_sheet(app, client, monkeypatch):
     assert "data-high-yield hidden" not in client.get(f"/decks/{deck_id}/preview").text
 
 
-def _planned_high_yield_deck(app, monkeypatch):
+def _planned_high_yield_deck(app, monkeypatch, **settings):
     _install_fake(monkeypatch)
-    deck_id = _make_deck(app, source_text=SOURCE, settings={**HIGH_YIELD, "review_plan": True})
+    deck_id = _make_deck(app, source_text=SOURCE, settings={**HIGH_YIELD, "review_plan": True, **settings})
     with app.app_context():
         assert _generate(app, monkeypatch, deck_id) == deck_id
         deck = _db.session.get(Deck, deck_id)
@@ -255,16 +346,20 @@ def test_plan_review_lists_the_sheet_and_brings_lines_back(app, client, monkeypa
     from app.routes import main
 
     deck_id, tasks = _planned_high_yield_deck(app, monkeypatch)
+    # On auto no task has a count.
+    assert {t["target_cards"] for t in tasks.values()} == {0}
     login(client, email="gen@example.com")
     page = client.get(f"/decks/{deck_id}/plan").text
     assert "High-yield sheet" in page and "<b>2</b> core · 1 supporting · 2 left off" in page
     assert 'name="tier_0_1"' in page and 'name="tier_0_2"' in page and 'name="left_0_0"' in page
     assert '<option value="explain" selected>Card · explain</option>' in page and CONTEXT_0 in page
+    assert f'name="target_{tasks[0]["id"]}" value="" placeholder="auto"' in page
+    assert "each writer decides how many cards its material earns" in page
 
     monkeypatch.setattr(main, "dispatch_generation", lambda *args, **kwargs: None)
     response = client.post(f"/decks/{deck_id}/plan", data={
         "action": "run",
-        f"target_{tasks[0]['id']}": str(tasks[0]["target_cards"]),
+        f"target_{tasks[0]['id']}": "",
         # Unit 0: the left-off point gets a card, the supporting line is promoted.
         "left_0_0": "recall", "tier_0_2": "define",
         # Unit 1: its only line is left off, so the unit has nothing to write from.
@@ -279,8 +374,8 @@ def test_plan_review_lists_the_sheet_and_brings_lines_back(app, client, monkeypa
         assert units[1].skipped and units[1].skip_reason == main.REVIEW_EMPTIED_REASON
         plan = deck.run_json["plan"]
         by_unit = {t["unit_idxs"][0]: t for t in plan["tasks"]}
-        # Unit 0 went from one card's worth to three; unit 1's task is gone with it.
-        assert by_unit[0]["target_cards"] == tasks[0]["target_cards"] + 2 and 1 not in by_unit
+        # Still no count: the writer writes a card per core line. Unit 1's task is gone.
+        assert by_unit[0]["target_cards"] == 0 and 1 not in by_unit
         assert plan["skips"]["1"] == main.REVIEW_EMPTIED_REASON
         stats = deck.run_json["cheat_sheet"]
         assert (stats["core"], stats["supporting"], stats["left_off_count"]) == (3, 0, 2)
@@ -288,6 +383,22 @@ def test_plan_review_lists_the_sheet_and_brings_lines_back(app, client, monkeypa
             {"heading": "Key points", "text": CONTEXT_1, "asks": "recall"},
             {"heading": "Key points", "text": CORE_1, "asks": "explain"},
         ]
+
+
+def test_plan_review_moves_a_count_the_student_sized_with_the_sheet(app, client, monkeypatch):
+    from app.routes import main
+
+    deck_id, tasks = _planned_high_yield_deck(app, monkeypatch, target_cards=30)
+    assert tasks[0]["target_cards"] > 0
+    login(client, email="gen@example.com")
+    monkeypatch.setattr(main, "dispatch_generation", lambda *args, **kwargs: None)
+    client.post(f"/decks/{deck_id}/plan", data={
+        "action": "run", f"target_{tasks[0]['id']}": str(tasks[0]["target_cards"]), "left_0_0": "recall", "tier_0_2": "define",
+    })
+    with app.app_context():
+        plan = _db.session.get(Deck, deck_id).run_json["plan"]
+        # Two more core lines, two more cards.
+        assert {t["unit_idxs"][0]: t["target_cards"] for t in plan["tasks"]}[0] == tasks[0]["target_cards"] + 2
 
 
 def test_plan_review_keeps_a_card_count_the_student_set(app, client, monkeypatch):
@@ -325,7 +436,7 @@ def test_plan_review_gives_a_left_off_section_a_task_when_a_line_comes_back(app,
         assert not unit.skipped and unit.text == f"### Key points\n- [calculate] {CONTEXT_1}"
         plan = _db.session.get(Deck, deck_id).run_json["plan"]
         task, = [t for t in plan["tasks"] if t["unit_idxs"] == [1]]
-        assert (task["origin"], task["target_cards"]) == ("review", 1) and "1" not in plan["skips"]
+        assert (task["origin"], task["target_cards"]) == ("review", 0) and "1" not in plan["skips"]
 
 
 def test_cheat_sheet_page_shows_the_tags_and_what_was_left_off(app, client, monkeypatch):

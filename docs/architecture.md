@@ -37,15 +37,15 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
      core, supporting and context. Each line of the unit's text then starts with a tag:
      the thing the exam asks for a core line (`[calculate]`, `[apply]`, `[explain]`,
      `[distinguish]`, `[define]`, `[recall]`), or `[supporting]`. Context points are
-     kept beside the sheet in `run_json["cheat_sheet"]["left_off"]`. The tags then drive
-     the rest of the run. `heuristic_target` sizes a tagged unit at one card per core
-     line plus one per three supporting lines. The planner is told to plan one task per
-     unit at that count, and its runaway ceiling is 1.3x the estimate instead of 2.5x.
-     Workers get a brief that shapes each card by its line's tag. The coverage audit
-     sees only the core lines (`cheatsheet.core_text`), and its back-fill may add at
-     most 20% instead of 40%. On the plan review, `cheatsheet.retier` applies the
-     student's re-sorting to the unit text, and the route adjusts the matching task's
-     target.
+     kept beside the sheet in `run_json["cheat_sheet"]["left_off"]`. Sorted one section
+     at a time, nearly every section has a point that looks core, so a ranking pass
+     (`cheatsheet.rank_core_points`, one call per 400 points) rates every core line of
+     the document 1-5 against the others: 4-5 stay core, 3 becomes supporting, 1-2 are
+     left off, and a repeat keeps only its clearest statement. A unit left with no core
+     line comes off whole. The planner is told to plan one task per unit; workers get a
+     brief that has them write one card per core line, shaped by its tag. The coverage
+     phase is skipped. On the plan review, `cheatsheet.retier` applies the student's
+     re-sorting to the unit text.
 
      The sheet keeps the source's diagrams. The writer is told what each diagram in
      its section shows and places a `[[Figure N]]` marker line for it; a diagram it
@@ -74,22 +74,26 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
    cards, and specific notes for the worker. It rules on every figure too: a
    `figure_recall` task of its own, or no cards. So every card count is in one plan,
    weighed against the text, and visible on the plan review.
-   - The budget it starts from is an **estimate, not a cap**: what the text is worth by
-     size and density plus what the vision pass thinks each figure adds. The planner is
-     told to go over it where the material holds more and under it where it holds less.
-     A deck size the student typed is a stronger suggestion: stay close to it.
+   - **On Auto no card count reaches a model** (`planner.counts_cards`). A number in a
+     model's context, even one called an estimate, is one it writes towards. So the
+     planner gets no budget, no per-unit suggestion and no `target_cards` in its tools,
+     and is told how the vision pass judged each figure, not how many cards it saw in it.
+     Its tasks carry `target_cards = 0`, meaning the writer decides. A deck size the
+     student typed is the exception: it reaches the planner, which sizes each task
+     against it.
    - What is fixed are the safety rails. Every live unit ends up covered (an uncovered
      one gets a default task), every figure ends up decided (an undecided one follows
-     the vision pass), and a plan beyond 2.5× the estimate is scaled back. If the model
-     never calls a tool, a single structured-output plan is used instead.
+     the vision pass), and with a deck size set, a plan beyond 2.5x it is scaled back.
+     If the model never calls a tool, a single structured-output plan is used instead.
 
    Tick **Review the plan before writing** and the run pauses so you can skip tasks,
    change strategies, resize budgets, or edit worker notes before anything is written.
 4. **Write** — each task is one worker call: the strategy's grammar + the planner's notes
    + the unit text **verbatim** (the source itself, or its cheat-sheet section when that
    option is on) + a hint of what sibling tasks cover. Tasks run concurrently
-   (`PIPELINE_MAX_WORKERS`). The card count a worker is given is an estimate it may go
-   over or under. Figure tasks run after the text tasks, and each is shown the cards its
+   (`PIPELINE_MAX_WORKERS`). A worker on Auto is told no count: it writes a card for
+   each point that earns one. With a deck size set, the count it is given is an estimate
+   it may go over or under. Figure tasks run after the text tasks, and each is shown the cards its
    unit already has, so it writes what the figure adds instead of repeating them. Images
    ship inside the `.apkg`. Truncated outputs are retried with a smaller ask. Workers are
    prompted to attach a verbatim `source_quote`; a card of a task that read several units
@@ -101,7 +105,7 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
    example is not). Figure cards are judged against the unit text *plus* what the vision
    pass read off the figure; the text alone rarely states what a diagram shows. Dropped
    cards are kept as `deleted` with `critic:*` tags so you can restore them.
-6. **Coverage** — per unit, the model reads the unit next to every card written from it
+6. **Coverage** (skipped on a high-yield deck) — per unit, the model reads the unit next to every card written from it
    and lists testable facts no card covers. Important gaps spawn one round of gap-filler
    tasks, whose writers see the unit's existing cards. A back-fill card then has to pass
    two checks: the critic, and a **back-fill review** that sees the candidates next to
@@ -113,9 +117,8 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
    similarity, and a model decides per cluster what to keep. Exact duplicates are removed
    first.
 8. **Finish** — cards are ordered by unit prerequisites so foundations are introduced
-   first, and tagged with unit, strategy, and difficulty. The run records the estimate it
-   started from and where the kept cards came from (text, figures, back-fill), so going
-   past the estimate is visible and explained.
+   first, and tagged with unit, strategy, and difficulty. The run records where the kept
+   cards came from (text, figures, back-fill), next to the deck size asked for, if any.
 
 ### Card strategies
 

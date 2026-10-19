@@ -77,7 +77,7 @@
   <div class="card-side">
     <span class="pill {{ 'ok' if card.type == 'basic' else 'info' }}">{{ card.type }}</span>
     {% if card.strategy %}<span class="pill violet">{{ card.strategy|replace('_', ' ') }}</span>{% endif %}
-    {% if card.difficulty %}<span class="pill diff-{{ card.difficulty }}" title="Critic difficulty estimate">{{ 'easy' if card.difficulty == 1 else ('core' if card.difficulty == 2 else 'hard') }}</span>{% endif %}
+    {% if card.difficulty %}<span class="pill diff-{{ card.difficulty }}" title="Critic difficulty estimate">{{ 'easy' if card.difficulty == 1 else ('medium' if card.difficulty == 2 else 'hard') }}</span>{% endif %}
     {% if card.status == "needs_review" %}
     <span class="pill warn"><span class="dot"></span> Needs review</span>
     {% elif card.status == "deleted" %}

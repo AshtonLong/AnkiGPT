@@ -62,7 +62,9 @@ def test_the_planner_decides_which_figures_get_cards(app, monkeypatch, cheat_she
         assert deck.status == "ready"
         # The planner was shown the diagram, and not the photo the vision pass set aside.
         brief = _planner_brief(fake)
-        assert "F1: unit 0 · p.1 · diagram · vision suggests 2 card(s)" in brief and "A leaf" not in brief
+        # On auto it is told whether the vision pass found cards in it, never how many.
+        assert "F1: unit 0 · p.1 · diagram · vision: worth cards" in brief and "A leaf" not in brief
+        assert "card(s)" not in brief
         diagram = Figure.query.filter_by(deck_id=deck_id, hash="diagram").one()
         assert deck.run_json["plan"]["figure_skips"] == {str(diagram.id): "The text states it."}
         assert not _figure_cards(deck_id)
@@ -87,9 +89,10 @@ def test_a_figure_is_written_after_its_units_text_and_shown_those_cards(app, mon
         diagram = Figure.query.filter_by(deck_id=deck_id, hash="diagram").one()
         planned = [t for t in deck.run_json["plan"]["tasks"] if t["figure_id"]]
         assert [(t["figure_id"], t["strategy"], t["target_cards"], t["notes"], t["unit_idxs"]) for t in planned] == [
-            (diagram.id, "figure_recall", 1, "Only the stroma.", [0])]
-        # Counted in the plan: the estimate the planner started from includes the figure.
-        assert deck.run_json["budget"] == deck.run_json["plan"]["budget"] and "figures included" in _planner_brief(fake)
+            (diagram.id, "figure_recall", 0, "Only the stroma.", [0])]
+        # On auto the plan has no budget and its tasks no counts, figures included.
+        assert deck.run_json["budget"] == deck.run_json["plan"]["budget"] == 0
+        assert "cards in total" not in _planner_brief(fake)
 
         writes = _writes(fake)
         figure_write, = [w for w in writes if "FIGURE under study" in w]
@@ -99,7 +102,8 @@ def test_a_figure_is_written_after_its_units_text_and_shown_those_cards(app, mon
         assert "- What does photosynthesis produce? -> Glucose" in figure_write
         assert "Planner notes: Only the stroma." in figure_write
         assert not [w for w in text_writes if "The deck already has" in w]
-        assert all("an estimate, not a quota" in w for w in writes)
+        # On auto no writer is given a count.
+        assert all("TASK: write cards using" in w and "write about" not in w for w in writes)
 
         node = PipelineTask.query.filter_by(deck_id=deck_id, phase="write", strategy="figure_recall").one()
         assert node.label == "Figure on p.1: Chloroplast"
@@ -233,7 +237,7 @@ def test_plan_review_shows_figure_tasks_and_what_was_left_out(app, client, monke
     assert f'name="target_{figure_task["id"]}"' in page and f'name="skip_{figure_task["id"]}"' in page
     # A figure task has one way of writing; no task is offered the figure strategy.
     assert f'name="strategy_{figure_task["id"]}"' not in page and 'value="figure_recall"' not in page
-    assert "given no cards" not in page and ">estimate " in page
+    assert "figure given no cards" not in page and ">no card counts<" in page
 
     monkeypatch.setattr(main, "dispatch_generation", lambda *args, **kwargs: None)
     client.post(f"/decks/{deck_id}/plan", data={
@@ -319,10 +323,10 @@ def test_duplicates_are_resolved_after_the_backfill(app, client, monkeypatch):
         stats = deck.run_json["stats"]
         ok = Card.query.filter_by(deck_id=deck_id, status="ok").count()
         assert stats["by_origin"] == {"text": ok - 1, "figures": 0, "backfill": 1}
-        assert stats["budget"] == deck.run_json["budget"] > 0 and stats["backfill_rejected"] == 0
+        assert stats["budget"] == deck.run_json["budget"] == 0 and stats["backfill_rejected"] == 0
     login(client, email="gen@example.com")
     page = client.get(f"/decks/{deck_id}/status").text
-    assert f"Estimated {stats['budget']} · kept {ok}: {ok - 1} from the text, 1 back-filled" in page
+    assert f"Kept {ok}: {ok - 1} from the text, 1 back-filled" in page and "Asked for" not in page
 
 
 def test_a_backfill_card_that_repeats_the_deck_is_turned_away(app, monkeypatch):
@@ -395,7 +399,7 @@ def test_a_deck_the_student_sized_is_backfilled_only_for_the_likely_questions(ap
             assert not gap_cards and _phase_result(deck_id, "coverage")["gap_tasks"] == 0
             assert "The student asked for about 30 cards in total" in brief
         else:
-            assert gap_cards and "not a limit" in brief
+            assert gap_cards and "cards in total" not in brief and "suggested cards" not in brief
 
 
 class WorthlessFigureCards(FigureLLM):

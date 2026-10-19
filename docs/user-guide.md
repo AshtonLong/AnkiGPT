@@ -26,11 +26,12 @@ Both limits are configurable. Continue to source review to check the extraction.
 The source preview displays the first 4,000 characters; generation uses the full
 stored source, subject to the source cap above. Add exam/context, focus areas,
 exclusions, and must-include terms. Leave deck size on **Auto** or set an approximate
-target. Either way the number is a suggestion, not a cap: on Auto the planner works from
-an estimate of what the material is worth and goes over it where the material holds
-more; a target you set is followed more closely, and the coverage back-fill then adds
-only what an examiner would very likely ask. The finished run shows the estimate next to
-how many cards came from the text, from figures, and from the back-fill.
+target. On Auto no card count reaches the AI at all: the planner decides what each task
+covers, never how many cards it makes, and each writer writes a card for each point that
+earns one. (A number in a model's context, even one called an estimate, is one it writes
+towards.) A target you set is passed on and followed closely, and the coverage back-fill
+then adds only what an examiner would very likely ask. The finished run shows how many
+cards came from the text, from figures, and from the back-fill.
 
 Turn on **Make a cheat sheet first** when the full source would be information
 overload. Before any cards are planned, the source is boiled down to what you would fit
@@ -49,27 +50,40 @@ With the cheat sheet on, **High-yield only** goes further: it keeps only what th
 asks you to *do*. Every point in the source is sorted into one of three tiers:
 
 - **Core** is what an examiner would set a question on. Each core line is tagged with what
-  the question asks of you: *calculate*, *apply* (a method to carry out, such as how to
-  set up a case-study analysis), *explain*, *distinguish*, *define* or *recall*.
+  the question asks of you: *calculate*, *apply* (carry out a method, rule or pattern: solve
+  a type of problem, write or trace code, build a sentence), *explain*, *distinguish*,
+  *define* or *recall*.
 - **Supporting** is background a core line can't be answered without, such as a constant
   or a unit.
-- **Left off** is everything else: the particulars of case studies and worked examples,
-  history, background, extra examples. A case study keeps the method it teaches as a core
-  line; its details are left off.
+- **Left off** is everything else: the particulars of worked examples, scenarios and
+  illustrations, statistics and figures that only illustrate a point, history,
+  background, extra examples. An example keeps the method it teaches as a core line; its
+  details are left off.
+
+What counts as a fact worth recalling depends on the subject. In a language course the
+vocabulary and forms are what gets tested, and in a programming course what a construct
+does; a statistic that only shows how big something is is left off unless your source
+stresses it. A sentence that lists several facts is judged one fact at a time.
+
+Each section of your source is sorted on its own, and next to its own section almost
+every slide has a point that looks core. So the sorting gets a second look: one call
+rates every core line of the whole document against all the others, keeps the ones an
+exam would ask, makes the next tier supporting (no card), and leaves the rest off. A
+point repeated across slides keeps only its clearest statement. A section left with
+nothing to card comes off entirely.
 
 Each core line gets one card, shaped by its tag, so a calculation line gets a card that
 has you set up or work the calculation rather than name the formula. Supporting lines get
-no cards of their own. The planner's estimate is the number of core lines, and the plan
-is kept close to it. The coverage audit checks only the core lines. Your **Exam / context**
-brief steers the sorting: "calculation-heavy final, scenario questions" makes definitions
-and recall facts earn their place. Expect far fewer cards than either the full source or
-the plain cheat sheet gives.
+no cards of their own, and there is no coverage back-fill: a high-yield deck is meant to
+leave things out. Your **Exam / context** brief steers the sorting: "calculation-heavy
+final, scenario questions" makes definitions and recall facts earn their place. Expect far
+fewer cards than either the full source or the plain cheat sheet gives.
 
 Nothing left off is thrown away. With **Review the plan before writing** on, the plan
 review lists every unit's lines and left-off points, each with its tier. Give a
 supporting or left-off line a card tag to bring it in, or choose **Leave off** to drop
-one. The unit's task gains or loses a card for each change, unless you have changed that
-task's count yourself. The cheat sheet page shows each line's tag, and lists what was left
+one. On Auto the writer simply gets the new lines; with a deck size set, the unit's task
+gains or loses a card for each change, unless you changed that task's count yourself. The cheat sheet page shows each line's tag, and lists what was left
 off under its section (left-off points are not printed).
 
 Once the plan exists, **Cheat sheet** (on the plan review, the finished run, and the

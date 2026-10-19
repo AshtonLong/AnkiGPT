@@ -1500,6 +1500,8 @@ input[type=file]::file-selector-button {
 }
 
 .pt-target input {
+  flex:none;
+  width:64px;
   max-width:64px;
   padding:8px!important
 }

@@ -496,6 +496,8 @@
     var tasks = $$('[data-plan-task]');
     if (!tasks.length) return;
     var totalEl = $('[data-plan-total]'), countEl = $('[data-plan-count]');
+    // A plan on Auto has no counts; the total shows only once some task has one.
+    var countedEl = $('[data-plan-counted]'), uncountedEl = $('[data-plan-uncounted]');
     function recount() {
       var total = 0, count = 0;
       tasks.forEach(function (t) {
@@ -506,6 +508,8 @@
       });
       if (totalEl) totalEl.textContent = total;
       if (countEl) countEl.textContent = count;
+      if (countedEl) countedEl.hidden = !total;
+      if (uncountedEl) uncountedEl.hidden = !!total;
     }
     body.addEventListener('change', function (e) { if (e.target.closest('[data-plan-task]')) recount(); });
     body.addEventListener('input', function (e) { if (e.target.hasAttribute('data-target')) recount(); });
@@ -665,12 +669,8 @@
     if (!range) return;
     var out = doc.getElementById(range.getAttribute('data-range'));
     var hidden = doc.getElementById('target_cards_value');
-    var est = $('[data-estimate]');
     var form = range.closest('form');
-    var chars = parseInt(form ? form.getAttribute('data-source-chars') : 0, 10) || 0;
     var autoLabel = range.getAttribute('data-auto-label') || 'Auto';
-    // Mirrors planner.heuristic_target for an average-density document (~3 cards / 1k chars).
-    if (est && chars) est.textContent = fmtInt(Math.max(5, Math.round(chars / 1000 * 3)));
     var cheat = $('[data-cheat-sheet]', form), cheatNote = $('[data-cheat-sheet-note]', form);
     // High-yield is a kind of cheat sheet, so it is only offered while the sheet is on.
     var highYield = $('[data-high-yield]', form);

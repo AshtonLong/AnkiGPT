@@ -17,14 +17,14 @@
   <div>
     <span class="eyebrow ember">Plan review</span>
     <h1>{{ deck.title }}</h1>
-    <p>The planner mapped {{ units|length }} units{% if doc.subject %} of <b>{{ doc.subject }}</b>{% endif %} and proposes {{ plan.tasks|length }} tasks for about {{ total_target }} cards. Adjust anything below, then run it.</p>
+    <p>The planner mapped {{ units|length }} units{% if doc.subject %} of <b>{{ doc.subject }}</b>{% endif %} and proposes {{ plan.tasks|length }} tasks{% if total_target %} for about {{ total_target }} cards{% endif %}. Adjust anything below, then run it.</p>
   </div>
   <div class="actions">
     <span class="pill violet">{{ icon('brain', 12) }} {{ plan.mode }} · {{ plan.turns }} turns</span>
     {% if (deck.settings_json or {}).get('target_cards') %}
     <span class="pill" title="The deck size you asked for. The planner stays close to it.">target {{ plan.budget }}</span>
     {% else %}
-    <span class="pill" title="An estimate from the size and density of the material, not a limit. The planner goes over it where the material holds more.">estimate {{ plan.budget }}</span>
+    <span class="pill" title="On Auto, no card count reaches the AI: each writer writes a card for each point that earns one.">no card counts</span>
     {% endif %}
     {% if figure_count %}<span class="pill warn">{{ icon('image', 12) }} {{ figure_count }} figures</span>{% endif %}
     {% if deck.has_cheat_sheet %}<a class="btn" href="{{ url_for('main.cheat_sheet', deck_id=deck.id) }}">{{ icon('sheet', 15) }} Read the cheat sheet</a>{% endif %}
@@ -72,7 +72,7 @@
           </div>
           {% endif %}
           <div class="pt-target">
-            <input type="number" name="target_{{ task.id }}" value="{{ task.target_cards }}" min="1" max="60" inputmode="numeric" aria-label="Target cards" data-target>
+            <input type="number" name="target_{{ task.id }}" value="{{ task.target_cards or '' }}" placeholder="auto" min="1" max="60" inputmode="numeric" aria-label="Target cards (leave empty to let the writer decide)" data-target>
             <span>cards</span>
           </div>
         </div>
@@ -99,7 +99,7 @@
         <span class="panel-title">{{ icon('sheet') }} High-yield sheet</span>
         <span class="counter"><b>{{ sheet.get('core') or 0 }}</b> core · {{ sheet.get('supporting') or 0 }} supporting · {{ sheet.get('left_off_count') or 0 }} left off</span>
       </div>
-      <p class="hint">Each line with a card tag gets one card. To bring a supporting or left-off line in, give it a card tag; to drop a line, choose Leave off. Its unit's task gains or loses a card for each, unless you changed that task's count yourself.</p>
+      <p class="hint">Each line with a card tag gets one card. To bring a supporting or left-off line in, give it a card tag; to drop a line, choose Leave off.{% if (deck.settings_json or {}).get('target_cards') %} Its unit's task gains or loses a card for each, unless you changed that task's count yourself.{% endif %}</p>
       {% for unit, lines, items in sheet_rows %}
       {% set core = lines|rejectattr(1, 'equalto', 'supporting')|list|length %}
       <details class="sheet-unit">
@@ -118,7 +118,7 @@
     {% endif %}
 
     <div class="plan-foot panel">
-      <div class="plan-total">{{ icon('target', 16) }} <span>About <b data-plan-total>{{ total_target }}</b> cards from <b data-plan-count>{{ plan.tasks|length }}</b> tasks</span></div>
+      <div class="plan-total">{{ icon('target', 16) }} <span><span data-plan-counted {% if not total_target %}hidden{% endif %}>About <b data-plan-total>{{ total_target }}</b> cards from </span><b data-plan-count>{{ plan.tasks|length }}</b> tasks<span data-plan-uncounted {% if total_target %}hidden{% endif %}> · each writer decides how many cards its material earns</span></span></div>
       <div class="actions">
         <button class="btn" type="submit" name="action" value="replan" formnovalidate>{{ icon('refresh', 15) }} Re-plan</button>
         <button class="btn primary lg" type="submit" name="action" value="run">{{ icon('play', 16) }} Run this plan</button>

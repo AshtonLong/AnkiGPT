@@ -23,14 +23,24 @@ WORKER_PROMPT_VERSION = f"{PROMPT_VERSION}:worker"
 SIBLING_HINT_LIMIT = 6
 EXISTING_CARD_LIMIT = 80
 
+COUNTED_BRIEF = (
+    "That count is an estimate, not a quota: write more if the material holds more examinable facts than it allows "
+    "for and fewer if it holds less. Never pad to reach it."
+)
+# A task with no count. Nothing in a worker's context says how many cards to write, so
+# nothing pulls it towards a number.
+UNCOUNTED_BRIEF = (
+    "Write a card for each point in the source that earns one, and stop there. Nothing sets how many: material may "
+    "earn one card or many, and a card that only fills the deck costs the student review time."
+)
 # In the user message rather than the system prompt, so the system prompt stays the same
 # for every deck and provider prompt caches keep hitting.
-HIGH_YIELD_BRIEF = """That count is one card per core line of the source. The source is a high-yield exam sheet: only what the exam asks about is on it, and each line starts with a tag saying what the exam asks the student to do with it. Shape each card by its line's tag:
+HIGH_YIELD_BRIEF ="""The source is a high-yield exam sheet: only what the exam asks about is on it, and each line starts with a tag saying what the exam asks the student to do with it. Write one card per core line, shaped by its tag:
 - [calculate]: have the student set up or carry out the calculation: which formula applies and when, what a quantity in it stands for, or what result and units it gives for values the source states. Not the name of the formula.
-- [apply]: give the situation and ask for the method, the next step, or the choice to make and its reason.
+- [apply]: give the situation the line describes and ask the student to carry out the method, rule or pattern: the next step, the choice to make and its reason, the code to write or what it does, the form or sentence to produce.
 - [explain]: ask why or how.
 - [distinguish]: ask for the difference itself.
-- [define]: ask for the term or its meaning.
+- [define]: ask for the meaning of the term, or for the term that has the meaning.
 - [recall]: ask for the fact.
 - [supporting]: background a card's answer may use. Write no card for a supporting line unless a core line cannot be tested without it.
 Write at most one card per core line: no second card on the same line, no reverse card, and no card beyond the core lines, whatever the strategy's rules suggest. Never put a tag in a card or in its source_quote."""
@@ -56,13 +66,13 @@ def build_worker_messages(task, units, settings, card_style, siblings=None, figu
     target = target_override or task.target_cards
     # A unit whose sheet could not be written keeps its full text, which has no tags.
     tagged = high_yield(settings) and any(yield_target(u.text) is not None for u in units)
-    parts = [
-        f"TASK: write about {target} cards using the {task.strategy} strategy.",
-        HIGH_YIELD_BRIEF if tagged else
-        "That count is an estimate, not a quota: write more if the material holds more examinable facts than it "
-        "allows for and fewer if it holds less. Never pad to reach it.",
-        f"Planner notes: {task.notes or '(none)'}",
-    ]
+    if target:
+        # Only a deck size the student set gives a task a count.
+        parts = [f"TASK: write about {target} cards using the {task.strategy} strategy.",
+                 HIGH_YIELD_BRIEF if tagged else COUNTED_BRIEF]
+    else:
+        parts = [f"TASK: write cards using the {task.strategy} strategy.", HIGH_YIELD_BRIEF if tagged else UNCOUNTED_BRIEF]
+    parts.append(f"Planner notes: {task.notes or '(none)'}")
     context = settings.get("exam_context") or ""
     if context:
         parts.append(f"Student context: {context}")
@@ -149,14 +159,15 @@ def run_worker(client, messages, task_target, retry_on_truncation=True):
     content = result.content
     if truncated and retry_on_truncation:
         # The model ran out of output budget mid-JSON. Ask for fewer, tighter cards.
-        smaller = max(3, int(task_target * 0.6))
         retry_messages = list(messages)
-        retry_messages[-1] = {
-            "role": "user",
-            "content": messages[-1]["content"].replace(
-                f"write about {task_target} cards", f"write about {smaller} cards"
-            ) + f"\n\nYour previous attempt was cut off. Write at most {smaller} cards and keep answers tight.",
-        }
+        if task_target:
+            smaller = max(3, int(task_target * 0.6))
+            ask = messages[-1]["content"].replace(f"write about {task_target} cards", f"write about {smaller} cards")
+            ask += f"\n\nYour previous attempt was cut off. Write at most {smaller} cards and keep answers tight."
+        else:
+            ask = (messages[-1]["content"] + "\n\nYour previous attempt was cut off before it finished. Keep only the "
+                   "cards that matter most and keep answers tight.")
+        retry_messages[-1] = {"role": "user", "content": ask}
         result2 = client.chat("worker", retry_messages, response_format=CARD_RESPONSE_FORMAT)
         attempts += 1
         for k in ("prompt_tokens", "completion_tokens"):

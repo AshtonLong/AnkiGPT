@@ -44,7 +44,7 @@
     {% if figures %}<div class="source-figures"><span class="mono">FIGURES FROM YOUR PDF</span><div>{% for figure in figures %}<a href="{{ url_for('main.figure_image', figure_id=figure.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('main.figure_image', figure_id=figure.id) }}" alt="Extracted figure {{ loop.index }}{% if figure.page %}, page {{ figure.page }}{% endif %}" loading="lazy"><span class="hint">{% if figure.page %}Page {{ figure.page }}{% else %}Figure {{ loop.index }}{% endif %}</span></a>{% endfor %}</div>{% if figure_count > 6 %}<p class="hint">Showing 6 of {{ figure_count }} figures.</p>{% endif %}</div>{% endif %}
   </section>
 
-  <form method="post" class="panel form-card sticky" data-reveal style="--d:110" data-source-chars="{{ n }}">
+  <form method="post" class="panel form-card sticky" data-reveal style="--d:110">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="panel-title" style="margin-bottom:1.4rem">{{ icon('brain') }} Brief the planner</div>
 
@@ -81,7 +81,7 @@
       </div>
       <input type="hidden" name="target_cards" id="target_cards_value" value="{{ s.get('target_cards') or 'auto' }}">
       <div class="estimate">{{ icon('target', 15) }}
-        <span><b data-estimate>—</b> cards is what the planner would size this source at on its own. Leave on Auto to let it decide.<span data-cheat-sheet-note {% if not s.get('cheat_sheet') %}hidden{% endif %}> A cheat sheet trims the source first, so expect fewer.</span></span>
+        <span>On Auto, no card count reaches the AI: each writer writes a card for each point that earns one, so the deck is as big as your material needs. Set a size only if you want one.<span data-cheat-sheet-note {% if not s.get('cheat_sheet') %}hidden{% endif %}> A cheat sheet trims the source first, so expect fewer.</span></span>
       </div>
     </div>
 
@@ -94,7 +94,7 @@
       <label class="toggle sub-toggle" data-high-yield {% if not s.get('cheat_sheet') %}hidden{% endif %}>
         <input type="checkbox" name="high_yield" {% if s.get('high_yield') %}checked{% endif %}>
         <span class="tg"></span>
-        <span class="tg-text"><b>High-yield only</b><small>Keep only what the exam asks you to do: calculations, methods to apply, reasons, distinctions and the terms you must use. Case-study details, history and extra examples are left off, and a case study keeps its method instead. One card per line, so far fewer cards. Tell the planner what your exam is like above, and turn on plan review to bring back anything it left off.</small></span>
+        <span class="tg-text"><b>High-yield only</b><small>Keep only what the exam asks you to do: calculations, methods to apply, reasons, distinctions and the terms you must use. The details of examples and scenarios, statistics that only illustrate a point, history and extra examples are left off, and an example keeps the method it shows. One card per line, so far fewer cards. Tell the planner what your exam is like above, and turn on plan review to bring back anything it left off.</small></span>
       </label>
       <label class="toggle">
         <input type="checkbox" name="review_plan" {% if s.get('review_plan') %}checked{% endif %}>
