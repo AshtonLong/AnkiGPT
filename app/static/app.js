@@ -574,7 +574,12 @@
     // Mirrors planner.heuristic_target for an average-density document (~3 cards / 1k chars).
     if (est && chars) est.textContent = fmtInt(Math.max(5, Math.round(chars / 1000 * 3)));
     var cheat = $('[data-cheat-sheet]', form), cheatNote = $('[data-cheat-sheet-note]', form);
-    if (cheat && cheatNote) cheat.addEventListener('change', function () { cheatNote.hidden = !cheat.checked; });
+    // High-yield is a kind of cheat sheet, so it is only offered while the sheet is on.
+    var highYield = $('[data-high-yield]', form);
+    if (cheat) cheat.addEventListener('change', function () {
+      if (cheatNote) cheatNote.hidden = !cheat.checked;
+      if (highYield) highYield.hidden = !cheat.checked;
+    });
     function update() {
       var v = parseInt(range.value, 10), min = parseInt(range.min, 10), max = parseInt(range.max, 10);
       range.style.setProperty('--fill', ((v - min) / (max - min) * 100) + '%');

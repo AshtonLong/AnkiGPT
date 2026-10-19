@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from ..llm import CARD_RESPONSE_FORMAT, extract_json, finish_reason
 from ..schemas import ChunkSchema
 from ..validators import normalize_math, normalize_text
+from .cheatsheet import high_yield, yield_target
 from .figures import describe_figure
 from .strategies import PROMPT_VERSION, system_prompt
 
@@ -21,6 +22,18 @@ logger = logging.getLogger(__name__)
 WORKER_PROMPT_VERSION = f"{PROMPT_VERSION}:worker"
 SIBLING_HINT_LIMIT = 6
 EXISTING_CARD_LIMIT = 80
+
+# In the user message rather than the system prompt, so the system prompt stays the same
+# for every deck and provider prompt caches keep hitting.
+HIGH_YIELD_BRIEF = """That count is one card per core line of the source. The source is a high-yield exam sheet: only what the exam asks about is on it, and each line starts with a tag saying what the exam asks the student to do with it. Shape each card by its line's tag:
+- [calculate]: have the student set up or carry out the calculation: which formula applies and when, what a quantity in it stands for, or what result and units it gives for values the source states. Not the name of the formula.
+- [apply]: give the situation and ask for the method, the next step, or the choice to make and its reason.
+- [explain]: ask why or how.
+- [distinguish]: ask for the difference itself.
+- [define]: ask for the term or its meaning.
+- [recall]: ask for the fact.
+- [supporting]: background a card's answer may use. Write no card for a supporting line unless a core line cannot be tested without it.
+Write at most one card per core line: no second card on the same line, no reverse card, and no card beyond the core lines, whatever the strategy's rules suggest. Never put a tag in a card or in its source_quote."""
 
 
 def _unit_block(unit):
@@ -41,8 +54,11 @@ def build_worker_messages(task, units, settings, card_style, siblings=None, figu
         focus=settings.get("focus", ""), exclude=settings.get("exclude", ""), glossary=settings.get("glossary", ""),
     )
     target = target_override or task.target_cards
+    # A unit whose sheet could not be written keeps its full text, which has no tags.
+    tagged = high_yield(settings) and any(yield_target(u.text) is not None for u in units)
     parts = [
         f"TASK: write about {target} cards using the {task.strategy} strategy.",
+        HIGH_YIELD_BRIEF if tagged else
         "That count is an estimate, not a quota: write more if the material holds more examinable facts than it "
         "allows for and fewer if it holds less. Never pad to reach it.",
         f"Planner notes: {task.notes or '(none)'}",
