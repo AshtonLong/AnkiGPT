@@ -16,6 +16,9 @@ class TestConfig(Config):
     GENERATION_IN_THREAD = False
     PIPELINE_MAX_WORKERS = 2
     PIPELINE_CACHE_ENABLED = False
+    # The picker and effort-slider tests are written against GPT-6 Luna's six levels.
+    # What ships as the default is tested on its own (test_models, against DEFAULT_MODEL).
+    OPENROUTER_MODEL = "openai/gpt-6-luna"
 
 
 @pytest.fixture

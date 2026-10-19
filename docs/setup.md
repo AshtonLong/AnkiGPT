@@ -89,7 +89,7 @@ volume, which is a different file from `instance/ankigpt.db` in a local checkout
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` when serving over HTTPS. |
 | `DATABASE_URL` | `sqlite:///instance/ankigpt.db` | SQLite URL; nothing else is accepted. |
 | `OPENROUTER_API_KEY` | | Optional fallback for accounts without their own key. Users normally save a key under **My profile**. |
-| `OPENROUTER_MODEL` | `openai/gpt-6-luna` | Default model for every role. Each user can pick another under **My profile → AI model**; the picker marks this one **Default**. |
+| `OPENROUTER_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | Default model for every role. Each user can pick another under **My profile → AI model**; the picker marks this one **Default**. |
 | `OPENROUTER_MODEL_{MAPPER,CHEATSHEET,PLANNER,WORKER,CRITIC,RECONCILE,VISION}` | | Per-role overrides (e.g. a stronger planner). They apply to users on the default model; a model a user picks runs every role. |
 | `OPENROUTER_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Used for duplicate clustering. |
 | `OPENROUTER_REASONING_{PLANNER,CHEATSHEET,MAPPER,WORKER,CRITIC,RECONCILE,VISION}` | `medium`/`low` | Default reasoning effort per role: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max` (planner and cheat sheet default to `medium`); empty omits the parameter. A level the model in use lacks is sent as the next one up that it has. Each user can set their own effort per agent under **My profile → Advanced**, which wins over these. |

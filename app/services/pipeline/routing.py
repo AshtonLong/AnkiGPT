@@ -8,6 +8,7 @@ Flask/DB state so it can be used from worker threads.
 import logging
 from dataclasses import dataclass, field
 
+from ...config import DEFAULT_MODEL
 from .. import llm as llm_module
 from .catalog import EFFORT_LEVELS, fit_effort
 
@@ -70,7 +71,7 @@ class LLMClient:
         self.api_key = api_key
         self.site_url = get("OPENROUTER_SITE_URL", "")
         self.app_name = get("OPENROUTER_APP_NAME", "AnkiGPT")
-        self.default_model = model or get("OPENROUTER_MODEL", "openai/gpt-6-luna")
+        self.default_model = model or get("OPENROUTER_MODEL", DEFAULT_MODEL)
         self.embedding_model = get("OPENROUTER_EMBEDDING_MODEL", "openai/text-embedding-3-small")
         self.max_retries = int(get("OPENROUTER_MAX_RETRIES", 2))
         self.backoff_seconds = float(get("OPENROUTER_RETRY_BACKOFF_SECONDS", 1.5))
