@@ -87,7 +87,7 @@ create `%APPDATA%\AnkiGPT\data\settings.env` and restart the app:
 ```ini
 # Use a different model for everything, and a stronger one for the planner.
 OPENROUTER_MODEL=openai/gpt-6-luna
-OPENROUTER_MODEL_PLANNER=openai/gpt-6-luna
+OPENROUTER_MODEL_PLANNER=openai/gpt-6-sol
 PIPELINE_MAX_WORKERS=4
 ```
 

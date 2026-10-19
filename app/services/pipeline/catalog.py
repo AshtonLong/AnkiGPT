@@ -17,7 +17,7 @@ EFFORT_LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 # Who makes the models, in the order the picker lists them. The key names the logo
 # (see `company_logo` in templates/partials/ui.html).
-COMPANIES = {"openai": "OpenAI", "anthropic": "Anthropic"}
+COMPANIES = {"deepseek": "DeepSeek", "openai": "OpenAI", "anthropic": "Anthropic"}
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,13 @@ class Model:
 
 
 MODELS = (
+    Model(
+        # The October 17, 2026 snapshot. With tools in a request it needs its reasoning
+        # sent back on every later turn (see llm.run_tool_loop).
+        "deepseek/deepseek-v4.1-flash-1017", "deepseek", "DeepSeek V4.1 Flash",
+        "DeepSeek's fast, low-cost model, as of October 2026.",
+        ("none", "low", "high", "max"),
+    ),
     Model(
         "openai/gpt-6-luna", "openai", "GPT-6 Luna",
         "The fast, low-cost model of OpenAI's GPT-6 series.",

@@ -529,10 +529,11 @@ def test_the_key_is_saved_replaced_and_removed_from_settings(client, app):
 
 
 def test_agent_effort_is_set_and_reset_from_settings(client, app):
-    saved = client.post("/auth/profile", data={"section": "advanced", "effort_judge": "4", "effort_coach": "5"})
+    # The desktop app runs the shipped default, DeepSeek V4.1 Flash: Off, Low, High, Max.
+    saved = client.post("/auth/profile", data={"section": "advanced", "effort_judge": "3", "effort_coach": "4"})
     assert saved.status_code == 303 and saved.headers["Location"].endswith("/auth/profile#advanced")
     with app.app_context():
-        assert User.query.one().agent_efforts_json == {"judge": "high", "coach": "xhigh"}
+        assert User.query.one().agent_efforts_json == {"judge": "high", "coach": "max"}
     html = client.get("/auth/profile").get_data(as_text=True)
     assert '<output for="effort_judge">High</output>' in html
 
@@ -584,7 +585,8 @@ def test_a_default_set_in_settings_env_is_the_one_the_sliders_name(data_dir):
     assert '<output for="effort_coach">Default · High</output>' in html
     # An emptied default sends no effort, so there is no level to name.
     assert '<output for="effort_worker">Default</output>' in html
-    assert '<output for="effort_planner">Default · Medium</output>' in html
+    # The planner's default, medium, is a level DeepSeek lacks: it thinks at the next one up.
+    assert '<output for="effort_planner">Default · High</output>' in html
 
 
 def test_a_key_saved_under_another_install_secret_is_asked_for_again(data_dir):

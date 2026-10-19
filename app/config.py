@@ -15,10 +15,10 @@ def _env_int(name, default):
 # Sentinel default secret. The app refuses to start in production if this is still in use.
 DEV_SECRET_KEY = "dev-secret"
 
-# GPT-6 Luna: 1M context, structured outputs, tools, vision, cheap. Every pipeline
-# role defaults to it; override a single role with OPENROUTER_MODEL_<ROLE>. A user can
-# pick another model for their own runs (see services.pipeline.catalog).
-DEFAULT_MODEL = "openai/gpt-6-luna"
+# DeepSeek V4.1 Flash: 1M context, structured outputs, tools, vision, cheap. Every
+# pipeline role defaults to it; override a single role with OPENROUTER_MODEL_<ROLE>. A
+# user can pick another model for their own runs (see services.pipeline.catalog).
+DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash-1017"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 
 
@@ -61,8 +61,9 @@ class Config:
     OPENROUTER_TIMEOUT_SECONDS = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "180"))
     OPENROUTER_MAX_RETRIES = _env_int("OPENROUTER_MAX_RETRIES", 2)
     OPENROUTER_RETRY_BACKOFF_SECONDS = float(os.getenv("OPENROUTER_RETRY_BACKOFF_SECONDS", "1.5"))
-    # Output cap per call. Luna allows 128k completion tokens; a dense unit can need
-    # 10k+ tokens of cards, and OpenRouter charges per token used, so a high cap is free.
+    # Output cap per call, reasoning included. Every model in the picker allows 128k+
+    # completion tokens; a dense unit can need 10k+ tokens of cards, and OpenRouter
+    # charges per token used, so a high cap is free.
     OPENROUTER_MAX_TOKENS = _env_int("OPENROUTER_MAX_TOKENS", 16000)
 
     # Pipeline knobs.

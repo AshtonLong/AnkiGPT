@@ -266,7 +266,7 @@ def openrouter_chat(
     seed=None,
 ):
     """One chat-completions call. `temperature` is only sent when given — reasoning
-    models (including GPT-6 Luna) reject it."""
+    models (GPT-6 Luna among them) reject it."""
     if not api_key:
         raise MissingAPIKeyError()
     payload = {
@@ -350,11 +350,16 @@ def run_tool_loop(chat, messages, tools, handlers, max_turns=12, on_turn=None):
         content = msg.get("content")
         if isinstance(content, list):
             content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
-        transcript.append(
-            {"role": "assistant", "content": content or "", "tool_calls": tool_calls or None}
-            if tool_calls
-            else {"role": "assistant", "content": content or ""}
-        )
+        turn = {"role": "assistant", "content": content or ""}
+        if tool_calls:
+            turn["tool_calls"] = tool_calls
+        # The model's reasoning goes back with its turn, unchanged. DeepSeek rejects the
+        # next request of a tool loop without it (a 400), and OpenRouter advises sending it
+        # back to every reasoning model that calls tools.
+        for key in ("reasoning", "reasoning_details"):
+            if msg.get(key):
+                turn[key] = msg[key]
+        transcript.append(turn)
         if not tool_calls:
             final_text = content or ""
             break

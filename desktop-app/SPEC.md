@@ -358,7 +358,7 @@ no environment to set. For what the Settings page does not cover, the backend re
 `OPENROUTER_TEMPERATURE`, `OPENROUTER_TIMEOUT_SECONDS`, `OPENROUTER_MAX_TOKENS`,
 `PIPELINE_*` and `MAX_SOURCE_CHARS`. Any other key is ignored and logged.
 
-This is also the escape hatch if the built-in default model (`openai/gpt-6-luna`) is
+This is also the escape hatch if the built-in default model (`deepseek/deepseek-v4.1-flash-1017`) is
 retired by the provider before an update ships. A user who picked another model in
 Settings is not affected by `OPENROUTER_MODEL` or `OPENROUTER_MODEL_*`: their pick runs
 every role until they change it.
