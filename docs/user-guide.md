@@ -9,11 +9,15 @@ called **Settings**. [Desktop app](desktop.md) lists the other differences.
 
 Create an account or sign in, then choose **New deck**. Give it a title and select
 **Basic** (front/back), **Cloze** (fill in the blank), or **Mixed** cards.
-Paste text or upload a PDF. For PDFs, optionally select a page range using 1-based
-page numbers. Scanned documents need text extraction elsewhere first; the app has
+Paste text or upload PDFs. To build one deck from several PDFs, such as a run of
+lectures, add them all (pick or drop a few at a time) and put them in order by
+dragging them or with the arrow buttons. They are combined into one document in that
+order, and source review lists each file with the pages it became. For PDFs,
+optionally select a page range using 1-based page numbers; with several PDFs the
+pages count through the combined document. Scanned documents need text extraction elsewhere first; the app has
 no OCR workflow. Only PDF uploads are supported.
 
-The default upload limit is 50 MB. Sources longer than 400,000 characters are
+The default upload limit is 50 MB in total, across up to 20 PDFs. Sources longer than 400,000 characters are
 truncated with a warning; use a smaller page range if the omitted material matters.
 Both limits are configurable. Continue to source review to check the extraction.
 

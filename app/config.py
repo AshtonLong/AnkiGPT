@@ -84,6 +84,8 @@ class Config:
     MAX_CONTENT_LENGTH = UPLOAD_MAX_MB * 1024 * 1024
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "instance/uploads")
     ALLOWED_UPLOAD_EXTENSIONS = {"pdf"}
+    # PDFs one deck may be built from; they are combined into one document in order.
+    MAX_UPLOAD_FILES = _env_int("MAX_UPLOAD_FILES", 20)
 
     # Guard against pasting an entire book: bounds LLM cost/time. 0 disables the cap.
     MAX_SOURCE_CHARS = _env_int("MAX_SOURCE_CHARS", 400000)

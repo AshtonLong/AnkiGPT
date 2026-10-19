@@ -14,8 +14,8 @@ interface with sample data, not results from a live AI run.*
 
 ## From source to study
 
-1. **Add your material.** Paste notes or upload a text-based PDF, optionally choosing a
-   page range. Pick basic, cloze, or mixed cards.
+1. **Add your material.** Paste notes or upload text-based PDFs (several lectures can be
+   combined into one deck, in the order you set), optionally choosing a page range. Pick basic, cloze, or mixed cards.
 2. **Set the direction.** Review the extracted source and tell the planner your exam
    context, focus areas, exclusions, must-include terms, and approximate deck size.
    When the full source would be overload, switch on **Make a cheat sheet first** to
@@ -117,7 +117,7 @@ persists its SQLite database and uploads in the `ankigpt-data` volume.
   close the page while it works; restarting the server interrupts the run.
 - **Data:** workspace routes enforce account ownership. AI operations send source
   content through OpenRouter. Extracted text, figures, cards, and traces are stored
-  in one SQLite file on the server. The original uploaded PDF is removed after extraction.
+  in one SQLite file on the server. Uploaded PDFs are removed after extraction.
 - **Anki:** export and review import are manual file transfers. Export includes all
   `ok` cards in the deck, even when the editor is filtered.
 

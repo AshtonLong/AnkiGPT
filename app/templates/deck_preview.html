@@ -16,7 +16,7 @@
   </div>
   <div class="actions">
     <span class="pill {{ 'info' if deck.card_style == 'cloze' else ('violet' if deck.card_style == 'mixed' else 'ok') }}">{{ deck.card_style }}</span>
-    <span class="pill">{{ 'PDF' if deck.source_type == 'pdf' else 'Text' }} source</span>
+    <span class="pill">{% if s.source_files %}{{ s.source_files|length }} PDFs combined{% else %}{{ 'PDF' if deck.source_type == 'pdf' else 'Text' }} source{% endif %}</span>
     {% if figure_count %}<span class="pill warn">{{ icon('image', 12) }} {{ figure_count }} figures</span>{% endif %}
   </div>
 </div>
@@ -27,6 +27,15 @@
       <span class="panel-title">{{ icon('file-text') }} Extracted source</span>
       <span class="counter"><b>{{ '{:,}'.format(n) }}</b> chars</span>
     </div>
+    {% if s.source_files %}
+    {% set pages = namespace(first=1) %}
+    <ol class="source-files">
+      {% for file in s.source_files %}
+      <li><span class="mono">{{ loop.index }}.</span> <b>{{ file.name }}</b> <span class="hint">{% if file.pages == 1 %}page {{ pages.first }}{% else %}pages {{ pages.first }}–{{ pages.first + file.pages - 1 }}{% endif %}</span></li>
+      {% set pages.first = pages.first + file.pages %}
+      {% endfor %}
+    </ol>
+    {% endif %}
     <div class="source-view">
       <pre>{{ deck.source_text[:preview_len] }}</pre>
       {% if n > preview_len %}<span class="trunc">Showing the first {{ '{:,}'.format(preview_len) }} of {{ '{:,}'.format(n) }} characters. The full text is used for generation.</span>{% endif %}
