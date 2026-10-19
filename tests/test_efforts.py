@@ -16,6 +16,7 @@ from app.services.pipeline.routing import AGENT_ROLES, LLMClient, ROLES
 from conftest import FakeLLM, fake_embeddings, fake_response, register
 
 DEFAULTS = {
+    "OPENROUTER_MODEL": "openai/gpt-6-luna",
     "OPENROUTER_REASONING_PLANNER": "medium", "OPENROUTER_REASONING_CRITIC": "low",
     "OPENROUTER_REASONING_RECONCILE": "low", "OPENROUTER_REASONING_WORKER": "",
 }

@@ -62,3 +62,32 @@ class TestRetryLogic:
     def test_exponential_backoff(self):
         assert _retry_delay_seconds(0, 1.5, None) == 1.5
         assert _retry_delay_seconds(1, 1.5, None) == 3.0
+
+
+class TestToolLoop:
+    def test_reasoning_goes_back_with_each_turn(self):
+        """DeepSeek rejects the next request of a tool loop that leaves out its reasoning."""
+        from app.services.llm import run_tool_loop
+
+        details = [{"type": "reasoning.text", "text": "Read unit 0 first.", "format": "unknown", "index": 0}]
+        replies = [
+            {"choices": [{"message": {
+                "role": "assistant", "content": None, "reasoning": "Read unit 0 first.", "reasoning_details": details,
+                "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "look", "arguments": "{}"}}],
+            }}]},
+            {"choices": [{"message": {"role": "assistant", "content": "Done.", "reasoning": None}}]},
+        ]
+        sent = []
+
+        def chat(transcript, tools):
+            sent.append([dict(m) for m in transcript])
+            return replies[len(sent) - 1]
+
+        final, transcript, turns, stopped = run_tool_loop(chat, [{"role": "user", "content": "Plan."}], [],
+                                                          {"look": lambda args: {"ok": True}})
+        assert (final, turns, stopped) == ("Done.", 2, False)
+        turn = sent[1][1]
+        assert turn["role"] == "assistant" and turn["tool_calls"][0]["id"] == "c1"
+        assert turn["reasoning"] == "Read unit 0 first." and turn["reasoning_details"] == details
+        # A model that gave no reasoning sends none back.
+        assert "reasoning" not in transcript[-1] and "reasoning_details" not in transcript[-1]

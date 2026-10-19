@@ -3,6 +3,7 @@ reasoning effort follows the model."""
 
 import pytest
 
+from app.config import DEFAULT_MODEL, Config
 from app.extensions import db as _db
 from app.models import Deck, User
 from app.services import deckgen
@@ -15,6 +16,7 @@ from app.services.pipeline.routing import LLMClient, ROLES
 
 from conftest import FakeLLM, fake_embeddings, fake_response, register
 
+DEEPSEEK = "deepseek/deepseek-v4.1-flash-1017"
 LUNA = "openai/gpt-6-luna"
 HAIKU = "anthropic/claude-haiku-5.5"
 SOURCE = """# Photosynthesis
@@ -75,6 +77,52 @@ def test_an_unlisted_model_is_offered_every_level():
     assert efforts_for("vendor/unlisted") == EFFORT_LEVELS
 
 
+# ------------------------------------------------------------------ the default
+def test_deepseek_v4_1_flash_is_the_default_and_listed_first():
+    deepseek = find(DEEPSEEK)
+    assert DEFAULT_MODEL == Config.OPENROUTER_MODEL == DEEPSEEK
+    assert deepseek.company == "deepseek" and deepseek.name == "DeepSeek V4.1 Flash"
+    # OpenRouter's `reasoning.supported_efforts` for it: Off, Low, High, Max.
+    assert deepseek.efforts == ("none", "low", "high", "max")
+    assert list(COMPANIES)[0] == "deepseek"
+    # A client given no model at all runs the default.
+    assert LLMClient({}).default_model == DEEPSEEK
+
+
+@pytest.mark.parametrize("effort, sent", [
+    ("none", "none"), ("minimal", "low"), ("low", "low"), ("medium", "high"), ("high", "high"),
+    ("xhigh", "max"), ("max", "max"),
+])
+def test_every_level_reaches_deepseek_as_one_it_takes(effort, sent):
+    assert fit_effort(effort, DEEPSEEK) == sent
+
+
+def test_the_server_defaults_reach_deepseek_as_levels_it_takes(monkeypatch):
+    """Every role's shipped default effort is one DeepSeek takes, once fitted."""
+    sent = []
+    monkeypatch.setattr(llm_module, "openrouter_chat",
+                        lambda messages, model, *args, **kwargs: sent.append((model, kwargs["reasoning_effort"]))
+                        or fake_response("ok"))
+    client = LLMClient(Config, "sk-or-test")
+    for role in ROLES:
+        client.chat(role, [])
+    assert {model for model, _effort in sent} == {DEEPSEEK}
+    assert {effort for _model, effort in sent} <= set(find(DEEPSEEK).efforts)
+    assert dict(zip(ROLES, (effort for _model, effort in sent)))["planner"] == "high"
+
+
+def test_the_picker_offers_deepseek_first_as_the_default(client, app):
+    app.config["OPENROUTER_MODEL"] = DEEPSEEK
+    register(client)
+    html = _page(client)
+    assert html.index("<legend>DeepSeek</legend>") < html.index("<legend>OpenAI</legend>")
+    assert f'name="model" value="{DEEPSEEK}" checked' in html
+    assert 'DeepSeek V4.1 Flash <span class="model-default">Default</span>' in html
+    assert 'class="model-logo model-logo-deepseek"><svg' in html and "M23.748 4.482c" in html
+    # Its sliders run Off, Low, High, Max.
+    assert "These are the levels <b>DeepSeek V4.1 Flash</b> takes: Off, Low, High, Max." in html
+
+
 # ------------------------------------------------------------------ routing
 def test_a_picked_model_runs_every_role_and_the_server_routes_without_one():
     config = {"OPENROUTER_MODEL": LUNA, "OPENROUTER_MODEL_PLANNER": "vendor/strong-planner"}
@@ -90,7 +138,7 @@ def test_a_call_sends_a_level_the_model_takes(monkeypatch):
     monkeypatch.setattr(llm_module, "openrouter_chat",
                         lambda messages, model, *args, **kwargs: sent.append((model, kwargs["reasoning_effort"]))
                         or fake_response("ok"))
-    config = {"OPENROUTER_REASONING_CRITIC": "minimal", "OPENROUTER_REASONING_PLANNER": "medium"}
+    config = {"OPENROUTER_MODEL": LUNA, "OPENROUTER_REASONING_CRITIC": "minimal", "OPENROUTER_REASONING_PLANNER": "medium"}
     efforts = {"judge": "none", "coach": "max"}
     for model in (None, HAIKU):
         client = LLMClient(config, "sk-or-test", efforts, model)
@@ -105,7 +153,7 @@ def test_a_call_sends_a_level_the_model_takes(monkeypatch):
 
 
 def test_cached_results_are_shared_only_between_efforts_sent_as_the_same_level():
-    config = {"OPENROUTER_REASONING_CRITIC": "low", "OPENROUTER_REASONING_PLANNER": "medium"}
+    config = {"OPENROUTER_MODEL": LUNA, "OPENROUTER_REASONING_CRITIC": "low", "OPENROUTER_REASONING_PLANNER": "medium"}
     # Haiku takes "none" as "low", which is the critic's default: nothing moved.
     assert LLMClient(config, efforts={"judge": "none"}, model=HAIKU).effort_key("judge") == ()
     assert LLMClient(config, efforts={"judge": "none"}).effort_key("judge") == ("effort:judge=none",)
