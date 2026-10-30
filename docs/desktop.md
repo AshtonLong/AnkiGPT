@@ -41,7 +41,7 @@ Everything in the [user guide](user-guide.md) applies, with these differences:
 - **Closing the window quits the app.** Generation stops when the app closes, so the app
   asks before quitting while a deck is being generated. A deck that was cut off shows
   as failed the next time you open the app, with **Retry generation**.
-- **Bigger uploads.** PDFs up to 200 MB. The 400,000 character source limit still applies.
+- **Bigger uploads.** One upload can be up to 200 MB in total, against 50 MB on the web. The 400,000 character source limit still applies.
 - **Updates install themselves.** The app checks GitHub for a new version shortly after
   it starts and every six hours, downloads it in the background, and offers to restart.
   **Help → Check for updates…** checks at once.
@@ -65,6 +65,7 @@ Everything is kept in `%APPDATA%\AnkiGPT`, which you can open with
     main.log             the app
     backend.log          deck generation and everything else
   secret.bin             the key that protects your OpenRouter key, encrypted by Windows
+  window-state.json      the window's size, position and zoom
 ```
 
 - Source material and cards are sent to OpenRouter, under your key, when you generate,
@@ -85,9 +86,9 @@ picker does not list, give one role its own model, or change the pipeline settin
 create `%APPDATA%\AnkiGPT\data\settings.env` and restart the app:
 
 ```ini
-# Use a different model for everything, and a stronger one for the planner.
+# Use a different model for everything, and another one for the planner.
 OPENROUTER_MODEL=openai/gpt-6-luna
-OPENROUTER_MODEL_PLANNER=openai/gpt-6-sol
+OPENROUTER_MODEL_PLANNER=anthropic/claude-haiku-5.5
 PIPELINE_MAX_WORKERS=4
 ```
 

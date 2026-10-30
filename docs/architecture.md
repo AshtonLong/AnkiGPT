@@ -19,7 +19,7 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
 1. **Map** — the source is split on headings into candidates; one cheap model call groups
    them into semantic *units* with a kind (definitions, formulas, procedure, comparison,
    worked example…), a density score, prerequisites, and skip verdicts for front matter,
-   references, and recaps. Short sources skip the model and become one unit.
+   references, and recaps. A document of 3,000 characters or fewer, or one with a single section, skips the model: its sections become units without a model call.
    - **Cheat sheet** (optional, off by default) — with **Make a cheat sheet first**
      ticked, each live unit is rewritten as the section of a cheat sheet a student could
      bring into the exam: every examinable concept in its barest form, edge cases
@@ -173,7 +173,7 @@ was asked for.
 
 ### Content-addressed cache
 
-Cheat-sheet, worker, critic, vision, coverage and back-fill review results are cached on a hash of
+Cheat-sheet, high-yield ranking, worker, critic, vision, coverage and back-fill review results are cached on a hash of
 (role, model, prompt version, inputs), plus the reasoning effort, as sent, of any agent its user
 moved off the default. A cache hit avoids a provider call for that task. Mapping, planning, embeddings,
 and changed inputs can still incur calls; a repeated deck is not guaranteed to be free.
