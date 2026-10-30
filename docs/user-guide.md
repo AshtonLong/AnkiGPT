@@ -147,8 +147,8 @@ Anki with scheduling information. Upload the `.apkg` or `.colpkg` through
 **Import reviews**. Matching uses the stable note GUID assigned by AnkiGPT's export.
 Unrelated notes will not match.
 
-Cards with at least two lapses or an again-rate of at least 40% are flagged as
-struggling. The **Coach** tab can rewrite or split these cards using the review stats
+Cards with at least three reviews, and either at least two lapses or an again-rate of at
+least 40%, are flagged as struggling. The **Coach** tab can rewrite or split these cards using the review stats
 and source. Suggestions are marked **Needs review**; inspect and save them before
 exporting. This is a manual file round trip, not continuous Anki synchronization.
 

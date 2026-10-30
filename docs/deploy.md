@@ -12,8 +12,8 @@ browser ──HTTPS──> Caddy (:443, Let's Encrypt) ──> gunicorn app (:80
                                     OpenRouter (each user's key) · Resend (SMTP)
 ```
 
-The app idles at ~180 MB for both gunicorn workers, so 1 GB of RAM plus the 2 GB swap
-file that `server-setup.sh` adds is enough. Any Ubuntu VPS works the same way (Vultr,
+The app is small enough for 1 GB of RAM plus the 2 GB swap file that `server-setup.sh`
+adds; watch memory if the server starts swapping under load. Any Ubuntu VPS works the same way (Vultr,
 Hetzner, DigitalOcean); only the price changes.
 
 ## 1. Accounts (you)
@@ -114,7 +114,7 @@ email delivery.
   docker compose --env-file .env -f deploy/docker-compose.prod.yml cp web:/app/instance/backup.db ./ankigpt-backup.db
   ```
 
-  Then download `ankigpt-backup.db` to your PC with `scp`. About 300 decks fit in 0.5 GB at current sizes, so
-  watch the server's disk (`df -h`) as the library grows.
+  Then download `ankigpt-backup.db` to your PC with `scp`. Watch the server's disk
+  (`df -h`) as the library grows; the database and any backups share it.
 - **Generation during deploys:** a deploy restarts the app and interrupts decks that are
   mid-generation. Users can retry them, but deploy at quiet times.

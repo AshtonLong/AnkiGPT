@@ -1,10 +1,12 @@
 # AnkiGPT Desktop — Specification
 
-Status: written 2026-10-05 and built the same day as version 0.1.0, which is published,
-unsigned, on the repository's Releases page. Still not done: the installer has not been
-run on a clean Windows account, one version has not been watched updating to the next,
-and the manual checklist (section 10.3) has not been run with a real OpenRouter key. The
-code-signing decision in section 13 is still open. [docs/desktop.md](../docs/desktop.md) is the page for users and developers.
+Status: written 2026-10-05, when it was built as version 0.1.0. Versions 0.1.0 through
+0.10.0 are now published, unsigned, on the repository's Releases page, and that list is
+the record of what has shipped. This document does not record whether the open items of
+2026-10-05 (a clean-account install, a watched update, the checklist in section 10.3 run
+with a real OpenRouter key) were done later. The code-signing decision in section 13 is
+still open. For current behaviour, see [docs/desktop.md](../docs/desktop.md), which is the
+page for users and developers.
 
 ## 1. Summary
 
@@ -205,7 +207,7 @@ The database schema is the same as the web app's.
 
 `SECRET_KEY` signs the session cookie and derives the key that encrypts the saved
 OpenRouter key (`app/services/credentials.py:19`). Today it defaults to `"dev-secret"`
-(`app/config.py:25`), which must never ship.
+(`app/config.py:26`), which must never ship.
 
 - On first launch Electron generates 48 random bytes, encrypts them with Electron's
   `safeStorage` (Windows DPAPI, tied to the Windows user account) and writes `secret.bin`.
