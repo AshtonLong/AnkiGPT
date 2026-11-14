@@ -600,9 +600,10 @@ workflow, triggered by a `v*` tag on a Windows runner:
 
 1. Run the existing test suite.
 2. Build the backend in a clean venv and run its self-check.
-3. Build the installer and upload it to a **draft** GitHub Release.
-4. A person runs the manual checklist (section 10.3) against the draft, then publishes it.
-   Publishing is what makes installed copies update.
+3. Build the installer and publish it as the latest GitHub Release. Installed copies
+   update from it straight away, so pushing the tag is the release decision.
+4. The manual checklist (section 10.3) is run against a local build before tagging when a
+   change needs it.
 
 The same scripts run locally, so a release can be built on a Windows machine without CI.
 
