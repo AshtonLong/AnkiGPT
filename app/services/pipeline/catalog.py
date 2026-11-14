@@ -28,7 +28,10 @@ class Model:
     blurb: str
     # From `reasoning.supported_efforts` in OpenRouter's model list
     # (https://openrouter.ai/api/v1/models), lowest first. Copy it from there when
-    # adding a model: sending a level a model lacks is not something to guess at.
+    # adding a model: sending a level a model lacks is not something to guess at. A
+    # model may be offered fewer levels than it takes, to cap how hard it thinks: every
+    # effort sent to it is fitted to this list (see `fit_effort`), so nothing above it
+    # ever reaches OpenRouter.
     efforts: tuple
 
 
@@ -44,6 +47,13 @@ MODELS = (
         "openai/gpt-6-luna", "openai", "GPT-6 Luna",
         "The fast, low-cost model of OpenAI's GPT-6 series.",
         ("none", "low", "medium", "high", "xhigh", "max"),
+    ),
+    Model(
+        "openai/gpt-6.1-sol", "openai", "GPT-6.1 Sol",
+        "OpenAI's GPT-6.1 model for demanding work, a step above Luna.",
+        # OpenRouter takes low to max, and reasoning cannot be turned off. Capped at
+        # high on purpose: Sol's extra-high and max runs cost far more for a deck.
+        ("low", "medium", "high"),
     ),
     Model(
         "anthropic/claude-haiku-5.5", "anthropic", "Claude Haiku 5.5",

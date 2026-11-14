@@ -137,6 +137,9 @@ class LLMClient:
         the role runs more than one."""
         model = model or self.model_for(role)
         effort = reasoning_effort if reasoning_effort is not None else self.reasoning_for(agent or role)
+        # Fitted to the model actually called, so a caller's own effort, or a `model`
+        # given here, never sends a level the catalog does not offer that model.
+        effort = fit_effort(effort, model)
         # Resolved at call time on purpose: tests monkeypatch llm.openrouter_chat.
         response = llm_module.openrouter_chat(
             messages,

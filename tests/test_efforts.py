@@ -76,8 +76,10 @@ def test_a_call_sends_the_calling_agents_effort(monkeypatch):
     client.chat("critic", [], agent="cold_reader")
     client.chat("critic", [])
     client.chat("worker", [])
+    # A caller's own effort wins, fitted like any other: Luna takes no "minimal".
     client.chat("critic", [], agent="judge", reasoning_effort="minimal")
-    assert sent == ["high", "low", "low", None, "minimal"]
+    client.chat("critic", [], agent="judge", reasoning_effort="xhigh")
+    assert sent == ["high", "low", "low", None, "low", "xhigh"]
 
 
 def test_cached_results_are_kept_apart_by_effort():

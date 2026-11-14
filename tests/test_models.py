@@ -18,6 +18,7 @@ from conftest import FakeLLM, fake_embeddings, fake_response, register
 
 DEEPSEEK = "deepseek/deepseek-v4.1-flash-1017"
 LUNA = "openai/gpt-6-luna"
+SOL = "openai/gpt-6.1-sol"
 HAIKU = "anthropic/claude-haiku-5.5"
 SOURCE = """# Photosynthesis
 
@@ -71,6 +72,38 @@ def test_claude_haiku_is_listed_under_anthropic_with_its_own_levels():
 ])
 def test_an_effort_is_fitted_to_the_levels_the_model_takes(effort, model, sent):
     assert fit_effort(effort, model) == sent
+
+
+def test_gpt_6_1_sol_is_listed_under_openai_and_capped_at_high():
+    sol = find(SOL)
+    assert sol.company == "openai" and sol.name == "GPT-6.1 Sol"
+    # OpenRouter takes low to max for it; the catalog stops at high on purpose.
+    assert sol.efforts == ("low", "medium", "high")
+
+
+@pytest.mark.parametrize("effort, sent", [
+    ("none", "low"), ("minimal", "low"), ("low", "low"), ("medium", "medium"), ("high", "high"),
+    ("xhigh", "high"), ("max", "high"),
+])
+def test_every_level_reaches_gpt_6_1_sol_at_high_or_below(effort, sent):
+    assert fit_effort(effort, SOL) == sent
+
+
+def test_no_call_sends_gpt_6_1_sol_more_than_high(monkeypatch):
+    """The cap holds for the server's defaults and for an effort a caller passes itself."""
+    sent = []
+    monkeypatch.setattr(llm_module, "openrouter_chat",
+                        lambda messages, model, *args, **kwargs: sent.append((model, kwargs["reasoning_effort"]))
+                        or fake_response("ok"))
+    config = {"OPENROUTER_MODEL": SOL, **{f"OPENROUTER_REASONING_{role.upper()}": "max" for role in ROLES}}
+    client = LLMClient(config, "sk-or-test")
+    for role in ROLES:
+        client.chat(role, [])
+        client.chat(role, [], reasoning_effort="xhigh")
+    LLMClient(config, "sk-or-test").chat("planner", [], model=LUNA, reasoning_effort="max")
+    assert sent[-1] == (LUNA, "max")
+    assert {model for model, _effort in sent[:-1]} == {SOL}
+    assert {effort for _model, effort in sent[:-1]} == {"high"}
 
 
 def test_an_unlisted_model_is_offered_every_level():
