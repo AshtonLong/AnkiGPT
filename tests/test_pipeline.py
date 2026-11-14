@@ -330,6 +330,58 @@ class TestCritic:
         _out, status, tags = critic.apply_verdict(card, verdict)
         assert status == "needs_review" and "critic:needs_review" in tags
 
+    def test_a_rewrite_that_anki_would_cut_short_is_repaired(self):
+        card = {"type": "basic", "front": "vague?", "back": "a"}
+        verdict = {"verdict": "rewrite", "rewrite": {"type": "cloze", "front": None, "back": None,
+                   "cloze_text": r"The slope is {{c1::\frac{a}{b}}}.", "extra": ""}}
+        out, status, _tags = critic.apply_verdict(card, verdict)
+        assert status == "ok" and out["cloze_text"] == r"The slope is {{c1::\frac{a}{b} }}."
+
+    def test_cold_reader_answers_each_deletion_as_it_is_studied(self):
+        cards = [
+            {"type": "basic", "front": "What does insulin lower?", "back": "Blood glucose"},
+            {"type": "cloze", "cloze_text": "{{c1::Insulin}} lowers blood {{c2::glucose::sugar}}."},
+            {"type": "cloze", "cloze_text": "ATP is made in the {{c1::mitochondria}}."},
+        ]
+        # Anki shows the other deletion's answer on each card, and a hint in place of its blank.
+        assert critic.card_prompts(cards[1]) == ["[...] lowers blood glucose.", "Insulin lowers blood [hint: sugar]."]
+        assert critic.cold_messages(cards)[1]["content"] == (
+            "Prompts:\n[0] What does insulin lower?\n[1] [...] lowers blood glucose.\n"
+            "[2] Insulin lowers blood [hint: sugar].\n[3] ATP is made in the [...].")
+        assert "[hint: ...]" in critic.COLD_SYSTEM
+
+    def test_judge_sees_every_studied_prompt_with_its_cold_answer(self):
+        cards = [
+            {"type": "cloze", "cloze_text": "{{c1::Insulin}} lowers blood {{c2::glucose}}."},
+            {"type": "basic", "front": "q", "back": "a"},
+        ]
+        cold = json.dumps({"answers": [{"index": 0, "answer": "Insulin"}, {"index": 1, "answer": "pressure"},
+                                       {"index": 2, "answer": "a"}]})
+        verdicts = json.dumps({"verdicts": [
+            {"index": i, "supported": True, "atomic": True, "ambiguous": False, "leaks_answer": False,
+             "cold_answer_correct": False, "worthwhile": True, "difficulty": 2, "verdict": "keep", "reason": "fine",
+             "rewrite": None} for i in range(2)]})
+
+        class Recording(FakeClient):
+            def chat(self, role, messages, **kwargs):
+                self.seen = getattr(self, "seen", []) + [messages]
+                return super().chat(role, messages, **kwargs)
+
+        client = Recording([fake_response(cold), fake_response(verdicts)])
+        out = critic.run_critic_batch(client, cards, "Insulin lowers blood glucose.")
+        judged = client.seen[1][1]["content"].split("\nCARDS:\n")[1]
+        assert judged == (
+            "[0] type=cloze\ncloze_text: {{c1::Insulin}} lowers blood {{c2::glucose}}.\n"
+            "studied as: [...] lowers blood glucose.\n  cold answer: Insulin\n"
+            "studied as: Insulin lowers blood [...].\n  cold answer: pressure\n\n"
+            "[1] type=basic\nfront: q\nback: a\ncold answer: a")
+        assert out["verdicts"][0]["cold_answer"] == "Insulin / pressure" and out["verdicts"][1]["cold_answer"] == "a"
+        assert "studied as" in critic.JUDGE_SYSTEM
+
+    def test_judge_still_runs_when_the_cold_pass_gave_nothing(self):
+        user = critic.judge_messages([{"type": "cloze", "cloze_text": "{{c1::A}} binds {{c2::B}}"}], {}, "src")[1]["content"]
+        assert user.endswith("cloze_text: {{c1::A}} binds {{c2::B}}\ncold answer: unknown")
+
     def test_judge_rules_on_whether_a_card_is_worth_learning(self):
         schema = critic.JUDGE_SCHEMA["json_schema"]["schema"]["properties"]["verdicts"]["items"]
         assert "worthwhile" in schema["required"]
@@ -422,6 +474,28 @@ def test_every_strategy_prompt_shares_the_base_prefix():
     base = prompts[0].split("\n\nSTRATEGY:")[0]
     assert all(p.startswith(base) for p in prompts)
     assert "source_quote" in base
+    # Whatever the deck's style, a worker knows which facts suit which type, and not to test one twice.
+    assert all(system_prompt("general", style).startswith(base) for style in ("cloze", "mixed"))
+    assert "CHOOSING THE TYPE" in base and "never write a basic card and a cloze that test the same fact" in base
+
+
+def test_a_mixed_deck_is_told_how_to_choose_and_what_breaks_a_tie():
+    def style_line(strategy, card_style):
+        return system_prompt(strategy, card_style).split("\n")[-4]
+
+    assert all(s.default_type in ("basic", "cloze") for s in STRATEGIES.values())
+    for key, strategy in STRATEGIES.items():
+        line = style_line(key, "mixed")
+        assert line.startswith("Card style: mixed.") and "CHOOSING THE TYPE" in line
+        assert line.endswith(f"write a {strategy.default_type} card.")
+    # Processes, formulas and plain prose lean cloze; question-shaped strategies lean basic.
+    assert {k for k, s in STRATEGIES.items() if s.default_type == "cloze"} == {
+        "general", "formula_derivation", "mechanism_chain"}
+    # A deck set to one type leans that way on every strategy.
+    assert style_line("compare_contrast", "cloze").startswith("Preferred card style: cloze")
+    assert style_line("mechanism_chain", "basic").startswith("Preferred card style: basic")
+    # A style the app does not know is treated as mixed.
+    assert style_line("general", None) == style_line("general", "mixed")
 
 
 def test_cache_key_is_stable_and_input_sensitive():

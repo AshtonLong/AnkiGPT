@@ -5,13 +5,14 @@ replace the old one-size-fits-all rule wall: a definitions table and a derivatio
 different card shapes, and a model told exactly which shape to produce writes far
 better cards than one juggling twenty generic rules.
 
-Every strategy shares BASE_RULES (grounding, atomicity, cloze hygiene, math format) and
+Every strategy shares BASE_RULES (grounding, atomicity, cloze hygiene, which facts suit
+which card type, math format) and
 adds its own section. The shared part is placed first so prompt caches hit across tasks.
 """
 
 from dataclasses import dataclass, field
 
-PROMPT_VERSION = "v7-agentic"
+PROMPT_VERSION = "v8-agentic"
 
 BASE_RULES = """You are an expert flashcard author for spaced repetition (Anki). You write cards ONLY from the source text you are given.
 
@@ -35,7 +36,13 @@ CLOZE CARDS
 - `cloze_text` uses {{c1::...}} syntax with one or two deletions. Set `front` and `back` to null. `extra` may hold a brief clarification shown on the back.
 - Cloze the discriminating detail, never the topic word. Bad: "{{c1::Mitochondria}} produce ATP." Good: "ATP is produced by oxidative phosphorylation in the {{c1::mitochondria}}."
 - The surrounding text must not give the answer away: do not cloze the grammatical subject, the only capitalised term, or one item of a short guessable list. Avoid clozing numbers unless the number itself is the point.
-- Use {{c2::...}} only when two deletions test genuinely separate facts from the same sentence.
+- Use {{c2::...}} only when two deletions test genuinely separate facts from the same sentence. Each numbered deletion is studied as its own card with the other one's answer in view, so neither answer may give the other away.
+- When the blank alone leaves open what kind of answer is wanted, add a hint: {{c1::answer::hint}} shows [hint] in place of the blank. The hint names the kind of answer ("enzyme", "year", "unit"), never any part of the answer.
+
+CHOOSING THE TYPE
+- A cloze is the better test of a short answer that is recalled inside its own sentence: a term in the wording of a definition or rule, a value, symbol or unit inside a formula, the step, agent or place in a process, a name or date in a statement.
+- A basic card is the better test of an answer that is a reason or a sentence of its own: why and how, a comparison, a condition, the choice of a method.
+- One type per fact: never write a basic card and a cloze that test the same fact.
 
 FORMAT
 - Math: \\( ... \\) inline and \\[ ... \\] display only. Never $...$ or LaTeX environments.
@@ -50,7 +57,9 @@ class Strategy:
     name: str
     description: str  # shown to the planner
     rules: str  # appended to BASE_RULES
-    default_type: str = "auto"  # basic | cloze | auto
+    # basic | cloze: in a mixed deck, the type a card takes when either would test its fact
+    # equally well. A deck set to basic or to cloze leans that way whatever this says.
+    default_type: str = "basic"
     cards_per_1k_chars: float = 3.0  # planner sizing heuristic
     aliases: tuple = field(default_factory=tuple)
 
@@ -73,8 +82,10 @@ _register(
         ),
         rules="""STRATEGY: GENERAL COVERAGE
 - Cover every exam-useful concept, definition, relationship, procedure, constraint, and pitfall in the unit.
-- Mix basic and cloze cards according to what each fact needs; use the requested card style when either would do.
+- Mix basic and cloze cards according to what each fact needs; the card style at the end of these instructions settles it when either would do.
 - Prefer "why" and "how" questions over pure recall when the source explains a mechanism.""",
+        # Left alone, a model writes questions: a cloze tie-break is what makes the mix real.
+        default_type="cloze",
         cards_per_1k_chars=3.0,
     )
 )
@@ -111,6 +122,7 @@ _register(
 - For derivations: one card per non-obvious step ("what justifies going from A to B?"), plus a card for the final result.
 - Capture limiting cases and sign/direction conventions as separate cards.
 - Write all math with \\( ... \\) and \\[ ... \\].""",
+        default_type="cloze",
         cards_per_1k_chars=4.5,
     )
 )
@@ -128,6 +140,7 @@ _register(
 - Add cards for the inputs, outputs, and location of the process, and for what regulates or halts it.
 - Cloze the step that follows, or the agent that performs a step, never the process name.
 - Never ask for the whole sequence in one card unless it is at most four short steps meant to be recited as a unit.""",
+        default_type="cloze",
         cards_per_1k_chars=3.5,
     )
 )
@@ -249,7 +262,12 @@ def system_prompt(strategy_key, card_style, focus="", exclude="", glossary=""):
     style_line = {
         "basic": "Preferred card style: basic (use cloze only where a sentence with a deletion is clearly the better test).",
         "cloze": "Preferred card style: cloze (use basic only where a question is clearly the better test).",
-    }.get(card_style, "Preferred card style: choose the better type per fact.")
+    }.get(card_style) or (
+        # Mixed. "Choose the better type" alone leaves a model writing questions, so the
+        # choice is tied to CHOOSING THE TYPE and the strategy breaks the ties.
+        "Card style: mixed. Give each fact the type that tests it better, as CHOOSING THE TYPE says. Where either "
+        f"would test a fact equally well, write a {strategy.default_type} card."
+    )
     return "\n\n".join(
         [
             BASE_RULES,

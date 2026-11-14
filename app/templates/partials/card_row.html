@@ -31,8 +31,17 @@
       {% else %}
       <div class="cf">
         <label for="cloze-{{ card.id }}">Cloze</label>
-        <textarea class="inp q" id="cloze-{{ card.id }}" name="cloze_text" rows="1" data-autogrow
-          placeholder="Text with {{ '{{c1::deletions}}' }}">{{ card.cloze_text or '' }}</textarea>
+        {# The preview is redrawn as the student types. Target, swap, indicator and disabled-elt
+           are set here because this field would otherwise inherit the form's, which replace
+           the whole row and lock its Save button. #}
+        <textarea class="inp q" id="cloze-{{ card.id }}" name="cloze_text" rows="1" data-autogrow data-cloze-preview
+          placeholder="Text with {{ '{{c1::deletions}}' }}, or {{ '{{c1::answer::hint}}' }}"
+          hx-post="{{ url_for('main.preview_cloze') }}" hx-trigger="input changed delay:300ms" hx-sync="this:replace"
+          hx-target="#cloze-preview-{{ card.id }}" hx-swap="innerHTML" hx-indicator="#cloze-preview-{{ card.id }}"
+          hx-disabled-elt="unset" aria-describedby="cloze-preview-{{ card.id }}">{{ card.cloze_text or '' }}</textarea>
+        <div class="cloze-preview" id="cloze-preview-{{ card.id }}" aria-live="polite">
+          {% with preview = cloze_preview(card.cloze_text) %}{% include "partials/cloze_preview.html" %}{% endwith %}
+        </div>
       </div>
       <div class="cf">
         <label for="extra-{{ card.id }}">Extra</label>
@@ -68,6 +77,13 @@
         title="Ask the AI to tighten this card">
         <span class="btn-icon">{{ icon('sparkles', 14) }}</span><span class="btn-spinner" aria-hidden="true"></span>
         <span>AI improve</span>
+      </button>
+      {# Sends the fields as they stand, so unsaved edits are converted rather than lost. #}
+      <button class="btn sm ghost" type="button" data-convert hx-post="{{ url_for('main.convert_card', card_id=card.id) }}"
+        hx-target="#card-{{ card.id }}" hx-swap="outerHTML" hx-indicator="#card-{{ card.id }}" hx-disabled-elt="this"
+        title="{{ 'Rewrite as a fill-in-the-blank sentence' if card.type == 'basic' else 'Rewrite as a question and answer' }}. The result is a draft to reword and save.">
+        <span class="btn-icon">{{ icon('refresh', 14) }}</span><span class="btn-spinner" aria-hidden="true"></span>
+        <span>{{ 'Make cloze' if card.type == 'basic' else 'Make basic' }}</span>
       </button>
       <span class="dirty">Unsaved changes</span>
       <span class="saved" role="status">{{ icon('check', 13) }} Saved</span>

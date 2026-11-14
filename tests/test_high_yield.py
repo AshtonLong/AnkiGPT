@@ -10,7 +10,8 @@ from app.extensions import db as _db
 from app.models import Card, Deck, PipelineTask, Source
 from app.services.pipeline import cheatsheet
 from app.services.pipeline.document_map import Unit
-from app.services.pipeline.workers import HIGH_YIELD_BRIEF
+from app.services.pipeline.planner import PlanTask
+from app.services.pipeline.workers import HIGH_YIELD_BRIEF, build_worker_messages
 
 from conftest import fake_response, login
 from test_deckgen import _generate, _install_fake, _make_deck
@@ -39,6 +40,43 @@ HIGH_YIELD = {"cheat_sheet": True, "high_yield": True}
 
 def _unit(text, idx=0, density=3):
     return Unit(idx=idx, title=f"Unit {idx}", text=text, char_start=0, char_end=len(text), density=density)
+
+
+# ------------------------------------------------- the writer's brief and card types
+class TestCardTypes:
+    """Every tag reads as a question ("ask for the fact"), so a deck that takes clozes is
+    also told which lines a cloze tests."""
+
+    def _brief(self, card_style, settings=HIGH_YIELD):
+        task = PlanTask(id=1, unit_idxs=[0], strategy="general", target_cards=0, notes="")
+        unit = _unit("### Gas laws\n- [recall] R is 8.314 J/(mol K).\n- [explain] Gases expand when heated because...")
+        return build_worker_messages(task, [unit], settings, card_style)[-1]["content"]
+
+    def test_a_cloze_deck_writes_its_short_answer_lines_as_clozes(self):
+        brief = self._brief("cloze")
+        assert HIGH_YIELD_BRIEF in brief
+        assert '"ask" is met by a cloze as much as by a question' in brief
+        assert "This deck prefers cloze, so write a line's card as a cloze wherever" in brief
+        assert "a [recall] or [define] line" in brief and "Keep a basic card for an [explain] line" in brief
+
+    def test_a_mixed_deck_is_told_which_lines_suit_which_type(self):
+        brief = self._brief("mixed")
+        assert "This deck mixes both types. A cloze is the better card where" in brief
+        assert "A basic card is the better one for an [explain] line" in brief
+        # A style the app does not know is treated as mixed, as it is in the system prompt.
+        assert self._brief(None) == brief
+
+    def test_a_cloze_never_turns_one_line_into_two_cards(self):
+        for style in ("cloze", "mixed"):
+            assert "one deletion number, {{c1::...}} only" in self._brief(style)
+
+    def test_a_basic_deck_gets_the_tags_and_nothing_about_types(self):
+        brief = self._brief("basic")
+        assert HIGH_YIELD_BRIEF in brief and "This deck" not in brief and "{{c1::" not in brief
+
+    def test_a_deck_without_a_high_yield_sheet_gets_none_of_it(self):
+        brief = self._brief("cloze", settings={})
+        assert "high-yield exam sheet" not in brief and "This deck prefers cloze" not in brief
 
 
 # ------------------------------------------------------------------ the sheet itself

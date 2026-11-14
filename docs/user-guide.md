@@ -8,7 +8,13 @@ called **Settings**. [Desktop app](desktop.md) lists the other differences.
 ## 1. Add your material
 
 Create an account or sign in, then choose **New deck**. Give it a title and select
-**Basic** (front/back), **Cloze** (fill in the blank), or **Mixed** cards.
+**Basic** (front/back), **Cloze** (fill in the blank), or **Mixed** cards. Basic and
+Cloze are preferences: the writer still uses the other type where it is clearly the
+better test. Mixed gives each fact the type that tests it better: a cloze for a short
+answer recalled inside its sentence (a term, a value, a step in a process), a basic card
+for a reason or a comparison. Where either would do, plain prose, formulas and processes
+get a cloze and the other strategies a basic card. The finished run and the editor show
+how many cards of each type the deck holds.
 Paste text or upload PDFs. To build one deck from several PDFs, such as a run of
 lectures, add them all (pick or drop a few at a time) and put them in order by
 dragging them or with the arrow buttons. They are combined into one document in that
@@ -73,7 +79,10 @@ point repeated across slides keeps only its clearest statement. A section left w
 nothing to card comes off entirely.
 
 Each core line gets one card, shaped by its tag, so a calculation line gets a card that
-has you set up or work the calculation rather than name the formula. Supporting lines get
+has you set up or work the calculation rather than name the formula. The tag decides what
+a card tests, not its type: in a Cloze or Mixed deck, recall and define lines, and other
+lines whose answer is a word or a value, are written as clozes with a single deletion,
+and explain lines stay basic. Supporting lines get
 no cards of their own, and there is no coverage back-fill: a high-yield deck is meant to
 leave things out. Your **Exam / context** brief steers the sorting: "calculation-heavy
 final, scenario questions" makes definitions and recall facts earn their place. Expect far
@@ -119,10 +128,24 @@ asks the model to tighten a card. Select cards for bulk tagging, deletion, resto
 coaching, or regeneration. **Regenerate unit** rewrites the source units behind the
 selection, so it can affect more than the selected cards.
 
+**Add card** puts a blank card at the end of the deck: cloze in a cloze deck, basic
+otherwise. **Make cloze** and **Make basic** switch a card's type and carry its wording
+over as a draft: the question followed by the answer as one deletion, or the blanked
+sentence as the question. A new or converted card is marked Needs review until you save
+it. A converted card is a new note to Anki; a copy you exported earlier stays in Anki
+until you delete it there.
+
+Under a cloze field, a preview lists the cards Anki will make, one per deletion number
+(`c1`, `c2`, ...), each with the other numbers' answers in view. Add a hint with
+`{{c1::answer::hint}}`: Anki shows `[hint]` in place of the blank. Anki ends a deletion
+at the first `}}`, so an answer that ends in a LaTeX brace, such as
+`{{c1::\frac{a}{b}}}`, would be cut short. AnkiGPT stores it as `{{c1::\frac{a}{b} }}`
+when a card is written or saved, and writes it that way on export.
+
 | Editor status | Exported? | What to do |
 |---|---|---|
 | Reviewed (`ok`) | Yes | Check accuracy and save edits before exporting. This label does not prove a person reviewed it. |
-| Needs review | No | Review and save the card; cloze cards need valid deletion syntax. |
+| Needs review | No | Review and save the card. A basic card needs both sides; a cloze card needs a deletion Anki can read, and the preview under the field says what is wrong. |
 | Deleted | No | Restore it explicitly if you want to keep it. Editing alone does not restore it. |
 
 **Export deck** downloads an `.apkg` containing all `ok` cards in the deck, regardless

@@ -89,7 +89,7 @@
     {% set origin = stats.by_origin or {} %}
     {% if origin %}
     {# Where the kept cards came from, next to the deck size the student asked for if they set one. #}
-    <p class="sub origin-line">{% if stats.budget %}Asked for {{ stats.budget }} · {% endif %}Kept {{ stats.cards_ok }}: {{ origin.text or 0 }} from the text{% if origin.figures %}, {{ origin.figures }} from figures{% endif %}{% if origin.backfill %}, {{ origin.backfill }} back-filled{% endif %}{% if stats.backfill_rejected %} ({{ stats.backfill_rejected }} back-fill card{{ '' if stats.backfill_rejected == 1 else 's' }} turned away){% endif %}</p>
+    <p class="sub origin-line">{% if stats.budget %}Asked for {{ stats.budget }} · {% endif %}Kept {{ stats.cards_ok }}: {{ origin.text or 0 }} from the text{% if origin.figures %}, {{ origin.figures }} from figures{% endif %}{% if origin.backfill %}, {{ origin.backfill }} back-filled{% endif %}{% if stats.backfill_rejected %} ({{ stats.backfill_rejected }} back-fill card{{ '' if stats.backfill_rejected == 1 else 's' }} turned away){% endif %}{% if stats.by_type %} · {{ stats.by_type.basic or 0 }} basic, {{ stats.by_type.cloze or 0 }} cloze{% endif %}</p>
     {% endif %}
 
     {% if payload.summary %}

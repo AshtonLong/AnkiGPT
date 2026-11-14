@@ -2,6 +2,7 @@ from app.services.validators import (
     is_in_scope,
     is_math_valid,
     is_valid_cloze,
+    normalize_cloze,
     normalize_math,
     normalize_text,
 )
@@ -20,9 +21,19 @@ class TestCloze:
     def test_empty(self):
         assert not is_valid_cloze("")
 
-    def test_latex_braces_do_not_break_validation(self):
-        # Literal LaTeX braces previously tripped the brace-count heuristic.
-        assert is_valid_cloze(r"Area is {{c1::\frac{a}{b}}} units")
+    def test_latex_braces_outside_a_deletion_are_fine(self):
+        assert is_valid_cloze(r"The ratio \frac{a}{b} is {{c1::constant}}")
+
+    def test_a_deletion_ending_in_a_latex_brace_is_cut_short_by_anki(self):
+        # Anki ends a deletion at the first "}}": here that is inside \frac{a}{b}, so the
+        # answer would lose its last brace. A model-written cloze is repaired with a space.
+        assert not is_valid_cloze(r"Area is {{c1::\frac{a}{b}}} units")
+        assert normalize_cloze(r"Area is  {{c1::\frac{a}{b}}} units") == r"Area is {{c1::\frac{a}{b} }} units"
+        assert is_valid_cloze(r"Area is {{c1::\frac{a}{b} }} units")
+
+    def test_a_model_written_cloze_is_cleaned_like_any_other_field(self):
+        assert normalize_cloze("  $E$ = {{c1::$mc^{2}$}}  ") == r"\(E\) = {{c1::\(mc^{2}\)}}"
+        assert normalize_cloze(None) == ""
 
 
 class TestMath:

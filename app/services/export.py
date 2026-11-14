@@ -8,6 +8,7 @@ import genanki
 
 from ..extensions import db
 from ..models import Card, Deck, Figure
+from .cloze import repair_cloze
 
 
 def sanitize_tag(tag):
@@ -208,7 +209,10 @@ def export_deck(deck_id):
         if card.type == "basic":
             note = genanki.Note(model=basic_model, fields=[img + sanitize(card.front), sanitize(card.back)], guid=guid)
         else:
-            note = genanki.Note(model=cloze_model, fields=[img + sanitize(card.cloze_text), sanitize(card.extra or "")], guid=guid)
+            # Cards saved before deletions were repaired on the way in may still hold a "}}"
+            # that Anki would take for the end of one, so the text is repaired on the way out too.
+            cloze_text = repair_cloze(card.cloze_text, renumber=False)
+            note = genanki.Note(model=cloze_model, fields=[img + sanitize(cloze_text), sanitize(card.extra or "")], guid=guid)
         if card.tags:
             safe_tags = [sanitize_tag(t) for t in card.tags]
             note.tags = [t for t in safe_tags if t]

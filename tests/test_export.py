@@ -92,3 +92,16 @@ def test_guids_derived_from_row_ids_by_older_exports_are_replaced(app, tmp_path)
 
         assert notes["What is supply?"] == old.guid != legacy
         assert notes["What is demand?"] == kept.guid == "a-guid-of-its-own"
+
+
+def test_a_cloze_saved_before_deletions_were_repaired_goes_out_safe_for_anki(app, tmp_path):
+    with app.app_context():
+        deck = _deck("Maths", [])
+        # Anki would end this deletion at the "}}" that closes \frac{a}{b}.
+        _db.session.add(Card(deck_id=deck.id, type="cloze", cloze_text=r"The slope is {{c2::\frac{a}{b}}}.", extra="",
+                             status="ok"))
+        _db.session.commit()
+
+        _, notes = _identity(export_deck(deck.id)[0].getvalue(), tmp_path)
+
+        assert list(notes) == [r"The slope is {{c2::\frac{a}{b} }}."]

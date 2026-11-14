@@ -32,6 +32,7 @@ from ..services.pipeline import progress_for
 from ..services.pipeline.catalog import active_model
 from ..services.pipeline.feedback import ImportError_, apply_review_stats, coach_cards, read_review_stats
 from ..services.chunking import hash_text
+from ..services.cloze import cloze_answers, cloze_blanked, cloze_problem, cloze_prompts, repair_cloze
 from ..services.pipeline.cheatsheet import (
     ASKS, EMPTY_REASON, INLINE_RE, LEFT_OFF, MATH_GROUPS, SUPPORTING, high_yield, retier, sheet_blocks, sheet_lines,
     yield_counts, yield_target,
@@ -554,10 +555,18 @@ def deck_editor(deck_id):
     strategies_used = [s for (s,) in db.session.query(Card.strategy).filter_by(deck_id=deck_id).distinct().all() if s]
     struggling = sum(1 for c in Card.query.filter_by(deck_id=deck_id).filter(Card.status != "deleted").all() if (c.review_stats_json or {}).get("struggling"))
     units = Source.query.filter_by(deck_id=deck_id).order_by(Source.idx).all()
+    # The deck as it stands, whatever the filters show: how a mixed deck actually splits.
+    type_counts = dict(
+        db.session.query(Card.type, func.count(Card.id))
+        .filter(Card.deck_id == deck_id, Card.status != "deleted")
+        .group_by(Card.type)
+        .all()
+    )
     return render_template(
         "deck_editor.html",
         deck=deck,
         cards=cards,
+        type_counts=type_counts,
         q=q,
         card_type=card_type,
         status=status_filter,
@@ -629,25 +638,104 @@ def figure_image(figure_id):
     return Response(fig.image, mimetype=fig.mime or "image/png")
 
 
-@bp.route("/cards/<int:card_id>", methods=["POST"])
-def update_card(card_id):
-    card = get_owned_card(card_id)
+def _read_card_form(card):
+    """Put the submitted fields on the card. A cloze is stored with a space inside any "}}"
+    that would make Anki end a deletion early, so what is saved is what Anki will read."""
     if card.type == "basic":
         card.front = request.form.get("front", "").strip()
         card.back = request.form.get("back", "").strip()
-        if card.status == "needs_review":
-            card.status = "ok"
     else:
-        card.cloze_text = request.form.get("cloze_text", "").strip()
+        card.cloze_text = repair_cloze(request.form.get("cloze_text", "").strip(), renumber=False)
         card.extra = request.form.get("extra", "").strip()
-        if card.status == "deleted":
-            pass  # Editing a deleted card must not implicitly restore it.
-        elif not is_valid_cloze(card.cloze_text):
-            card.status = "needs_review"
-        else:
-            card.status = "ok"
     tags_raw = request.form.get("tags", "")
     card.tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
+
+
+def _card_complete(card):
+    """Whether the card can be studied: both sides of a basic card, a sound deletion on a cloze."""
+    if card.type == "basic":
+        return bool(card.front and card.back)
+    return is_valid_cloze(card.cloze_text)
+
+
+@bp.app_template_global()
+def cloze_preview(text):
+    """What a cloze note becomes in Anki, for the editor: one card per deletion number, and
+    what is wrong with the text if anything is."""
+    text = (text or "").strip()
+    saved = repair_cloze(text, renumber=False)
+    return {
+        "cards": [c for c in cloze_prompts(saved) if c["number"] >= 1],
+        "problem": cloze_problem(saved),
+        "note": "Saving adds a space inside a }} so that Anki does not end the deletion early." if saved != text else "",
+    }
+
+
+@bp.route("/cloze/preview", methods=["POST"])
+def preview_cloze():
+    """The preview under a cloze field, redrawn as the student types."""
+    return render_template("partials/cloze_preview.html", preview=cloze_preview(request.form.get("cloze_text", "")))
+
+
+@bp.route("/decks/<int:deck_id>/cards", methods=["POST"])
+def add_card(deck_id):
+    """A blank card at the end of the deck for the student to write. It is not exported
+    until it has been filled in and saved."""
+    deck = get_owned_deck(deck_id)
+    if deck.status != "ready":
+        flash("Cards can be added once the deck has finished generating.", "info")
+        return redirect(url_for("main.deck_editor", deck_id=deck.id))
+    card_type = request.form.get("type")
+    if card_type not in ("basic", "cloze"):
+        card_type = "cloze" if deck.card_style == "cloze" else "basic"
+    last = db.session.query(func.max(Card.order_key)).filter(Card.deck_id == deck.id).scalar() or 0
+    card = Card(deck_id=deck.id, type=card_type, status="needs_review", tags=[], order_key=last + 1)
+    if card_type == "basic":
+        card.front, card.back = "", ""
+    else:
+        card.cloze_text, card.extra = "", ""
+    db.session.add(card)
+    db.session.commit()
+    return redirect(url_for("main.deck_editor", deck_id=deck.id, _anchor=f"card-{card.id}"))
+
+
+@bp.route("/cards/<int:card_id>", methods=["POST"])
+def update_card(card_id):
+    card = get_owned_card(card_id)
+    _read_card_form(card)
+    # Editing a deleted card must not implicitly restore it.
+    if card.status != "deleted":
+        card.status = "ok" if _card_complete(card) else "needs_review"
+    db.session.commit()
+    return render_template("partials/card_row.html", card=card)
+
+
+@bp.route("/cards/<int:card_id>/convert", methods=["POST"])
+def convert_card(card_id):
+    """Turn a basic card into a cloze note, or a cloze note into a basic card.
+
+    The wording is carried over mechanically as a draft: question then answer as one
+    deletion, or the blanked sentence as the question. The card waits as Needs review
+    until the student has reworded it and saved."""
+    card = get_owned_card(card_id)
+    if ("front" if card.type == "basic" else "cloze_text") in request.form:
+        _read_card_form(card)  # convert what is on screen, not the last save
+    if card.type == "basic":
+        front, back = card.front or "", card.back or ""
+        deletion = "{{c1::%s}}" % back if back else ""
+        card.cloze_text = repair_cloze(" ".join(filter(None, [front, deletion])), renumber=False)
+        card.extra = ""
+        card.type, card.front, card.back = "cloze", None, None
+    else:
+        text, extra = card.cloze_text or "", card.extra or ""
+        card.front = cloze_blanked(text)
+        card.back = "\n".join(filter(None, [" / ".join(cloze_answers(text)), extra]))
+        card.type, card.cloze_text, card.extra = "basic", None, None
+    # Anki will not change the note type of a note it already has, so the converted card
+    # goes out as a new note on the next export.
+    card.guid = None
+    if card.status != "deleted":
+        card.status = "needs_review"
     db.session.commit()
     return render_template("partials/card_row.html", card=card)
 

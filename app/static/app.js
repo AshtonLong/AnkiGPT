@@ -204,8 +204,12 @@
   }
 
   body.addEventListener('htmx:configRequest', function (e) { e.detail.headers['X-CSRFToken'] = csrf; });
+  // The cloze preview redraws while the card is being typed: it changes nothing on the
+  // server, so it neither waits for a save in flight nor holds one up.
+  function isPreview(elt) { return !!(elt && elt.hasAttribute && elt.hasAttribute('data-cloze-preview')); }
   body.addEventListener('htmx:beforeRequest', function (e) {
     var elt = e.detail.elt;
+    if (isPreview(elt)) return;
     var row = elt && elt.closest('.card-row');
     // One mutation per card; editing can continue while a save is in flight.
     if (row && requestMemo[row.id]) { e.preventDefault(); return; }
@@ -215,19 +219,20 @@
       var values = {};
       cardFields(row).forEach(function (field) { values[field.name] = field.value; });
       requestMemo[row.id] = { values: values };
-      row.classList.add(elt.matches('.card-form') ? 'is-saving' : 'is-improving');
+      row.classList.add(elt.matches('.card-form') ? 'is-saving' : elt.hasAttribute('data-convert') ? 'is-converting' : 'is-improving');
       row.setAttribute('aria-busy', 'true');
       var label = $('[data-save-label]', row);
       if (label && elt.matches('.card-form')) label.textContent = 'Saving…';
     }
   });
   body.addEventListener('htmx:afterRequest', function (e) {
-    pDone();
     var elt = e.detail.elt;
+    if (isPreview(elt)) return;
+    pDone();
     if (elt && elt.classList) elt.classList.remove('is-busy');
     var row = elt && elt.closest('.card-row');
     if (row) {
-      row.classList.remove('is-saving', 'is-improving');
+      row.classList.remove('is-saving', 'is-improving', 'is-converting');
       row.removeAttribute('aria-busy');
       var label = $('[data-save-label]', row);
       if (label) label.textContent = 'Save';
@@ -346,6 +351,12 @@
         if (!tagIn.value.trim()) { e.preventDefault(); tagIn.focus(); tagIn.style.borderColor = 'var(--rose)'; setTimeout(function () { tagIn.style.borderColor = ''; }, 900); }
       });
     }
+  }
+  // "Add card" lands on the new card's anchor: put the cursor in its first field.
+  if (/^#card-\d+$/.test(location.hash)) {
+    var added = doc.getElementById(location.hash.slice(1));
+    var firstField = added && $('.card-fields textarea, .card-fields input', added);
+    if (firstField) firstField.focus();
   }
 
   /* --------------------------------------------------- status page: trace */
