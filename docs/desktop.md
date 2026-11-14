@@ -190,13 +190,15 @@ The version lives in `desktop-app/package.json`. To release it:
 
 1. Set the version, commit, and push a tag `v<version>`.
 2. The **Desktop release** workflow runs the tests, builds the backend and the
-   installer, and uploads `AnkiGPT-Setup-<version>.exe`, `latest.yml` and the blockmap
-   to a **draft** GitHub Release.
-3. Run the checklist below against the draft's installer.
-4. Publish the release. Publishing is what makes installed copies update.
+   installer, and publishes `AnkiGPT-Setup-<version>.exe`, `latest.yml` and the blockmap
+   as the latest GitHub Release. Installed copies update from it straight away.
+
+Pushing the tag is the release decision, so when a change needs the checklist below, run
+it against a local build before tagging.
 
 Without CI, `npm run build:backend` then `npm run dist` builds the same three files in
-`desktop-app\out` on a Windows machine. Upload all three to one draft release for the tag.
+`desktop-app\out` on a Windows machine. Upload all three to one release for the tag and
+mark it latest.
 
 Builds are not code-signed. That works, updates included, but Windows SmartScreen warns
 on first install and antivirus tools are more likely to flag the frozen backend. Whether
