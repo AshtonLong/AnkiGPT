@@ -200,6 +200,7 @@ by the company that makes them:
 |---|---|---|
 | DeepSeek | DeepSeek V4.1 Flash (`deepseek/deepseek-v4.1-flash-1017`), the default | Off, Low, High, Max |
 | OpenAI | GPT-6 Luna (`openai/gpt-6-luna`) | Off, Low, Medium, High, Extra high, Max |
+| OpenAI | GPT-6.1 Sol (`openai/gpt-6.1-sol`) | Low, Medium, High (capped at High) |
 | Anthropic | Claude Haiku 5.5 (`anthropic/claude-haiku-5.5`) | Low, Medium, High, Extra high, Max |
 
 Pick one and choose **Save model**. From your next run it does everything: generating a
@@ -238,7 +239,8 @@ your account only. An effort you set under one model is kept when you switch. If
 model has no such level, the agent uses the next level up that it has (its highest, if
 there is none above), and the slider shows that level. So **Off** under GPT-6 Luna
 becomes **Low** under Claude Haiku 5.5, which cannot have reasoning turned off, and
-**Medium** becomes **High** under DeepSeek V4.1 Flash, which has no Medium.
+**Medium** becomes **High** under DeepSeek V4.1 Flash, which has no Medium. GPT-6.1 Sol
+is capped at **High**: **Extra high** and **Max** run at **High** under it.
 
 ## Troubleshooting
 
