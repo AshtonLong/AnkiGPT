@@ -20,7 +20,7 @@ from ...extensions import db
 from ...models import Card, Deck, LLMRun, PipelineTask, Source, utcnow
 from ..credentials import openrouter_key_for
 from ..llm import extract_json, is_terminal_error
-from ..validators import is_valid_cloze, normalize_math, normalize_text
+from ..validators import is_valid_cloze, normalize_cloze, normalize_math, normalize_text
 from . import critic as critic_mod
 from .catalog import user_model
 from .efforts import user_efforts
@@ -260,7 +260,7 @@ def _valid_replacement(r):
     if r.get("type") == "basic":
         return bool(r.get("front") and r.get("back"))
     if r.get("type") == "cloze":
-        return bool(r.get("cloze_text")) and is_valid_cloze(r["cloze_text"])
+        return bool(r.get("cloze_text")) and is_valid_cloze(normalize_cloze(r["cloze_text"]))
     return False
 
 
@@ -272,7 +272,7 @@ def _apply_replacement(card, r):
         card.cloze_text = None
         card.extra = None
     else:
-        card.cloze_text = normalize_math(normalize_text(r["cloze_text"]))
+        card.cloze_text = normalize_cloze(r["cloze_text"])
         card.extra = normalize_math(normalize_text(r.get("extra") or ""))
         card.front = None
         card.back = None

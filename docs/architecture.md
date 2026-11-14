@@ -43,7 +43,9 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
      the document 1-5 against the others: 4-5 stay core, 3 becomes supporting, 1-2 are
      left off, and a repeat keeps only its clearest statement. A unit left with no core
      line comes off whole. The planner is told to plan one task per unit; workers get a
-     brief that has them write one card per core line, shaped by its tag. The coverage
+     brief that has them write one card per core line, shaped by its tag; in a cloze or
+     mixed deck the brief also says which lines a cloze tests (`workers.high_yield_brief`),
+     since every tag reads as a question. The coverage
      phase is skipped. On the plan review, `cheatsheet.retier` applies the student's
      re-sorting to the unit text.
 
@@ -97,11 +99,15 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
    unit already has, so it writes what the figure adds instead of repeating them. Images
    ship inside the `.apkg`. Truncated outputs are retried with a smaller ask. Workers are
    prompted to attach a verbatim `source_quote`; a card of a task that read several units
-   is filed under the unit its quote comes from.
+   is filed under the unit its quote comes from. Cloze text is read the way Anki reads it
+   (`services/cloze.py`): a deletion ends at the first `}}`, so one whose answer ends in
+   a LaTeX brace is stored with a space before its close, and a cloze that still has no
+   sound deletion waits as `needs_review` instead of being dropped.
 5. **Critique** — two cheap calls per batch of 20 cards. A *cold pass* answers each card
    front with no source (exposes prompts that leak their answer, gives a difficulty
-   signal); a *judge pass* rules keep / rewrite / drop on support, atomicity, ambiguity,
-   leakage, and whether the card is worth learning at all (a detail of one worked
+   signal); a cloze note is answered once per deletion number with the other numbers'
+   answers in view, which is how Anki shows it. A *judge pass* rules keep / rewrite /
+   drop on support, atomicity, ambiguity, leakage, and whether the card is worth learning at all (a detail of one worked
    example is not). Figure cards are judged against the unit text *plus* what the vision
    pass read off the figure; the text alone rarely states what a diagram shows. Dropped
    cards are kept as `deleted` with `critic:*` tags so you can restore them.
@@ -135,7 +141,11 @@ source ──▶ MAP ──▶ FIGURES ──▶ PLAN ──▶ WRITE ──▶ 
 | `figure_recall` | Diagrams and charts, with the image on the card |
 
 All strategies share one base rule set (grounding, minimum-information, cloze hygiene,
-math format) placed first in the prompt so provider prompt caches hit across tasks.
+which facts suit which card type, math format) placed first in the prompt so provider
+prompt caches hit across tasks. The deck's card style comes last: a preference for basic
+or cloze, or, in a mixed deck, the instruction to choose per fact with the strategy's
+`default_type` as the tie-break (cloze for `general`, `formula_derivation` and
+`mechanism_chain`, basic for the rest).
 
 ### Everything is traced
 
@@ -204,6 +214,7 @@ app/
     llm.py              OpenRouter HTTP: chat, tools loop, embeddings, JSON repair
     credentials.py      each user's OpenRouter API key, encrypted at rest
     deckgen.py          regenerate a unit, improve a card
+    cloze.py            cloze deletions as Anki reads them: parse, repair, per-card prompts
     pdf.py, export.py, validators.py, chunking.py, schemas.py
   routes/, templates/, static/, models.py, config.py, tasks.py
   desktop.py            everything desktop mode adds (see docs/desktop.md)

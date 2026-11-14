@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from ..llm import CARD_RESPONSE_FORMAT, extract_json, finish_reason
 from ..schemas import ChunkSchema
-from ..validators import normalize_math, normalize_text
+from ..validators import normalize_cloze, normalize_math, normalize_text
 from .cheatsheet import high_yield, yield_target
 from .figures import describe_figure
 from .strategies import PROMPT_VERSION, system_prompt
@@ -44,6 +44,38 @@ HIGH_YIELD_BRIEF ="""The source is a high-yield exam sheet: only what the exam a
 - [recall]: ask for the fact.
 - [supporting]: background a card's answer may use. Write no card for a supporting line unless a core line cannot be tested without it.
 Write at most one card per core line: no second card on the same line, no reverse card, and no card beyond the core lines, whatever the strategy's rules suggest. Never put a tag in a card or in its source_quote."""
+# Every tag above reads as a question, so on its own the brief turns a deck that takes
+# clozes into a basic one. A tag says what a card tests; these say which type tests it.
+_TAG_IS_NOT_TYPE = 'A tag says what the card tests, not its type: "ask" is met by a cloze as much as by a question.'
+_CLOZE_LINES = (
+    "the thing tested is a short answer that sits inside a sentence: a [recall] or [define] line (delete the fact, "
+    "the term, or the discriminating part of its meaning), a [calculate] line that tests a quantity, symbol or unit "
+    "inside its formula, a [distinguish] line whose difference is a word or a value, an [apply] line that tests the "
+    "next step or the form to produce"
+)
+_BASIC_LINES = "an [explain] line and any line whose answer is a reason or a sentence of its own"
+_ONE_NUMBER = (
+    "A cloze written for a line carries one deletion number, {{c1::...}} only: a second number would make a second "
+    "card from that line."
+)
+HIGH_YIELD_TYPES = {
+    "cloze": (
+        f"{_TAG_IS_NOT_TYPE} This deck prefers cloze, so write a line's card as a cloze wherever {_CLOZE_LINES}. "
+        f"Keep a basic card for {_BASIC_LINES}. {_ONE_NUMBER}"
+    ),
+    "mixed": (
+        f"{_TAG_IS_NOT_TYPE} This deck mixes both types. A cloze is the better card where {_CLOZE_LINES}. A basic "
+        f"card is the better one for {_BASIC_LINES}. {_ONE_NUMBER}"
+    ),
+}
+
+
+def high_yield_brief(card_style):
+    """The brief for a task over a tagged sheet, with the card types a deck that takes
+    clozes should give its lines. A basic deck needs nothing more than the tags."""
+    if card_style == "basic":
+        return HIGH_YIELD_BRIEF
+    return f"{HIGH_YIELD_BRIEF}\n{HIGH_YIELD_TYPES.get(card_style) or HIGH_YIELD_TYPES['mixed']}"
 
 
 def _unit_block(unit):
@@ -69,9 +101,10 @@ def build_worker_messages(task, units, settings, card_style, siblings=None, figu
     if target:
         # Only a deck size the student set gives a task a count.
         parts = [f"TASK: write about {target} cards using the {task.strategy} strategy.",
-                 HIGH_YIELD_BRIEF if tagged else COUNTED_BRIEF]
+                 high_yield_brief(card_style) if tagged else COUNTED_BRIEF]
     else:
-        parts = [f"TASK: write cards using the {task.strategy} strategy.", HIGH_YIELD_BRIEF if tagged else UNCOUNTED_BRIEF]
+        parts = [f"TASK: write cards using the {task.strategy} strategy.",
+                 high_yield_brief(card_style) if tagged else UNCOUNTED_BRIEF]
     parts.append(f"Planner notes: {task.notes or '(none)'}")
     context = settings.get("exam_context") or ""
     if context:
@@ -140,7 +173,7 @@ def normalize_card(card, strategy=None):
             "type": "cloze",
             "front": None,
             "back": None,
-            "cloze_text": normalize_math(normalize_text(card.cloze_text)),
+            "cloze_text": normalize_cloze(card.cloze_text),
             "extra": normalize_math(normalize_text(card.extra or "")),
         }
     out["tags"] = [t.strip().lower() for t in (card.tags or []) if t and t.strip()][:5]

@@ -1,0 +1,16 @@
+{# What a cloze note becomes in Anki: one card per deletion number, the other numbers'
+   answers in view. `preview` comes from cloze_preview() in routes/main.py. #}
+{% from "partials/ui.html" import icon %}
+{% if preview.problem %}<p class="cp-note warn">{{ icon('alert', 12) }} {{ preview.problem }}</p>{% endif %}
+{% if preview.note %}<p class="cp-note">{{ icon('info', 12) }} {{ preview.note }}</p>{% endif %}
+{% if preview.cards %}
+<ol class="cp-cards" aria-label="Cards Anki makes from this note">
+  {% for c in preview.cards %}
+  <li>
+    <span class="cp-n" title="The card Anki makes for deletion c{{ c.number }}">c{{ c.number }}</span>
+    <span class="cp-q">{% for kind, text in c.segments %}{% if kind == 'blank' %}<mark>{{ text }}</mark>{% else %}{{ text }}{% endif %}{% endfor %}</span>
+    <span class="cp-a">{{ c.answer }}</span>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}

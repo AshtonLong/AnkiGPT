@@ -22,6 +22,7 @@
       {% elif deck.status == 'failed' %}<span class="pill danger"><span class="dot"></span> Failed</span>
       {% else %}<span class="pill">{{ deck.status }}</span>{% endif %}
       <span class="pill">{{ cards|length }} shown · {{ total }} total</span>
+      <span class="pill" title="The deck's cards by type, deleted ones left out">{{ type_counts.get('basic', 0) }} basic · {{ type_counts.get('cloze', 0) }} cloze</span>
       {% if struggling %}<a class="pill danger" href="{{ url_for('main.deck_editor', deck_id=deck.id, strategy='struggling') }}">{{ icon('flag', 12) }} {{ struggling }} struggling</a>{% endif %}
       {% if filtered %}<span class="pill warn">Filtered</span>{% endif %}
     </div>
@@ -35,6 +36,12 @@
     <a class="btn" href="{{ url_for('main.cheat_sheet', deck_id=deck.id) }}">{{ icon('sheet', 15) }} Cheat sheet</a>
     {% endif %}
     <a class="btn" href="{{ url_for('main.status', deck_id=deck.id) }}">{{ icon('git', 15) }} Run trace</a>
+    {% if deck.status == 'ready' %}
+    <form action="{{ url_for('main.add_card', deck_id=deck.id) }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit" title="Add a blank {{ 'cloze' if deck.card_style == 'cloze' else 'basic' }} card at the end of the deck. Its type can be switched on the card.">{{ icon('edit', 15) }} Add card</button>
+    </form>
+    {% endif %}
     <button class="btn primary" type="button" data-open-dialog="export-dialog">{{ icon('download') }} Export deck</button>
   </div>
 </div>

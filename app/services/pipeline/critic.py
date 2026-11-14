@@ -5,6 +5,8 @@ Two cheap calls per batch of cards:
 1. Cold pass: the model answers every card front *without* the source. This exposes
    cards whose front leaks the answer (the classic cloze failure) and gives a difficulty
    signal: a well-formed card a strong model still can't answer cold is discriminating.
+   A cloze note is answered as Anki shows it: once per deletion number, with the other
+   numbers' answers in view, since that visible text is where a second deletion leaks.
 2. Judge pass: with the source, the cards, and the cold answers in view, the model rules
    on each card — supported by the source, atomic, unambiguous, not leaking, and worth
    a student's review time — and returns keep / rewrite / drop with a reason and, for
@@ -15,14 +17,14 @@ used the right vocabulary from a right one.
 """
 
 import logging
-import re
 
+from ..cloze import cloze_answers, cloze_blanked, cloze_prompts
 from ..llm import extract_json, json_schema_format
-from ..validators import is_valid_cloze, normalize_math, normalize_text
+from ..validators import is_valid_cloze, normalize_cloze, normalize_math, normalize_text
 
 logger = logging.getLogger(__name__)
 
-CRITIC_PROMPT_VERSION = "critic-v2"
+CRITIC_PROMPT_VERSION = "critic-v3"
 BATCH_SIZE = 20
 SOURCE_CAP = 24000
 
@@ -94,7 +96,7 @@ JUDGE_SCHEMA = json_schema_format(
     },
 )
 
-COLD_SYSTEM = """You are a strong student sitting a quiz with no notes. For each flashcard prompt, give your best short answer from memory. For cloze prompts, the blank is shown as [...]; answer with what fills the blank. If you genuinely do not know, answer "unknown". Return only JSON."""
+COLD_SYSTEM = """You are a strong student sitting a quiz with no notes. For each flashcard prompt, give your best short answer from memory. For cloze prompts, the blank is shown as [...], or as [hint: ...] when the card hints at the kind of answer wanted; answer with what fills the blank. If you genuinely do not know, answer "unknown". Return only JSON."""
 
 JUDGE_SYSTEM = """You are the quality critic for machine-written Anki cards. You receive the SOURCE the cards were written from, the cards, and a "cold answer" produced by a student model that had no access to the source.
 
@@ -107,29 +109,41 @@ Judge every card on:
 - worthwhile: a student preparing for an exam on this material would lose something by not knowing the answer. Not worthwhile: a detail that is only true of one worked example or one sample picture (the particular numbers in an exercise, which state an arrow of an example diagram leads to), the specifics of a practice question, a heading or caption turned into a question, an answer that only restates its question. Judge the fact, not its difficulty: an easy definition is worthwhile. When unsure, it is worthwhile.
 - difficulty 1-3: 1 = basic recall most students know, 2 = requires studying this material, 3 = a fine distinction most students get wrong.
 
+A cloze card whose deletions carry different numbers ({{c1::...}}, {{c2::...}}) is studied as one prompt per number, with the other numbers' answers visible. Each of those prompts is listed under the card as "studied as", with its own cold answer. Judge leaks_answer and ambiguous on every prompt as studied, counting the visible answers of the other deletions as surrounding words, and set cold_answer_correct only if every cold answer is right. In {{c1::answer::hint}} the hint is shown in place of the blank: it leaks if it gives away any part of the answer.
+
 Verdicts:
 - keep: supported, atomic, not ambiguous, not leaking. Minor stylistic issues are still keep.
-- rewrite: the fact is valuable and supported but the wording is ambiguous, leaks, is not atomic (rewrite as the single most important fact), or has a cloze/format problem. Provide the fixed card in `rewrite` using the same JSON shape (basic: front+back; cloze: cloze_text+extra with {{c1::...}}). Keep math as \\( ... \\).
+- rewrite: the fact is valuable and supported but the wording is ambiguous, leaks, is not atomic (rewrite as the single most important fact), or has a cloze/format problem. Provide the fixed card in `rewrite` using the same JSON shape (basic: front+back; cloze: cloze_text+extra with {{c1::...}}, or {{c1::answer::hint}} where the blank needs a hint). Keep math as \\( ... \\).
 - drop: unsupported by the source, not worthwhile, trivially guessable, meta/filler, or a duplicate of another card in this batch (drop the later one). Give a specific reason.
 
 Set `rewrite` to null unless verdict is rewrite. Return only JSON."""
 
 
 def cloze_prompt_text(cloze_text):
-    return re.sub(r"\{\{c\d+::(.+?)(::[^}]*)?\}\}", "[...]", cloze_text or "")
+    return cloze_blanked(cloze_text)
 
 
 def card_prompt(card):
+    """The card as one prompt. For a cloze note, every deletion blanked at once: a summary
+    of what it asks, not a card the student sees (`card_prompts` gives those)."""
     if card["type"] == "basic":
         return card.get("front") or ""
     return cloze_prompt_text(card.get("cloze_text"))
 
 
+def card_prompts(card):
+    """The prompts the student is shown: one for a basic card, and for a cloze note one per
+    deletion number, with the other numbers' answers in view."""
+    if card["type"] == "basic":
+        return [card.get("front") or ""]
+    studied = [" ".join(p["prompt"].split()) for p in cloze_prompts(card.get("cloze_text"), hint_label="[hint: {}]")]
+    return studied or [card_prompt(card)]
+
+
 def card_answer(card):
     if card["type"] == "basic":
         return card.get("back") or ""
-    answers = re.findall(r"\{\{c\d+::(.+?)(?:::[^}]*)?\}\}", card.get("cloze_text") or "")
-    return " / ".join(answers)
+    return " / ".join(cloze_answers(card.get("cloze_text")))
 
 
 def card_line(card):
@@ -138,6 +152,7 @@ def card_line(card):
 
 
 def _card_block(i, card, cold=None):
+    """`cold` is the card's (prompt as studied, cold answer) pairs, where a cold pass ran."""
     lines = [f"[{i}] type={card['type']}"]
     if card["type"] == "basic":
         lines.append(f"front: {card.get('front')}")
@@ -148,13 +163,22 @@ def _card_block(i, card, cold=None):
             lines.append(f"extra: {card.get('extra')}")
     if card.get("source_quote"):
         lines.append(f"source_quote: {card['source_quote']}")
-    if cold is not None:
-        lines.append(f"cold answer: {cold}")
+    if cold is not None and len(cold) > 1:
+        for prompt, answer in cold:
+            lines.append(f"studied as: {prompt}")
+            lines.append(f"  cold answer: {answer}")
+    elif cold is not None:
+        lines.append(f"cold answer: {cold[0][1] if cold else 'unknown'}")
     return "\n".join(lines)
 
 
+def cold_slots(cards):
+    """(card index, prompt) for every prompt the cold reader answers, in order."""
+    return [(i, prompt) for i, card in enumerate(cards) for prompt in card_prompts(card)]
+
+
 def cold_messages(cards):
-    prompts = "\n".join(f"[{i}] {card_prompt(c)}" for i, c in enumerate(cards))
+    prompts = "\n".join(f"[{n}] {prompt}" for n, (_i, prompt) in enumerate(cold_slots(cards)))
     return [
         {"role": "system", "content": COLD_SYSTEM},
         {"role": "user", "content": f"Prompts:\n{prompts}"},
@@ -162,8 +186,9 @@ def cold_messages(cards):
 
 
 def judge_messages(cards, cold_answers, source_text):
+    """`cold_answers` maps a card's index to its (prompt, cold answer) pairs."""
     source = source_text if len(source_text) <= SOURCE_CAP else source_text[:SOURCE_CAP] + "\n...[source truncated]"
-    blocks = "\n\n".join(_card_block(i, c, cold_answers.get(i, "unknown")) for i, c in enumerate(cards))
+    blocks = "\n\n".join(_card_block(i, c, cold_answers.get(i, [])) for i, c in enumerate(cards))
     return [
         {"role": "system", "content": JUDGE_SYSTEM},
         {"role": "user", "content": f"SOURCE:\n{source}\n\nCARDS:\n{blocks}"},
@@ -210,11 +235,14 @@ def run_critic_batch(client, cards, source_text, cold_pass=True):
                                agent="cold_reader")
             usages.append(cold.usage)
             data = extract_json(cold.content)
+            given = {}
             for item in data.get("answers") or []:
                 try:
-                    cold_answers[int(item.get("index"))] = str(item.get("answer") or "")[:300]
+                    given[int(item.get("index"))] = str(item.get("answer") or "")[:300]
                 except (TypeError, ValueError):
                     continue
+            for n, (i, prompt) in enumerate(cold_slots(cards)):
+                cold_answers.setdefault(i, []).append((prompt, given.get(n, "unknown")))
         except Exception as exc:
             # The cold pass is a signal, not a gate; the judge still runs without it.
             logger.warning("Cold pass failed: %s", exc)
@@ -229,7 +257,7 @@ def run_critic_batch(client, cards, source_text, cold_pass=True):
         except (TypeError, ValueError):
             continue
         if 0 <= idx < len(cards):
-            item["cold_answer"] = cold_answers.get(idx)
+            item["cold_answer"] = " / ".join(a for _prompt, a in cold_answers[idx]) if idx in cold_answers else None
             verdicts[idx] = item
     return {"verdicts": verdicts, "usage": _merge_usage(*usages), "model": judge.model}
 
@@ -270,10 +298,11 @@ def apply_verdict(card, verdict):
             )
             tags.append("critic:rewritten")
             return card, "ok", tags
-        if new_type == "cloze" and rewrite.get("cloze_text") and is_valid_cloze(rewrite["cloze_text"]):
+        cloze_text = normalize_cloze(rewrite.get("cloze_text")) if new_type == "cloze" else ""
+        if cloze_text and is_valid_cloze(cloze_text):
             card.update(
                 type="cloze",
-                cloze_text=normalize_math(normalize_text(rewrite["cloze_text"])),
+                cloze_text=cloze_text,
                 extra=normalize_math(normalize_text(rewrite.get("extra") or "")),
                 front=None, back=None,
             )
@@ -332,7 +361,7 @@ Actions:
 - rewrite: one replacement card that fixes the problem.
 - split: two to four replacement cards, each atomic.
 - keep: the card is fine; the student just needs more repetitions (use sparingly).
-Replacements use the card JSON shape (basic: front+back; cloze: cloze_text+extra with {{c1::...}}). Ground everything in the source. Return only JSON."""
+Replacements use the card JSON shape (basic: front+back; cloze: cloze_text+extra with {{c1::...}}, or {{c1::answer::hint}} where the blank needs a hint). Ground everything in the source. Return only JSON."""
 
 
 def diagnose_messages(cards_with_stats, source_text):

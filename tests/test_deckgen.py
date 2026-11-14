@@ -470,3 +470,52 @@ def test_unit_kept_in_full_still_carries_its_diagram(app, monkeypatch):
         stats = _db.session.get(Deck, deck_id).run_json["cheat_sheet"]
         assert stats["kept_full"] == [0] and stats["figures"] == 1
         assert [c.status for c in _figure_cards(deck_id)] == ["ok"]
+
+
+# ----------------------------------------------------------------- cloze notes
+class ClozeLLM(FakeLLM):
+    """A worker that writes clozes the way models do: an answer ending in a LaTeX group,
+    two numbered deletions in one sentence, and one card with no deletion at all."""
+
+    def _anki_cards(self, messages):
+        if "Coverage gap-fill" in messages[-1]["content"]:
+            return super()._anki_cards(messages)
+        texts = [r"The quantum yield of oxygen is \( {{c1::\frac{1}{8}}} \).",
+                 "{{c1::Water}} is split, releasing {{c2::oxygen}}.",
+                 "Photosynthesis uses light."]
+        return fake_response(json.dumps({"cards": [
+            {"type": "cloze", "front": None, "back": None, "cloze_text": text, "extra": "", "tags": [], "source_quote": None}
+            for text in texts]}))
+
+
+def test_cloze_notes_reach_the_deck_as_anki_will_read_them(app, monkeypatch):
+    fake = ClozeLLM()
+    monkeypatch.setattr(llm_module, "openrouter_chat", fake)
+    monkeypatch.setattr(llm_module, "openrouter_embeddings",
+                        lambda texts, *a, **k: [[float(i == j) for j in range(len(texts))] for i in range(len(texts))])
+    # One section, so one unit and one worker: nothing for the duplicate pass to remove.
+    deck_id = _make_deck(app, source_text=SOURCE.split("\n\n# Respiration")[0], card_style="cloze")
+    with app.app_context():
+        app.config["OPENROUTER_API_KEY"] = "test-key"
+        assert deckgen.generate_deck(deck_id) == deck_id
+        cards = {c.cloze_text: c for c in Card.query.filter_by(deck_id=deck_id, type="cloze").all()}
+
+        # A space keeps Anki from ending the deletion inside \frac{1}{8}.
+        repaired = cards[r"The quantum yield of oxygen is \( {{c1::\frac{1}{8} }} \)."]
+        assert repaired.status == "ok"
+
+        # No deletion to repair: the card waits for the student instead of being thrown away.
+        broken = cards["Photosynthesis uses light."]
+        assert broken.status == "needs_review"
+        assert "validation:invalid_cloze" in broken.tags and "auto_deleted" not in broken.tags
+        stats = _db.session.get(Deck, deck_id).run_json["stats"]
+        assert stats["cards_needs_review"] == 1
+        # The run records how the kept cards split: two clozes and the back-fill's basic card.
+        assert stats["by_type"] == {"basic": 1, "cloze": 2}
+
+        # The critic meets the two-deletion note as its two cards, each with the other answer in view.
+        cold = next(c for c in fake.calls if c["name"] == "cold_answers")["messages"][-1]["content"]
+        assert "] [...] is split, releasing oxygen." in cold and "] Water is split, releasing [...]." in cold
+        assert "Photosynthesis uses light." not in cold
+        judged = next(c for c in fake.calls if c["name"] == "critic_verdicts")["messages"][-1]["content"]
+        assert "studied as: Water is split, releasing [...].\n  cold answer: unknown" in judged

@@ -1978,6 +1978,71 @@ input[type=file]::file-selector-button {
   font-size:12px
 }
 
+/* Under a cloze field: the cards Anki makes from it, one per deletion number. */
+.cloze-preview {
+  display:grid;
+  gap:6px;
+  margin-top:8px
+}
+
+.cp-note {
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  margin:0;
+  font-size:11px;
+  line-height:1.6;
+  color:var(--muted)
+}
+
+.cp-note svg {
+  flex:none;
+  margin-top:3px
+}
+
+.cp-note.warn {
+  color:var(--rose)
+}
+
+.cp-cards {
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:grid;
+  gap:4px
+}
+
+.cp-cards li {
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr);
+  column-gap:8px;
+  font-size:12px;
+  line-height:1.6;
+  color:var(--muted);
+  overflow-wrap:anywhere
+}
+
+.cp-n {
+  font:10px/1.9 var(--mono);
+  grid-row:span 2
+}
+
+.cp-q {
+  color:var(--ink)
+}
+
+.cp-q mark {
+  background:var(--accent-soft);
+  color:var(--accent);
+  border-radius:4px;
+  padding:0 4px;
+  font-weight:600
+}
+
+.cp-a:before {
+  content:"\2192\00a0"
+}
+
 .card-notes {
   display:grid;
   gap:8px;
@@ -4745,13 +4810,17 @@ dialog p {
 }
 .is-dirty .card-save { color: var(--accent); border-color: #E8B9AC; background: var(--accent-soft); }
 .card-row.is-saving .card-save .btn-spinner,
-.card-row.is-improving [data-improve] .btn-spinner { display: inline-block; }
+.card-row.is-improving [data-improve] .btn-spinner,
+.card-row.is-converting [data-convert] .btn-spinner { display: inline-block; }
 .card-row.is-saving .card-save .btn-icon,
-.card-row.is-improving [data-improve] .btn-icon { display: none; }
+.card-row.is-improving [data-improve] .btn-icon,
+.card-row.is-converting [data-convert] .btn-icon { display: none; }
 .card-row:not(.is-saving) .card-save .btn-spinner,
-.card-row:not(.is-improving) [data-improve] .btn-spinner { display: none; }
+.card-row:not(.is-improving) [data-improve] .btn-spinner,
+.card-row:not(.is-converting) [data-convert] .btn-spinner { display: none; }
 .card-row:not(.is-saving) .card-save .btn-icon,
-.card-row:not(.is-improving) [data-improve] .btn-icon { display: inline-flex; }
+.card-row:not(.is-improving) [data-improve] .btn-icon,
+.card-row:not(.is-converting) [data-convert] .btn-icon { display: inline-flex; }
 .card-save { min-width: 78px; }
 .card-row.is-saving .dirty { visibility: hidden; }
 .is-dirty .saved { display: none; }

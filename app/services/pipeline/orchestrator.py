@@ -791,11 +791,15 @@ def _persist_cards(ctx, node, task, raw_cards, origin_tag=None):
         if origin_tag:
             tags.append(origin_tag)
         status = "ok"
-        if issues:
+        if "invalid_math" in issues:
             status = "deleted"
             auto_deleted += 1
             tags.append("auto_deleted")
-            tags.extend(f"validation:{i}" for i in issues)
+        elif issues:
+            # A deletion the repair could not make sound has a fact worth keeping behind it:
+            # it waits for the student to fix the syntax, and is not exported until then.
+            status = "needs_review"
+        tags.extend(f"validation:{i}" for i in issues)
         rows.append(
             Card(
                 deck_id=ctx.deck.id, source_id=ctx.source_ids.get(unit_idx), task_id=node.id, figure_id=task.figure_id,
@@ -1318,13 +1322,16 @@ def _phase_finish(ctx):
     # Where the kept cards came from, next to the estimate the planner started from: the
     # estimate is not a cap, so the run says how far it went past it and why.
     by_origin = {"text": 0, "figures": 0, "backfill": 0}
+    # How the kept cards split between the two types: what a mixed deck actually mixed.
+    by_type = {"basic": 0, "cloze": 0}
     for c in cards:
         if c.status == "ok":
+            by_type[c.type] = by_type.get(c.type, 0) + 1
             by_strategy[c.strategy or "general"] += 1
             by_origin["backfill" if "origin:coverage" in (c.tags or []) else "figures" if c.figure_id else "text"] += 1
     stats = {
         "cards_ok": ok, "cards_needs_review": review, "cards_deleted": deleted, "by_strategy": dict(by_strategy),
-        "budget": ctx.plan.budget, "by_origin": by_origin,
+        "budget": ctx.plan.budget, "by_origin": by_origin, "by_type": by_type,
         "backfill_rejected": sum(1 for c in cards if "backfill:rejected" in (c.tags or [])),
         "units": len(ctx.units), "units_skipped": sum(1 for u in ctx.units if u.skipped),
         "cache_hits": ctx.cache.hits, "cache_misses": ctx.cache.misses,

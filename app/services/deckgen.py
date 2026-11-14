@@ -21,7 +21,7 @@ from .pipeline.orchestrator import format_generation_error, generate_deck  # noq
 from .pipeline.planner import PlanTask, counts_cards, heuristic_target
 from .pipeline.routing import LLMClient
 from .pipeline.strategies import DEFAULT_STRATEGY, FIGURE_STRATEGY
-from .validators import is_math_valid, is_valid_cloze, normalize_math, normalize_text
+from .validators import is_math_valid, is_valid_cloze, normalize_cloze, normalize_math, normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +105,17 @@ def regenerate_source(source_id, strategy=None):
         except Exception:
             continue
         content = " ".join(filter(None, [card.get("front"), card.get("back"), card.get("cloze_text"), card.get("extra")]))
-        bad = (card["type"] == "cloze" and not is_valid_cloze(card["cloze_text"])) or not is_math_valid(content)
         tags = list(card["tags"]) + [f"strategy:{chosen}", f"unit:{source.idx + 1}", "origin:regenerate"]
+        status = "ok"
+        if not is_math_valid(content):
+            status = "deleted"
+        elif card["type"] == "cloze" and not is_valid_cloze(card["cloze_text"]):
+            # As in a full run: broken deletion syntax waits for the student instead of being lost.
+            status = "needs_review"
+            tags.append("validation:invalid_cloze")
         rows.append(Card(deck_id=deck.id, source_id=source.id, task_id=node.id, type=card["type"], front=card.get("front"),
                          back=card.get("back"), cloze_text=card.get("cloze_text"), extra=card.get("extra"), tags=tags,
-                         status="deleted" if bad else "ok", strategy=chosen, source_quote=card.get("source_quote")))
+                         status=status, strategy=chosen, source_quote=card.get("source_quote")))
     if not rows:
         node.status = "failed"
         node.error = "The model returned no usable cards."
@@ -178,7 +184,9 @@ def improve_card(card_id):
     else:
         prompt = (
             "Improve this Anki cloze card for clarity and concision. Preserve valid {{c1::...}} cloze syntax, cloze "
-            "the discriminating detail (not the topic word), and keep it atomic. Return only JSON.\n\n"
+            "the discriminating detail (not the topic word), and keep it atomic. A deletion may carry a hint, "
+            "{{c1::answer::hint}}, which names the kind of answer wanted and never any part of it: keep a useful "
+            "one, and add one only where the blank alone is ambiguous. Return only JSON.\n\n"
             f"Cloze: {card.cloze_text}\nExtra: {card.extra or ''}{grounding}"
         )
         response_format = IMPROVE_CLOZE_FORMAT
@@ -192,11 +200,11 @@ def improve_card(card_id):
         card.front = normalize_math(normalize_text(data.get("front", card.front)))
         card.back = normalize_math(normalize_text(data.get("back", card.back)))
     else:
-        card.cloze_text = normalize_math(normalize_text(data.get("cloze_text", card.cloze_text)))
+        card.cloze_text = normalize_cloze(data.get("cloze_text", card.cloze_text))
         card.extra = normalize_math(normalize_text(data.get("extra", card.extra or "")))
         card.status = "ok" if is_valid_cloze(card.cloze_text) else "needs_review"
     db.session.add(LLMRun(deck_id=deck.id, source_id=card.source_id, role="critic", model=result.model,
-                          prompt_version="improve-v2", input_tokens=result.input_tokens, output_tokens=result.output_tokens,
+                          prompt_version="improve-v3", input_tokens=result.input_tokens, output_tokens=result.output_tokens,
                           cost_estimate=result.cost, response_text=result.content, parsed_json=data))
     db.session.commit()
     return card_id

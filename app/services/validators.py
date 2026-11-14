@@ -1,7 +1,7 @@
 import re
 
+from .cloze import is_valid_cloze, repair_cloze  # noqa: F401  (is_valid_cloze is imported from here)
 
-CLOZE_PATTERN = re.compile(r"\{\{c\d+::.+?\}\}")
 BLOCK_MATH_PATTERN = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
 INLINE_MATH_PATTERN = re.compile(r"(?<!\\)\$(.+?)(?<!\\)\$")
 EQUATION_ENV_PATTERN = re.compile(r"\\begin\{(equation\*?|align\*?)\}(.+?)\\end\{\1\}", re.DOTALL)
@@ -64,18 +64,12 @@ def is_in_scope(card_text, chunk_text):
     return True
 
 
-def is_valid_cloze(text):
-    if not text:
-        return False
-    # Count opened clozes ("{{c1::") and require each to be well-formed. Counting the
-    # cloze markers directly avoids false negatives from literal LaTeX braces like \frac{a}{b}.
-    opens = len(re.findall(r"\{\{c\d+::", text))
-    if opens == 0:
-        return False
-    return opens == len(CLOZE_PATTERN.findall(text))
-
-
 def normalize_text(text):
     if not text:
         return ""
     return " ".join(text.strip().split())
+
+
+def normalize_cloze(text):
+    """A model-written cloze, cleaned up and with its deletions made safe for Anki."""
+    return repair_cloze(normalize_math(normalize_text(text)))
