@@ -38,6 +38,40 @@ interface with sample data, not results from a live AI run.*
 
 ![Plan review showing three editable tasks, strategy selectors, card budgets, worker notes, and the document map](docs/images/plan.png)
 
+## Recommended settings for students
+
+Start here and adjust once you have seen a deck or two.
+
+| Setting | Recommended | Why |
+|---|---|---|
+| **Card type** | **Mixed**, or **Cloze** if you prefer clozes | Mixed gives each fact the type that tests it better: a cloze for a term, value or step, a basic card for a reason or a comparison. Cloze is a preference, so explanations still get basic cards. |
+| **Deck size** | **Auto** | On Auto no card count reaches the AI, so it writes a card for each point that earns one and does not pad. A number you set is followed closely. |
+| **Exam / context** | **Always fill it in** | The planner, the cheat sheet and the high-yield ranking all use it. For example: *"2nd-year pharmacology final, mostly mechanism and drug-class MCQs, some 'explain why' short answers."* |
+| **Focus / Exclude** | Use them when you know the syllabus | Units you exclude are skipped and cost nothing. |
+| **Must-include terms** | The terms your lecturer stresses | Makes sure they get cards. |
+| **Review the plan before writing** | **On** for your first decks and for big sources | Drop units you will not be examined on and fix strategies before any cards are written. |
+| **Read figures with vision** | **On** for diagram-heavy subjects, **off** for text-only material | Anatomy, biology, engineering and circuits benefit most. |
+| **Model and effort** | The default model at **Default** effort | To get better cards, raise **Card writers** and the **Judge** first. Those two agents shape card quality the most. |
+
+Pick a mode for the material:
+
+| Situation | Make a cheat sheet first | High-yield only |
+|---|---|---|
+| Short, dense notes where you want everything (a glossary, a formula sheet) | Off | Off |
+| Long lecture slides with repetition and padding | **On** | Off |
+| Cramming, a huge course, or only what the exam will ask | **On** | **On** |
+
+High-yield gives far fewer cards. You can bring anything it left off back in at plan
+review, and it works best with **Exam / context** filled in.
+
+A good routine:
+
+1. Make one deck per exam or topic block, and use page ranges rather than a whole textbook.
+2. Skim the cards and their source quotes in the editor before exporting.
+3. After two or three weeks in Anki, use **Import reviews**, then let **Coach** rewrite
+   or split the cards you keep failing.
+4. Print the **Cheat sheet** page as a revision handout.
+
 ## What happens behind the scenes
 
 The pipeline maps the source into units, plans specialist tasks, and writes cards in
